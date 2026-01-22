@@ -1,3 +1,5 @@
+> [!CAUTION]
+> This is not YET fully working app. This is work in progress. Please report any issues in ISSUES tab.
 
 
 <h1 align="center">TIME - Tibia ImGui Map Editor</h1>
@@ -955,6 +957,7 @@ This project includes code and assets from various open-source projects, each wi
 
 > [!CAUTION]
 > Tibia is a registered trademark of CipSoft GmbH. This project is not affiliated with, endorsed by, or connected to CipSoft GmbH in any way. This is a community tool for Open Tibia servers.
+> THE SOFTWARE AND ANY RELATED DOCUMENTATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING, WITHOUT LIMITATION, THE IMPLIED WARRANTIES OR MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, OR NONINFRINGEMENT. THE ENTIRE RISK ARISING OUT OF USE OR PERFORMANCE OF THE SOFTWARE REMAINS WITH YOU
 
 ---
 
