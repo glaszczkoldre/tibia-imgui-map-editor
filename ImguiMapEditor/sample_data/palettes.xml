@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<palettes>
+
+    <!-- ============================================== -->
+    <!-- PALETTE: All Creatures                         -->
+    <!-- Loads every creature tileset from the folder   -->
+    <!-- ============================================== -->
+    <palette name="All Creatures">
+        <tileset>
+            <include folder="tilesets/creatures/" />
+        </tileset>
+    </palette>
+
+    <!-- ============================================== -->
+    <!-- PALETTE: Dungeon Builder                       -->
+    <!-- Hand-picked tilesets for dungeon creation      -->
+    <!-- ============================================== -->
+    <palette name="Dungeon Builder">
+        <tileset>
+            <!-- Cave environment -->
+            <include file="tilesets/collections/Cave Dungeon_Cave Dungeon_collections.xml" />
+
+            <!-- Undead creatures only (single tileset from file) -->
+            <include file="tilesets/creatures/Undead_Undead_creatures.xml" tileset="Undead" />
+
+            <!-- Bugs and spiders -->
+            <include file="tilesets/creatures/Bugs and Spiders_Bugs and Spiders_creatures.xml" />
+
+            <!-- Containers for loot -->
+            <include file="tilesets/items/Containers_Containers_items.xml" />
+        </tileset>
+    </palette>
+
+    <!-- ============================================== -->
+    <!-- PALETTE: Nature & Outdoors                     -->
+    <!-- Everything for outdoor/nature maps             -->
+    <!-- ============================================== -->
+    <palette name="Nature Pack">
+        <tileset>
+            <!-- All terrain types -->
+            <include folder="tilesets/terrain/" />
+
+            <!-- Animals only -->
+            <include file="tilesets/creatures/Animals_Animals_creatures.xml" tileset="Animals" />
+
+            <!-- Forest decorations -->
+            <include file="tilesets/collections/Forest_Forest_collections.xml" />
+
+            <!-- Jungle decorations -->
+            <include file="tilesets/collections/Jungle_Jungle_collections.xml" />
+
+            <!-- Tropical decorations -->
+            <include file="tilesets/collections/Tropical_Tropical_collections.xml" />
+        </tileset>
+    </palette>
+
+    <!-- ============================================== -->
+    <!-- PALETTE: Desert Theme                          -->
+    <!-- Desert-specific assets                         -->
+    <!-- ============================================== -->
+    <palette name="Desert Theme">
+        <tileset>
+            <include file="tilesets/collections/Desert_Desert_collections.xml" tileset="Desert" />
+        </tileset>
+    </palette>
+
+    <!-- ============================================== -->
+    <!-- PALETTE: Boss Encounters                       -->
+    <!-- Just the bosses for special encounters         -->
+    <!-- ============================================== -->
+    <palette name="Boss Encounters">
+        <tileset>
+            <include file="tilesets/creatures/Bosses_Bosses_creatures.xml" tileset="Bosses" />
+            <include file="tilesets/creatures/Magic_Magic_creatures.xml" tileset="Magic" />
+        </tileset>
+    </palette>
+
+    <!-- ============================================== -->
+    <!-- PALETTE: All Items                             -->
+    <!-- Every item tileset                             -->
+    <!-- ============================================== -->
+    <palette name="All Items">
+        <tileset>
+            <include folder="tilesets/items/" />
+        </tileset>
+    </palette>
+
+    <!-- ============================================== -->
+    <!-- PALETTE: Complete (Everything)                 -->
+    <!-- Loads absolutely everything recursively        -->
+    <!-- ============================================== -->
+    <palette name="Complete">
+        <tileset>
+            <include folder="tilesets/" subfolders="true" />
+        </tileset>
+    </palette>
+
+</palettes>

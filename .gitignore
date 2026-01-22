@@ -1,0 +1,27 @@
+/ImguiMapEditor/build
+/build
+/RME_Readonly/data/760
+/ImguiMapEditor/.qoder
+/ImguiMapEditor/build-release
+/ImguiMapEditor/vcpkg_installed
+/sec_files
+CMakeUserPresets.json
+/ImguiMapEditor/CMakeUserPresets.json
+
+# Build artifacts and analysis files
+*.log
+*_analysis.md
+*.ttf
+/ActionScript_ObjectBuilder_source
+
+# Build logs
+build_log.txt
+ImguiMapEditor/build_log.txt
+build*.txt
+/.agent
+.agent
+/ImguiMapEditor/ext/_imgui-docking
+/RME_Readonly
+/Map_Viewer_Readonly
+Map_Viewer_Readonly
+RME_Readonly

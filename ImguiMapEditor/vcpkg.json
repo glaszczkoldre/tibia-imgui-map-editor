@@ -1,0 +1,21 @@
+{
+  "name": "imgui-viewport-app",
+  "version-string": "1.0.0",
+  "builtin-baseline": "6bc1613f18f850c60d906575296f982c6dfcc9e0",
+  "dependencies": [
+    "glfw3",
+    "glad",
+    "glm",
+    "stb",
+    "nlohmann-json",
+    "spdlog",
+    "fmt",
+    "nativefiledialog-extended",
+    "zlib",
+    "pugixml",
+    "boost-iostreams",
+    "boost-filesystem",
+    "boost-circular-buffer",
+    "lz4"
+  ]
+}
