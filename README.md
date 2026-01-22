@@ -8,7 +8,8 @@
   <strong>A Modern, Community-Driven 2D Tile-Based Map Editor for Open Tibia.</strong>
 </p>
 
-<img width="1022" height="555" alt="obraz" src="https://github.com/user-attachments/assets/de6e927c-8ba6-47ef-b45b-8511ebac6ff4" />
+<img width="2554" height="1387" alt="obraz" src="https://github.com/user-attachments/assets/dac2c242-a2f3-4a9f-b2a3-23929fd90c3b" />
+
 
 
 <p align="center">
