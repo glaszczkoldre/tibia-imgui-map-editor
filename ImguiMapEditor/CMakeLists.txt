@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.25)
 
 project(TibiaMapEditor VERSION 1.0.0 LANGUAGES CXX)
 
@@ -378,6 +378,9 @@ add_executable(${PROJECT_NAME}
     ${IMGUI_SOURCES}
 )
 
+option(TME_UNITY_BUILD "Enable unity build for faster compilation." OFF)
+set_target_properties(${PROJECT_NAME} PROPERTIES UNITY_BUILD ${TME_UNITY_BUILD})
+
 # Include directories
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
@@ -430,7 +433,7 @@ if(MSVC)
 endif()
 
 # Copy data files
-add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+set(COPY_DATA_COMMANDS
     COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${PROJECT_NAME}>/data"
     COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${PROJECT_NAME}>/data/shaders"
     COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${PROJECT_NAME}>/data/fonts"
@@ -446,10 +449,20 @@ add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         "${CMAKE_CURRENT_SOURCE_DIR}/shaders"
         "$<TARGET_FILE_DIR:${PROJECT_NAME}>/data/shaders"
-    # Copy fonts
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${CMAKE_CURRENT_SOURCE_DIR}/ext/fontawesome6/fa-solid-900.ttf"
-        "$<TARGET_FILE_DIR:${PROJECT_NAME}>/data/fonts/fa-solid-900.ttf"
+)
+
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/ext/fontawesome6/fa-solid-900.ttf")
+    list(APPEND COPY_DATA_COMMANDS
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${CMAKE_CURRENT_SOURCE_DIR}/ext/fontawesome6/fa-solid-900.ttf"
+            "$<TARGET_FILE_DIR:${PROJECT_NAME}>/data/fonts/fa-solid-900.ttf"
+    )
+else()
+    message(WARNING "Missing fontawesome6 TTF: ext/fontawesome6/fa-solid-900.ttf (skipping copy).")
+endif()
+
+add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+    ${COPY_DATA_COMMANDS}
     COMMENT "Copying data files..."
 )
 

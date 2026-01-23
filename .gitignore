@@ -4,14 +4,15 @@
 /ImguiMapEditor/.qoder
 /ImguiMapEditor/build-release
 /ImguiMapEditor/vcpkg_installed
+/ImguiMapEditor/out
 /sec_files
 CMakeUserPresets.json
 /ImguiMapEditor/CMakeUserPresets.json
+/.vs
 
 # Build artifacts and analysis files
 *.log
 *_analysis.md
-*.ttf
 /ActionScript_ObjectBuilder_source
 
 # Build logs

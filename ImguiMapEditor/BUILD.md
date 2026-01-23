@@ -4,7 +4,7 @@ This project supports two package managers: **vcpkg** (default) and **Conan**.
 
 ## Prerequisites
 
-- CMake 3.20+
+- CMake 3.25+
 - C++20 compatible compiler (MSVC 2022, GCC 11+, Clang 14+)
 - Git
 
