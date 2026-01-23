@@ -473,7 +473,7 @@ Controllers (`Controllers/`) handle user input and coordinate UI with services:
 | Technology | Version | Purpose |
 |------------|---------|---------|
 | **C++** | C++20 | Core language |
-| **CMake** | 3.20+ | Build system |
+| **CMake** | 3.25+ | Build system |
 | **vcpkg / Conan** | Latest | Package management |
 
 ### Graphics Stack
@@ -584,7 +584,7 @@ cmake --build build --config Release
 | vcpkg not found | Set `VCPKG_ROOT` environment variable |
 | OpenGL headers missing | Ensure GPU drivers are installed |
 | Compiler too old | Upgrade to MSVC 2022, GCC 11+, or Clang 14+ |
-| CMake version | Upgrade to CMake 3.20+ |
+| CMake version | Upgrade to CMake 3.25+ |
 | Boost linking errors | Clean build directory and rebuild vcpkg |
 
 ### Client Data Setup
