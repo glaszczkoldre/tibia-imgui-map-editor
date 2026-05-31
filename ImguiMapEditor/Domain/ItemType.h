@@ -198,6 +198,21 @@ public:
   uint8_t ground_speed = 0;
   int8_t top_order = 0; // Render order for "always on top" items
 
+  // Animation data (from DAT)
+  bool animate_always = false;
+  uint8_t animation_mode = 0;
+  int32_t loop_count = 0;
+  uint8_t start_frame = 0;
+  std::vector<std::pair<uint32_t, uint32_t>> frame_durations;
+  uint32_t total_duration = 0;       // Pre-calculated sum of frame duration midpoints (ms)
+
+  // Frame groups (10.57+ creatures with idle/walking animations)
+  std::vector<uint32_t> idle_sprite_ids;
+  std::vector<uint32_t> walk_sprite_ids;
+  uint8_t idle_frames = 1;
+  uint8_t walk_frames = 1;
+  bool has_frame_groups = false;
+
   // Light properties
   uint8_t light_level = 0;
   uint8_t light_color = 0;

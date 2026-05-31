@@ -182,6 +182,10 @@ std::optional<SpriteProbeResult> probeSpriteStructure(const std::filesystem::pat
     }
   }
 
+  spdlog::info("SPR probe (extended={}): opaque={} alpha={} of {} sprites sampled",
+               extended, result.opaque_matches, result.alpha_matches,
+               offsets->size());
+
   return result;
 }
 
@@ -202,18 +206,22 @@ ClientAssetDetector::detect(const std::filesystem::path &client_path,
 
   if (!dat_exists && !spr_exists && !std::filesystem::exists(client_path)) {
     result.warnings.push_back("Client path does not exist: " + client_path.string());
-    return result;
+  spdlog::info("Asset detection: extended={} transparency={} frameDurations={} frameGroups={}",
+               result.extended.has_value() ? (*result.extended ? "true" : "false") : "undetected",
+               result.transparency.has_value() ? (*result.transparency ? "true" : "false") : "undetected",
+               result.frame_durations.has_value() ? (*result.frame_durations ? "true" : "false") : "undetected",
+               result.frame_groups.has_value() ? (*result.frame_groups ? "true" : "false") : "undetected");
+
+  return result;
   }
 
   if (std::filesystem::exists(dat_path)) {
     result.metadata_file_name = dat_path.string();
     result.dat_signature = readU32FromFile(dat_path, result.warnings);
 
-    // DAT probing: try parsing with known version readers
+    // DAT probing: try parsing with version readers (retry-toggling)
     if (versions && result.dat_signature) {
       for (const auto &[ver_num, cv] : *versions) {
-        if (cv.getDatSignature() != *result.dat_signature)
-          continue;
         try {
           auto reader = IO::DatReaderFactory::create(ver_num);
           auto dat_result = reader->read(dat_path, *result.dat_signature);
@@ -249,6 +257,7 @@ ClientAssetDetector::detect(const std::filesystem::path &client_path,
 
     if (candidates.empty()) {
       result.warnings.push_back("Could not derive SPR structure from binary.");
+      result.transparency = false;
     } else {
       auto best = std::max_element(
           candidates.begin(), candidates.end(),
@@ -258,7 +267,8 @@ ClientAssetDetector::detect(const std::filesystem::path &client_path,
           });
 
       if (best->opaque_matches > 0 || best->alpha_matches > 0) {
-        // Cross-validate with DAT result
+        spdlog::info("SPR probe (extended={}): opaque={} alpha={}",
+                     best->extended, best->opaque_matches, best->alpha_matches);
         if (result.extended && *result.extended != best->extended) {
           result.warnings.push_back("DAT and SPR disagree on extended flag. DAT takes precedence.");
         } else {
@@ -268,7 +278,7 @@ ClientAssetDetector::detect(const std::filesystem::path &client_path,
 
       if (best->alpha_matches > best->opaque_matches) {
         result.transparency = true;
-      } else if (best->opaque_matches > best->alpha_matches) {
+      } else {
         result.transparency = false;
       }
     }

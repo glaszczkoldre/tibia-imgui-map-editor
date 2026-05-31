@@ -32,12 +32,9 @@ CMakeUserPresets.json
 .opencode/**/tmp
 .opencode/**/cache
 .opencode/sessions
-<<<<<<< Updated upstream
 /vcproj/vcpkg_installed
 /vcproj/_deps
 /vcproj/CMakeFiles
-/vcproj
-=======
 
 # ============================================================
 # Read-only / External Source Trees
@@ -72,4 +69,4 @@ gha-creds-*.json
 # ============================================================
 # Unorganized (auto-appended)
 # ============================================================
->>>>>>> Stashed changes
+/OTCLIENT_Readonly

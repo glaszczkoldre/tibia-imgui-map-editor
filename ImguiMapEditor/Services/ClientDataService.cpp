@@ -12,12 +12,13 @@ namespace Services {
 ClientDataResult
 ClientDataService::load(const std::filesystem::path &client_path,
                         const std::filesystem::path &item_metadata_path,
-                        uint32_t client_version,
+                        const Domain::ClientVersion &client_version,
                         ::MapEditor::Domain::ItemDataSource data_source,
                         LoadProgressCallback progress) {
   ClientDataResult result;
-  // Clear any existing data first
   clear();
+
+  uint32_t version_num = client_version.getVersion();
 
   if (progress)
     progress(0, "Loading item database...");
@@ -72,11 +73,11 @@ ClientDataService::load(const std::filesystem::path &client_path,
 
   // 2. Load DAT (client item appearances)
   std::filesystem::path dat_path = client_path / "Tibia.dat";
-  auto dat_reader = IO::DatReaderFactory::create(client_version);
+  auto dat_reader = IO::DatReaderFactory::create(version_num);
 
   if (!dat_reader) {
     result.error =
-        "Unsupported client version: " + std::to_string(client_version);
+        "Unsupported client version: " + std::to_string(version_num);
     return result;
   }
 
@@ -146,7 +147,7 @@ ClientDataService::load(const std::filesystem::path &client_path,
   // Need to handle result object, no implicit bool conversion
   // spr_reader_ instance is preserved, only calling open() to reset internal
   // state and load new file
-  bool extended = client_version >= 960;
+  bool extended = client_version.isExtended();
   auto spr_result = spr_reader_->open(spr_path, 0, extended);
 
   if (spr_result.success) {
@@ -163,7 +164,7 @@ ClientDataService::load(const std::filesystem::path &client_path,
   result.success = true;
 
   loaded_ = true;
-  client_version_ = client_version;
+  client_version_ = version_num;
 
   if (progress)
     progress(100, "Done");
@@ -300,7 +301,7 @@ void ClientDataService::clear() {
 
 void ClientDataService::mergeOtbWithDat(
     const std::vector<Domain::ItemType> &otb_items,
-    const IO::DatResult &dat_result, uint32_t client_version) {
+    const IO::DatResult &dat_result, const Domain::ClientVersion &client_version) {
 
   // Build a map of client_id -> DAT item for quick lookup
   std::unordered_map<uint16_t, const IO::ClientItem *> dat_items;
@@ -345,13 +346,8 @@ void ClientDataService::mergeOtbWithDat(
         merged.light_color = static_cast<uint8_t>(dat->light_color);
       }
 
-      // Translucency - ONLY for client 10.00+
-      // Older clients ignore this flag for visibility calculations
-      if (client_version >= 1000) {
-        merged.is_translucent = dat->is_translucent;
-      } else {
-        merged.is_translucent = false;
-      }
+      // Translucency — DAT flag already false for pre-10.00 items
+      merged.is_translucent = dat->is_translucent;
 
       // Ground speed from DAT
       if (dat->is_ground && dat->ground_speed > 0) {
@@ -393,6 +389,24 @@ void ClientDataService::mergeOtbWithDat(
       // Fluid container flag from DAT (for proper subtype-based sprite
       // rendering)
       merged.is_fluid_container = dat->is_fluid_container;
+
+      // Animation data (from DAT)
+      merged.animate_always = dat->animate_always;
+      merged.animation_mode = dat->animation_mode;
+      merged.loop_count = dat->loop_count;
+      merged.start_frame = dat->start_frame;
+      merged.frame_durations = dat->frame_durations;
+      merged.total_duration = 0;
+      for (const auto &d : dat->frame_durations) {
+        merged.total_duration += (d.first + d.second) / 2;
+      }
+
+      // Frame groups (10.57+ creatures)
+      merged.idle_sprite_ids = dat->idle_sprite_ids;
+      merged.walk_sprite_ids = dat->walk_sprite_ids;
+      merged.idle_frames = dat->idle_frames;
+      merged.walk_frames = dat->walk_frames;
+      merged.has_frame_groups = dat->has_frame_groups;
     }
 
     // Store the item

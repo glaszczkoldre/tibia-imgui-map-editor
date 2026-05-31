@@ -36,6 +36,13 @@ struct ClientItem {
     
     // Sprite IDs
     std::vector<uint32_t> sprite_ids;
+
+    // Frame groups (10.57+ creatures with idle/walking animations)
+    std::vector<uint32_t> idle_sprite_ids;
+    std::vector<uint32_t> walk_sprite_ids;
+    uint8_t idle_frames = 1;
+    uint8_t walk_frames = 1;
+    bool has_frame_groups = false;
     
     // Properties from flags
     bool is_ground = false;
@@ -99,6 +106,7 @@ struct ClientItem {
     int32_t loop_count = 0;
     uint8_t start_frame = 0;
     std::vector<std::pair<uint32_t, uint32_t>> frame_durations;
+    uint32_t total_duration = 0;
     
     // Calculate total sprite count
     uint32_t getTotalSprites() const {

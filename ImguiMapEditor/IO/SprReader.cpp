@@ -8,34 +8,29 @@ namespace IO {
 
 bool SpriteData::decode(bool use_transparency) {
     // [UB FIX] Double-Checked Locking Pattern (Thread-Safe)
-    // First check with Acquire semantics to ensure we see writes to rgba_data
     if (is_decoded.load(std::memory_order_acquire)) {
         return true;
     }
 
     std::lock_guard<std::mutex> lock(mutex_);
     
-    // Second check under lock (Relaxed is fine as we hold the lock)
     if (is_decoded.load(std::memory_order_relaxed)) {
         return true;
     }
     
     if (is_empty || compressed_pixels.empty()) {
-        // Create transparent sprite
         rgba_data.resize(RGBA_SIZE, 0);
         is_decoded.store(true, std::memory_order_release);
         return true;
     }
     
-    // Initialize with transparent pixels
     rgba_data.resize(RGBA_SIZE, 0);
     
-    // RLE decode
+    const uint8_t color_bpp = use_transparency ? 4 : 3;
     size_t read_pos = 0;
     size_t pixel_index = 0;
     
     while (read_pos < compressed_pixels.size() && pixel_index < SPRITE_PIXELS) {
-        // Read transparent pixel count (little-endian 16-bit)
         if (read_pos + 2 > compressed_pixels.size()) break;
         
         uint16_t transparent_count = compressed_pixels[read_pos] | 
@@ -46,32 +41,30 @@ bool SpriteData::decode(bool use_transparency) {
         
         if (pixel_index >= SPRITE_PIXELS) break;
         
-        // Read colored pixel count
         if (read_pos + 2 > compressed_pixels.size()) break;
         
         uint16_t colored_count = compressed_pixels[read_pos] | 
                                  (compressed_pixels[read_pos + 1] << 8);
         read_pos += 2;
         
-        // Read colored pixels (RGB)
         for (uint16_t i = 0; i < colored_count && pixel_index < SPRITE_PIXELS; ++i) {
-            if (read_pos + 3 > compressed_pixels.size()) break;
+            if (read_pos + color_bpp > compressed_pixels.size()) break;
             
             uint8_t r = compressed_pixels[read_pos++];
             uint8_t g = compressed_pixels[read_pos++];
             uint8_t b = compressed_pixels[read_pos++];
+            uint8_t a = use_transparency ? compressed_pixels[read_pos++] : 255;
             
             size_t rgba_index = pixel_index * 4;
             rgba_data[rgba_index + 0] = r;
             rgba_data[rgba_index + 1] = g;
             rgba_data[rgba_index + 2] = b;
-            rgba_data[rgba_index + 3] = 255;  // Opaque
+            rgba_data[rgba_index + 3] = a;
             
             pixel_index++;
         }
     }
     
-    // Publish results with Release semantics so other threads see rgba_data writes
     is_decoded.store(true, std::memory_order_release);
     return true;
 }
