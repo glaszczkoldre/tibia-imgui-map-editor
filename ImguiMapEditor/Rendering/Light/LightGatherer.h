@@ -2,6 +2,7 @@
 
 #include <vector>
 #include <cstdint>
+#include <array>
 #include "Domain/ChunkedMap.h"
 #include "Domain/LightTypes.h"
 namespace MapEditor {
@@ -11,6 +12,21 @@ namespace Services {
 }
 
 namespace Rendering {
+
+/**
+ * Per-tile ground blocking data for a chunk.
+ * Records the highest floor (lowest Z) with solid ground above each tile.
+ * Lights from floors above blocking_floor are blocked.
+ */
+struct GroundBrightness {
+    // For each tile (32x32), the floor with solid ground that blocks lights from above.
+    // Value of -1 means no blocking (all lights pass through).
+    std::array<int16_t, 32 * 32> blocking_floor;
+    
+    GroundBrightness() {
+        blocking_floor.fill(-1);
+    }
+};
 
 /**
  * Collects light sources from visible tiles.
@@ -38,13 +54,7 @@ public:
     /**
      * Gather all light sources from multiple floors for a specific chunk.
      * Applies isometric offset to light positions based on floor difference.
-     * 
-     * @param map The map to gather lights from
-     * @param chunk_x Chunk X coordinate
-     * @param chunk_y Chunk Y coordinate
-     * @param client_data Client data service for item type lookup
-     * @param start_floor First floor to gather from (highest Z)
-     * @param end_floor Last floor to gather from (lowest Z)
+     * Also populates ground_brightness_ for light blocking.
      */
     void gatherForChunkMultiFloor(
         const MapEditor::Domain::ChunkedMap& map,
@@ -62,6 +72,12 @@ public:
      * Get number of light sources collected.
      */
     size_t getLightCount() const { return lights_.size(); }
+    
+    /**
+     * Get the ground blocking data for the target chunk.
+     * Only valid after gatherForChunkMultiFloor() has been called.
+     */
+    const GroundBrightness& getGroundBrightness() const { return ground_brightness_; }
 
 private:
     /**
@@ -71,9 +87,17 @@ private:
         const MapEditor::Domain::ChunkedMap& map,
         int32_t target_cx, int32_t target_cy,
         Services::ClientDataService* client_data,
-        int16_t floor, int32_t floor_offset);
+        int16_t floor, int32_t floor_offset,
+        bool is_target_chunk);
+
+    /**
+     * Add a light source with deduplication.
+     * If the last light has the same position, color, and floor, merge (keep higher intensity).
+     */
+    void addLight(int32_t x, int32_t y, uint8_t color, uint8_t intensity, int16_t floor);
 
     std::vector<MapEditor::Domain::LightSource> lights_;
+    GroundBrightness ground_brightness_;
 };
 
 } // namespace Rendering

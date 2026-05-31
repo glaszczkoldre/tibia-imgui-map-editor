@@ -134,10 +134,23 @@ void MainWindow::renderEditor(Domain::ChunkedMap *current_map,
           // Lighting controls toolbar (per-map)
           ImGui::Checkbox("Enable Lighting",
                           &view_settings_.map_lighting_enabled);
-          ImGui::SameLine();
-          ImGui::SetNextItemWidth(120);
-          ImGui::SliderInt("Ambient", &view_settings_.map_ambient_light, 0,
-                           255);
+          if (view_settings_.map_lighting_enabled) {
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(120);
+            int intensity = static_cast<int>(view_settings_.server_light_intensity);
+            if (ImGui::SliderInt("Intensity", &intensity, 0, 255)) {
+              view_settings_.server_light_intensity = static_cast<uint8_t>(intensity);
+            }
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(60);
+            int color = static_cast<int>(view_settings_.server_light_color);
+            if (ImGui::SliderInt("Color", &color, 0, 215)) {
+              view_settings_.server_light_color = static_cast<uint8_t>(color);
+            }
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(120);
+            ImGui::SliderInt("Min Ambient", &view_settings_.map_ambient_light, 0, 255);
+          }
           ImGui::Separator();
 
           // Render the map panel with explicit animation ticks

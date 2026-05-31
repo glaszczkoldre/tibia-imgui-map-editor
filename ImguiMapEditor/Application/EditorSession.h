@@ -118,7 +118,9 @@ public:
     int current_floor = 7;
     // Per-map lighting settings
     bool lighting_enabled = false;
-    int ambient_light = 128;
+    int ambient_light = 0;
+    uint8_t server_light_intensity = 200;
+    uint8_t server_light_color = 215;
     // Per-map window visibility
     bool show_ingame_box = false;
     bool show_minimap = false;

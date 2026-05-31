@@ -32,13 +32,15 @@ public:
      * @param start_floor First floor to gather lights from (highest Z)
      * @param end_floor Last floor to gather lights from (lowest Z)
      *                  When start_floor == end_floor, only that floor is used
+     * @param injected_lights Optional extra lights to add (e.g., player light in preview)
      */
     void render(const MapEditor::Domain::ChunkedMap& map,
                 int viewport_width, int viewport_height,
                 float camera_x, float camera_y, 
                 float zoom, int current_floor,
                 int start_floor, int end_floor,
-                const MapEditor::Domain::LightConfig& config);
+                const MapEditor::Domain::LightConfig& config,
+                const std::vector<MapEditor::Domain::LightSource>* injected_lights = nullptr);
 
     /**
      * Invalidate light cache for a specific tile position.
@@ -54,8 +56,10 @@ public:
 private:
     void computeChunkLight(CachedLightGrid& grid, 
                            const std::vector<MapEditor::Domain::LightSource>& lights,
+                           const GroundBrightness& ground_brightness,
                            const MapEditor::Domain::LightConfig& config,
-                           int32_t chunk_x, int32_t chunk_y);
+                           int32_t chunk_x, int32_t chunk_y,
+                           int16_t current_floor);
 
     Services::ClientDataService* client_data_;
     

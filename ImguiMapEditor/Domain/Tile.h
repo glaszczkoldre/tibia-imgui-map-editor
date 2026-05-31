@@ -26,7 +26,8 @@ enum class TileFlag : uint16_t {
   NoPvp = 1 << 2,            // 0x0004
   NoLogout = 1 << 3,         // 0x0008
   PvpZone = 1 << 4,          // 0x0010
-  Refresh = 1 << 5           // 0x0020
+  Refresh = 1 << 5,          // 0x0020
+  TranslucentLight = 1 << 6  // 0x0040 — z=8 tile lit by translucent ground above
 };
 
 inline TileFlag operator|(TileFlag a, TileFlag b) {

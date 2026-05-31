@@ -18,17 +18,24 @@ void LightingPass::render(const RenderContext &context) {
     return;
   }
 
+  // Build LightConfig from ViewSettings (new server light + client slider)
   Domain::LightConfig config;
   config.enabled = true;
-  config.ambient_level =
-      static_cast<uint8_t>(context.view_settings->map_ambient_light);
-  config.ambient_color = 215; // Default white-ish (from MapRenderer.cpp)
+  config.global_light.intensity = context.view_settings->server_light_intensity;
+  config.global_light.color = context.view_settings->server_light_color;
+  config.client_slider = static_cast<uint8_t>(context.view_settings->map_ambient_light);
+  config.camera_floor = context.current_floor;
+  // Legacy fields (kept for backward compat)
+  config.ambient_color = config.global_light.color;
+  config.ambient_level = config.global_light.intensity;
 
-  // Auto-invalidate if ambient light changes
-  // Note: RenderState tracking logic moved here
-  if (config.ambient_level != context.state.last_ambient_light) {
+  // Auto-invalidate if server light or slider changes
+  uint32_t config_hash = static_cast<uint32_t>(config.global_light.intensity) |
+                         (static_cast<uint32_t>(config.global_light.color) << 8) |
+                         (static_cast<uint32_t>(config.client_slider) << 16);
+  if (config_hash != context.state.last_config_hash) {
     context.state.light_manager->invalidateAll();
-    context.state.last_ambient_light = config.ambient_level;
+    context.state.last_config_hash = config_hash;
   }
 
   // Calculate floor range based on show_all_floors setting

@@ -135,6 +135,14 @@ CreatureXmlReader::parseCreatureNode(const pugi::xml_node &node, bool isNpc,
     creature->outfit.lookMountFeet = static_cast<uint16_t>(attr.as_uint());
   }
 
+  // Light properties (optional)
+  if (auto attr = node.attribute("lightlevel")) {
+    creature->light_level = static_cast<uint8_t>(attr.as_uint());
+  }
+  if (auto attr = node.attribute("lightcolor")) {
+    creature->light_color = static_cast<uint8_t>(attr.as_uint());
+  }
+
   return creature;
 }
 

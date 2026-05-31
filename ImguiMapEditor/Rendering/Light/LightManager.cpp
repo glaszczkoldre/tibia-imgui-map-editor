@@ -67,7 +67,8 @@ void LightManager::render(const Domain::ChunkedMap& map,
                           float camera_x, float camera_y, 
                           float zoom, int current_floor,
                           int start_floor, int end_floor,
-                          const Domain::LightConfig& config)
+                          const Domain::LightConfig& config,
+                          const std::vector<Domain::LightSource>* injected_lights)
 {
     if (!config.enabled) return;
 
@@ -96,8 +97,10 @@ void LightManager::render(const Domain::ChunkedMap& map,
         end_floor != last_end_floor_;
 
     bool config_changed =
-        config.ambient_color != last_config_.ambient_color ||
-        config.ambient_level != last_config_.ambient_level ||
+        config.global_light.color != last_config_.global_light.color ||
+        config.global_light.intensity != last_config_.global_light.intensity ||
+        config.client_slider != last_config_.client_slider ||
+        config.camera_floor != last_config_.camera_floor ||
         config.enabled != last_config_.enabled;
 
     // If bounds and config match, we can reuse the texture
@@ -161,7 +164,15 @@ void LightManager::render(const Domain::ChunkedMap& map,
                     gatherer_->gatherForChunk(map, cx, cy, client_data_, static_cast<int16_t>(current_floor));
                 }
                 
-                computeChunkLight(grid, gatherer_->getLights(), config, cx, cy);
+                // Combine gathered lights with any injected lights
+                if (injected_lights && !injected_lights->empty()) {
+                    std::vector<Domain::LightSource> combined = gatherer_->getLights();
+                    combined.insert(combined.end(), injected_lights->begin(), injected_lights->end());
+                    computeChunkLight(grid, combined, gatherer_->getGroundBrightness(), config, cx, cy, static_cast<int16_t>(current_floor));
+                } else {
+                    computeChunkLight(grid, gatherer_->getLights(), gatherer_->getGroundBrightness(), config, cx, cy, static_cast<int16_t>(current_floor));
+                }
+                
                 grid.is_valid = true;
             }
             
@@ -213,23 +224,49 @@ void LightManager::render(const Domain::ChunkedMap& map,
 
 void LightManager::computeChunkLight(CachedLightGrid& grid,
                                      const std::vector<Domain::LightSource>& lights,
+                                     const GroundBrightness& ground_brightness,
                                      const Domain::LightConfig& config,
-                                     int32_t chunk_x, int32_t chunk_y)
+                                     int32_t chunk_x, int32_t chunk_y,
+                                     int16_t current_floor)
 {
-    // OPTIMIZED: Iterate lights first, then only affected tiles
-    
-    // Get ambient light color
+    // Determine ambient based on camera floor (above-ground vs underground)
     float ambient_r, ambient_g, ambient_b;
-    LightColorPalette::from8bitFloat(config.ambient_color, ambient_r, ambient_g, ambient_b);
     
-    float ambient_scale = config.ambient_level / 255.0f;
-    ambient_r *= ambient_scale;
-    ambient_g *= ambient_scale;
-    ambient_b *= ambient_scale;
+    constexpr int GROUND_LAYER = 7;
+    if (config.camera_floor <= GROUND_LAYER) {
+        // Above ground: use server global light
+        float scale = static_cast<float>(config.global_light.intensity) / 255.0f;
+        LightColorPalette::from8bitFloat(config.global_light.color, ambient_r, ambient_g, ambient_b);
+        ambient_r *= scale;
+        ambient_g *= scale;
+        ambient_b *= scale;
+    } else {
+        // Underground: zero ambient (pitch black without lights)
+        ambient_r = 0.0f;
+        ambient_g = 0.0f;
+        ambient_b = 0.0f;
+    }
     
-    uint8_t base_r = static_cast<uint8_t>(ambient_r * 255.0f);
-    uint8_t base_g = static_cast<uint8_t>(ambient_g * 255.0f);
-    uint8_t base_b = static_cast<uint8_t>(ambient_b * 255.0f);
+    // Apply client slider as floor above ground; as absolute underground
+    float slider_scale = static_cast<float>(config.client_slider) / 255.0f;
+    if (config.camera_floor <= GROUND_LAYER) {
+        // Above ground: max(slider, ambient)
+        float slider_r = slider_scale; // White light from slider
+        float slider_g = slider_scale;
+        float slider_b = slider_scale;
+        ambient_r = std::max(ambient_r, slider_r);
+        ambient_g = std::max(ambient_g, slider_g);
+        ambient_b = std::max(ambient_b, slider_b);
+    } else {
+        // Underground: slider is absolute
+        ambient_r = slider_scale;
+        ambient_g = slider_scale;
+        ambient_b = slider_scale;
+    }
+    
+    uint8_t base_r = static_cast<uint8_t>(std::min(ambient_r * 255.0f, 255.0f));
+    uint8_t base_g = static_cast<uint8_t>(std::min(ambient_g * 255.0f, 255.0f));
+    uint8_t base_b = static_cast<uint8_t>(std::min(ambient_b * 255.0f, 255.0f));
     
     // Fill with ambient first
     uint32_t ambient_packed = base_r | (base_g << 8) | (base_b << 16) | (255 << 24);
@@ -259,6 +296,13 @@ void LightManager::computeChunkLight(CachedLightGrid& grid,
             for (int x = min_x; x <= max_x; ++x) {
                 int tile_x = chunk_start_x + x;
                 int tile_y = chunk_start_y + y;
+                
+                // Ground blocking check: skip if solid ground exists between light and tile
+                int tile_idx = y * 32 + x;
+                int16_t blocking_floor = ground_brightness.blocking_floor[tile_idx];
+                if (blocking_floor >= 0 && light.source_floor < blocking_floor) {
+                    continue; // Light is blocked by solid ground above
+                }
                 
                 float dx = (static_cast<float>(tile_x) + 0.5f) - (static_cast<float>(light.x) + 0.5f);
                 float dy = (static_cast<float>(tile_y) + 0.5f) - (static_cast<float>(light.y) + 0.5f);
