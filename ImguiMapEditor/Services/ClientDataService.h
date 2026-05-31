@@ -1,4 +1,5 @@
 #pragma once
+#include "Domain/ClientVersion.h"
 #include "Domain/ClientVersionTypes.h"
 #include "Domain/ItemType.h"
 #include "Domain/CreatureType.h"
@@ -64,14 +65,14 @@ public:
      * Load all client data for a specific version
      * @param client_path Path to Tibia client directory (containing Tibia.dat, Tibia.spr)
      * @param item_metadata_path Path to items.otb or items.srv file
-     * @param client_version Client version number (e.g., 860, 1010)
+     * @param client_version Client version with feature flags (transparency, extended, etc.)
      * @param data_source The item configuration type (OTB, SRV, or DAT-only)
      * @param progress Optional progress callback
      * @return Result with load status and statistics
      */
     ClientDataResult load(const std::filesystem::path& client_path,
                           const std::filesystem::path& item_metadata_path,
-                          uint32_t client_version,
+                          const Domain::ClientVersion& client_version,
                            Domain::ItemDataSource data_source = Domain::ItemDataSource::OTB,
                           LoadProgressCallback progress = nullptr);
     
@@ -195,7 +196,7 @@ private:
     // The name is historical; "otb_items" may contain SRV items or DAT-generated stubs.
     void mergeOtbWithDat(const std::vector<Domain::ItemType>& otb_items,
                          const IO::DatResult& dat_result,
-                         uint32_t client_version);
+                         const Domain::ClientVersion& client_version);
     
     // NOTE: generateCreatureTileset moved to TilesetService
 

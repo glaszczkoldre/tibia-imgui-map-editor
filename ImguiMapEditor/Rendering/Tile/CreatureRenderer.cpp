@@ -1,5 +1,6 @@
 #include "CreatureRenderer.h"
 #include "IO/Readers/DatReaderBase.h"
+#include "Rendering/Animation/ItemAnimation.h"
 #include "Rendering/Overlays/OutfitOverlay.h"
 #include "Utils/SpriteUtils.h"
 #include <spdlog/spdlog.h>
@@ -78,8 +79,21 @@ void CreatureRenderer::queue(const Domain::Creature *creature, float screen_x,
     dir = direction;
   }
 
-  // Clamp animation frame
-  int frame = (frames > 1) ? (animation_frame % frames) : 0;
+  // Choose sprite source based on frame groups and walking state
+  const std::vector<uint32_t>* sprites = &outfit_data->sprite_ids;
+  int frame = 0;
+  if (outfit_data->has_frame_groups && animation_frame == 0) {
+    if (!outfit_data->idle_sprite_ids.empty()) {
+      sprites = &outfit_data->idle_sprite_ids;
+      frame = ItemAnimation::getPhaseFromFrames(
+          static_cast<int>(outfit_data->frames), anim_ticks.global_ms,
+          tile_x, tile_y, tile_z);
+    }
+  } else if (animation_frame > 0 && !outfit_data->walk_sprite_ids.empty()) {
+    sprites = &outfit_data->walk_sprite_ids;
+    int walk_frames = std::max<int>(1, outfit_data->frames);
+    frame = animation_frame % walk_frames;
+  }
 
   // For each tile part of a multi-tile creature
   // RME formula: draw at (screenx - cx * TileSize, screeny - cy * TileSize)
@@ -99,11 +113,11 @@ void CreatureRenderer::queue(const Domain::Creature *creature, float screen_x,
           0,                   // pattern_z = mount (0 = no mount)
           frame);
 
-      if (base_sprite_idx >= outfit_data->sprite_ids.size()) {
+      if (base_sprite_idx >= sprites->size()) {
         continue;
       }
 
-      uint32_t base_sprite_id = outfit_data->sprite_ids[base_sprite_idx];
+      uint32_t base_sprite_id = (*sprites)[base_sprite_idx];
       if (base_sprite_id == 0) {
         continue;
       }

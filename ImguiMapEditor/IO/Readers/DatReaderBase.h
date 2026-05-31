@@ -36,6 +36,11 @@ struct ClientItem {
     
     // Sprite IDs
     std::vector<uint32_t> sprite_ids;
+
+    // Frame groups (10.57+ creatures with idle/walking animations)
+    std::vector<uint32_t> idle_sprite_ids;
+    std::vector<uint32_t> walk_sprite_ids;
+    bool has_frame_groups = false;
     
     // Properties from flags
     bool is_ground = false;

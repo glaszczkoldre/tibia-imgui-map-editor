@@ -105,6 +105,7 @@ set(DOMAIN_SOURCES
 )
 
 set(RENDERING_SOURCES
+    Rendering/Animation/ItemAnimation.cpp
     Rendering/Core/Texture.cpp
     Rendering/Core/Shader.cpp
     Rendering/Core/VertexArray.cpp

@@ -8,8 +8,9 @@
 namespace MapEditor {
 namespace Services {
 
-SpriteManager::SpriteManager(std::shared_ptr<IO::SprReader> spr_reader)
-    : spr_reader_(std::move(spr_reader)) {
+SpriteManager::SpriteManager(std::shared_ptr<IO::SprReader> spr_reader,
+                             bool use_transparency)
+    : spr_reader_(std::move(spr_reader)), use_transparency_(use_transparency) {
   // Create ItemCompositor
   item_compositor_ = std::make_unique<ItemCompositor>(spr_reader_);
   // Create CreatureSpriteService
@@ -89,7 +90,7 @@ std::vector<uint8_t> SpriteManager::loadSpriteData(uint32_t sprite_id) {
 
   // Decode if compressed
   if (!sprite->is_decoded) {
-    sprite->decode();
+    sprite->decode(use_transparency_);
   }
 
   return sprite->rgba_data;
@@ -213,7 +214,7 @@ SpriteManager::loadSpriteToAtlas(uint32_t sprite_id) {
 
   // Decode if compressed
   if (!sprite->is_decoded) {
-    sprite->decode();
+    sprite->decode(use_transparency_);
   }
 
   if (sprite->rgba_data.empty()) {

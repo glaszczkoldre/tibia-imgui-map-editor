@@ -548,7 +548,7 @@ bool MapLoadingService::loadClientData(
 
   // Load client data
   auto result = client_data_service_->load(
-      client_path, final_metadata_path, version_info->getVersion(),
+      client_path, final_metadata_path, *version_info,
       effective_source,
       [](int percent, const std::string &status) {
         spdlog::info("Loading: {}% - {}", percent, status);
@@ -592,7 +592,7 @@ bool MapLoadingService::loadClientData(
 
   // Create sprite manager with the loaded sprites
   sprite_manager_ = std::make_unique<Services::SpriteManager>(
-      client_data_service_->getSpriteReader());
+      client_data_service_->getSpriteReader(), version_info->isTransparent());
 
   // Initialize SpriteManager (async loading and GPU resources)
   // This must be done here (on main thread) to ensure service is ready for

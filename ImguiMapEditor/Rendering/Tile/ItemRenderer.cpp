@@ -1,6 +1,7 @@
 #include "ItemRenderer.h"
 #include "../../Core/Config.h"
 #include "../ColorFilter.h"
+#include "../Animation/ItemAnimation.h"
 #include "Services/ClientDataService.h"
 #include "Services/SecondaryClientConstants.h"
 #include "Services/SecondaryClientData.h"
@@ -36,6 +37,9 @@ void ItemRenderer::queueWithColor(
     bool tile_has_hook_south, bool tile_has_hook_east) {
   if (!item_type || item_type->sprite_ids.empty())
     return;
+
+  if (item_type->is_translucent)
+    alpha *= 0.5f;
 
   // Calculate scaling factor for zoom
   float scale = size / TILE_SIZE;
@@ -172,7 +176,8 @@ void ItemRenderer::queueWithColor(
 
   int frame = 0;
   if (frames > 1) {
-    frame = anim_ticks.tick_500ms % frames;
+    frame = ItemAnimation::getPhase(*item_type, anim_ticks.global_ms,
+                                     tile_x, tile_y, tile_z);
   }
 
   float draw_adjusted_x = std::round(adjusted_x);
