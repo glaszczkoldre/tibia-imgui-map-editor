@@ -204,6 +204,7 @@ public:
   int32_t loop_count = 0;
   uint8_t start_frame = 0;
   std::vector<std::pair<uint32_t, uint32_t>> frame_durations;
+  uint32_t total_duration = 0;       // Pre-calculated sum of frame duration midpoints (ms)
 
   // Frame groups (10.57+ creatures with idle/walking animations)
   std::vector<uint32_t> idle_sprite_ids;

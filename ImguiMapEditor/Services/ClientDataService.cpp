@@ -396,6 +396,10 @@ void ClientDataService::mergeOtbWithDat(
       merged.loop_count = dat->loop_count;
       merged.start_frame = dat->start_frame;
       merged.frame_durations = dat->frame_durations;
+      merged.total_duration = 0;
+      for (const auto &d : dat->frame_durations) {
+        merged.total_duration += (d.first + d.second) / 2;
+      }
 
       // Frame groups (10.57+ creatures)
       merged.idle_sprite_ids = dat->idle_sprite_ids;

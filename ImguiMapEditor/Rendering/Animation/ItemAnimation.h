@@ -10,11 +10,9 @@ struct ItemAnimation {
     static int getPhase(const Domain::ItemType &item, int64_t global_ms,
                         int tile_x, int tile_y, int tile_z);
 
-    static int getPhaseFromFrames(int frames, int64_t global_ms,
-                                  int tile_x, int tile_y, int tile_z);
+    static int getPhaseFromFrames(int frames, int64_t global_ms);
 
 private:
-    static int getTotalDuration(const Domain::ItemType &item);
     static int getPhaseDuration(const Domain::ItemType &item, int phase);
 };
 

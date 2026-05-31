@@ -71,7 +71,6 @@ void CreatureRenderer::queue(const Domain::Creature *creature, float screen_x,
   const int height = std::max<int>(1, outfit_data->height);
   const int layers = std::max<int>(1, outfit_data->layers);
   const int pattern_x = std::max<int>(1, outfit_data->pattern_x);
-  const int frames = std::max<int>(1, outfit_data->frames);
 
   // Map direction to pattern_x
   int dir = 2 % pattern_x; // Default to South
@@ -86,13 +85,15 @@ void CreatureRenderer::queue(const Domain::Creature *creature, float screen_x,
     if (!outfit_data->idle_sprite_ids.empty()) {
       sprites = &outfit_data->idle_sprite_ids;
       frame = ItemAnimation::getPhaseFromFrames(
-          static_cast<int>(outfit_data->frames), anim_ticks.global_ms,
-          tile_x, tile_y, tile_z);
+          static_cast<int>(outfit_data->frames), anim_ticks.global_ms);
     }
   } else if (animation_frame > 0 && !outfit_data->walk_sprite_ids.empty()) {
     sprites = &outfit_data->walk_sprite_ids;
     int walk_frames = std::max<int>(1, outfit_data->frames);
     frame = animation_frame % walk_frames;
+  } else {
+    int f = std::max<int>(1, outfit_data->frames);
+    frame = (f > 1) ? (animation_frame % f) : 0;
   }
 
   // For each tile part of a multi-tile creature
@@ -127,8 +128,8 @@ void CreatureRenderer::queue(const Domain::Creature *creature, float screen_x,
       if (layers >= 2) {
         uint32_t template_sprite_idx = Utils::SpriteUtils::getSpriteIndex(
             outfit_data, cx, cy, 1, dir, 0, 0, frame);
-        if (template_sprite_idx < outfit_data->sprite_ids.size()) {
-          template_sprite_id = outfit_data->sprite_ids[template_sprite_idx];
+        if (template_sprite_idx < sprites->size()) {
+          template_sprite_id = (*sprites)[template_sprite_idx];
         }
       }
 

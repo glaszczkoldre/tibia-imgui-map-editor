@@ -349,17 +349,24 @@ void DatReaderBase::readSpriteData(ClientItem& item, BinaryReader& reader) {
         uint8_t gpz = shouldReadPatternZ() ? reader.readU8() : 1;
         uint8_t gf = reader.readU8();
         
-        if (g == 0 && gf > 1 && hasFrameDurations()) {
-            item.has_animation_data = true;
-            item.animation_mode = reader.readU8();
-            item.loop_count = static_cast<int32_t>(reader.readU32());
-            item.start_frame = reader.readU8();
+        if (gf > 1 && hasFrameDurations()) {
+            uint8_t anim_mode = reader.readU8();
+            int32_t loop = static_cast<int32_t>(reader.readU32());
+            uint8_t start = reader.readU8();
             
-            item.frame_durations.reserve(gf);
+            if (g == 0) {
+                item.has_animation_data = true;
+                item.animation_mode = anim_mode;
+                item.loop_count = loop;
+                item.start_frame = start;
+            }
+            
             for (uint8_t f = 0; f < gf; ++f) {
                 uint32_t min_duration = reader.readU32();
                 uint32_t max_duration = reader.readU32();
-                item.frame_durations.emplace_back(min_duration, max_duration);
+                if (g == 0) {
+                    item.frame_durations.emplace_back(min_duration, max_duration);
+                }
             }
         }
         

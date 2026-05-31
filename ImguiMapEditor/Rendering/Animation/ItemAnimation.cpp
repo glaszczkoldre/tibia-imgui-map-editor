@@ -4,8 +4,7 @@
 namespace MapEditor {
 namespace Rendering {
 
-int ItemAnimation::getPhaseFromFrames(int frames, int64_t global_ms,
-                                      int tile_x, int tile_y, int tile_z) {
+int ItemAnimation::getPhaseFromFrames(int frames, int64_t global_ms) {
     if (frames <= 1)
         return 0;
     int tick = static_cast<int>(global_ms / 500);
@@ -26,7 +25,7 @@ int ItemAnimation::getPhase(const Domain::ItemType &item, int64_t global_ms,
         return (tick + tile_offset) % frames;
     }
 
-    int total = getTotalDuration(item);
+    int total = static_cast<int>(item.total_duration);
     if (total <= 0)
         return 0;
 
@@ -41,14 +40,6 @@ int ItemAnimation::getPhase(const Domain::ItemType &item, int64_t global_ms,
     }
 
     return 0;
-}
-
-int ItemAnimation::getTotalDuration(const Domain::ItemType &item) {
-    int total = 0;
-    for (const auto &d : item.frame_durations) {
-        total += (d.first + d.second) / 2;
-    }
-    return total;
 }
 
 int ItemAnimation::getPhaseDuration(const Domain::ItemType &item, int phase) {
