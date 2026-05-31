@@ -195,7 +195,7 @@ void StartupDialog::renderHeader() {
                         ImGuiWindowFlags_NoScrollWithMouse);
 
   // Title with larger text
-  ImGui::PushStyleColor(ImGuiCol_Text, SC::VALUE);
+  ImGui::PushStyleColor(ImGuiCol_Text, SC::TextPrimary());
   ImGui::SetWindowFontScale(1.4f);
   ImGui::Text("Tibia Map Editor");
   ImGui::SetWindowFontScale(1.0f);
@@ -203,7 +203,7 @@ void StartupDialog::renderHeader() {
 
   // Subtitle
   ImGui::TextColored(
-      SC::MUTED,
+      SC::TextDim(),
       "Welcome! Start a new project or continue where you left off.");
 
   // Header buttons on the right (Preferences + Client Configuration)
@@ -322,7 +322,7 @@ void StartupDialog::renderFooter() {
 
   ImGui::SameLine();
   ImGui::SetCursorPosY(button_y + 8.0f);
-  ImGui::TextColored(SC::MUTED, "Version 2.4.1");
+  ImGui::TextColored(SC::TextDim(), "Version 2.4.1");
 
   // Right side buttons: Ignore Signatures toggle + Load Map
   float button_spacing = 8.0f;

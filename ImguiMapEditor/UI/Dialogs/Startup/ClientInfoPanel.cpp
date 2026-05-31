@@ -10,34 +10,34 @@ namespace SC = SemanticColors;
 
 void ClientInfoPanel::render() {
   // Panel header
-  ImGui::TextColored(SC::HEADER_TEXT, "Client information");
+  ImGui::TextColored(SC::TextPrimary(), "Client information");
   ImGui::Spacing();
   ImGui::Separator();
   ImGui::Spacing();
 
   if (client_info_.version > 0) {
     // Client Name
-    ImGui::TextColored(SC::LABEL, ICON_FA_TAG " Client Name");
+    ImGui::TextColored(SC::TextDim(), ICON_FA_TAG " Client Name");
     if (!client_info_.client_name.empty()) {
-      ImGui::TextColored(SC::VALUE, "%s", client_info_.client_name.c_str());
+      ImGui::TextColored(SC::TextPrimary(), "%s", client_info_.client_name.c_str());
     } else {
-      ImGui::TextColored(SC::VALUE, "%s",
+      ImGui::TextColored(SC::TextPrimary(), "%s",
                          client_info_.version_string.c_str());
     }
     ImGui::Spacing();
 
     // Client Version
-    ImGui::TextColored(SC::LABEL, ICON_FA_CODE_BRANCH " Client Version");
-    ImGui::TextColored(SC::VALUE, "%s", client_info_.version_string.c_str());
+    ImGui::TextColored(SC::TextDim(), ICON_FA_CODE_BRANCH " Client Version");
+    ImGui::TextColored(SC::TextPrimary(), "%s", client_info_.version_string.c_str());
     ImGui::Spacing();
 
     // Data Directory
-    ImGui::TextColored(SC::LABEL, ICON_FA_FOLDER " Data Directory");
+    ImGui::TextColored(SC::TextDim(), ICON_FA_FOLDER " Data Directory");
     if (!client_info_.data_directory.empty()) {
-      ImGui::TextColored(SC::VALUE, "%s",
+      ImGui::TextColored(SC::TextPrimary(), "%s",
                          client_info_.data_directory.c_str());
     } else {
-      ImGui::TextColored(SC::EMPTY, "(Not set)");
+      ImGui::TextColored(SC::TextDim(), "(Not set)");
     }
     ImGui::Spacing();
     ImGui::Separator();
@@ -45,7 +45,7 @@ void ClientInfoPanel::render() {
 
     // OTBM Version (compare with map)
     bool otbm_match = (client_info_.otbm_version == map_info_.otbm_version);
-    ImGui::TextColored(SC::LABEL, ICON_FA_FILE_CODE " OTBM Version");
+    ImGui::TextColored(SC::TextDim(), ICON_FA_FILE_CODE " OTBM Version");
     ImGui::TextColored(otbm_match ? SC::SAVED : SC::DANGER, "%u",
                        client_info_.otbm_version);
     ImGui::Spacing();
@@ -53,7 +53,7 @@ void ClientInfoPanel::render() {
     // Items Major Version
     bool major_match =
         (client_info_.items_major_version == map_info_.items_major_version);
-    ImGui::TextColored(SC::LABEL, ICON_FA_CUBES " Items Major Version");
+    ImGui::TextColored(SC::TextDim(), ICON_FA_CUBES " Items Major Version");
     ImGui::TextColored(major_match ? SC::SAVED : SC::DANGER, "%u",
                        client_info_.items_major_version);
     ImGui::Spacing();
@@ -61,7 +61,7 @@ void ClientInfoPanel::render() {
     // Items Minor Version
     bool minor_match =
         (client_info_.items_minor_version == map_info_.items_minor_version);
-    ImGui::TextColored(SC::LABEL, ICON_FA_CUBE " Items Minor Version");
+    ImGui::TextColored(SC::TextDim(), ICON_FA_CUBE " Items Minor Version");
     ImGui::TextColored(minor_match ? SC::SAVED : SC::DANGER, "%u",
                        client_info_.items_minor_version);
     ImGui::Spacing();
@@ -69,36 +69,36 @@ void ClientInfoPanel::render() {
     ImGui::Spacing();
 
     // DAT Signature
-    ImGui::TextColored(SC::LABEL, ICON_FA_FINGERPRINT " DAT Signature");
+    ImGui::TextColored(SC::TextDim(), ICON_FA_FINGERPRINT " DAT Signature");
     if (!client_info_.dat_signature.empty()) {
-      ImGui::TextColored(SC::VALUE, "%s", client_info_.dat_signature.c_str());
+      ImGui::TextColored(SC::TextPrimary(), "%s", client_info_.dat_signature.c_str());
     } else {
-      ImGui::TextColored(SC::EMPTY, "(Unknown)");
+      ImGui::TextColored(SC::TextDim(), "(Unknown)");
     }
     ImGui::Spacing();
 
     // SPR Signature
-    ImGui::TextColored(SC::LABEL, ICON_FA_IMAGE " SPR Signature");
+    ImGui::TextColored(SC::TextDim(), ICON_FA_IMAGE " SPR Signature");
     if (!client_info_.spr_signature.empty()) {
-      ImGui::TextColored(SC::VALUE, "%s", client_info_.spr_signature.c_str());
+      ImGui::TextColored(SC::TextPrimary(), "%s", client_info_.spr_signature.c_str());
     } else {
-      ImGui::TextColored(SC::EMPTY, "(Unknown)");
+      ImGui::TextColored(SC::TextDim(), "(Unknown)");
     }
     ImGui::Spacing();
 
     // Description
-    ImGui::TextColored(SC::LABEL, ICON_FA_FILE_LINES " Description");
+    ImGui::TextColored(SC::TextDim(), ICON_FA_FILE_LINES " Description");
     if (!client_info_.description.empty()) {
       ImGui::TextWrapped("%s", client_info_.description.c_str());
     } else {
-      ImGui::TextColored(SC::EMPTY, "(No description)");
+      ImGui::TextColored(SC::TextDim(), "(No description)");
     }
     ImGui::Spacing();
     ImGui::Separator();
     ImGui::Spacing();
 
     // Status
-    ImGui::TextColored(SC::LABEL, ICON_FA_CIRCLE_CHECK " Status");
+    ImGui::TextColored(SC::TextDim(), ICON_FA_CIRCLE_CHECK " Status");
     if (client_info_.signatures_match) {
       ImGui::TextColored(SC::SAVED, "%s", client_info_.status.c_str());
     } else {

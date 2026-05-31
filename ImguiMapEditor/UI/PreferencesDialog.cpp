@@ -143,13 +143,8 @@ void PreferencesDialog::renderEditorTab() {
 
         const char* theme_icon = ICON_FA_CIRCLE;
         switch (theme.type) {
-          case ThemeType::TibiaRPG:       theme_icon = ICON_FA_CIRCLE; break;
           case ThemeType::ModernDark:     theme_icon = ICON_FA_MOON; break;
-          case ThemeType::ForestGreen:    theme_icon = ICON_FA_LEAF; break;
-          case ThemeType::SunsetOrange:   theme_icon = ICON_FA_SUN; break;
-          case ThemeType::MidnightPurple: theme_icon = ICON_FA_MOON; break;
-          case ThemeType::ClassicLight:   theme_icon = ICON_FA_SUN; break;
-          case ThemeType::OtclientTheme:  theme_icon = ICON_FA_GAMEPAD; break;
+          case ThemeType::DocumentLight:  theme_icon = ICON_FA_SUN; break;
         }
 
         ImGui::PushStyleColor(ImGuiCol_Text, theme.preview_color);

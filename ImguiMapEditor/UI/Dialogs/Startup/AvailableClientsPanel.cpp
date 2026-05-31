@@ -10,7 +10,7 @@ namespace UI {
 namespace SC = SemanticColors;
 
 void AvailableClientsPanel::render() {
-  ImGui::TextColored(SC::HEADER_TEXT, "Available Clients");
+  ImGui::TextColored(SC::TextPrimary(), "Available Clients");
   ImGui::Spacing();
   ImGui::Separator();
   ImGui::Spacing();
@@ -71,7 +71,7 @@ void AvailableClientsPanel::render() {
       // Client name and version info
       ImGui::BeginGroup();
       ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 4.0f);
-      ImGui::TextColored(SC::SAVED, "%s",
+      ImGui::TextColored(SC::TextPrimary(), "%s",
                          client->getName().c_str());
 
       const char* type_str = "???";
@@ -80,7 +80,7 @@ void AvailableClientsPanel::render() {
         case Domain::ItemDataSource::SRV: type_str = "SRV"; break;
         case Domain::ItemDataSource::DAT: type_str = "DAT"; break;
       }
-      ImGui::TextColored(SC::LABEL, "%u | %s",
+      ImGui::TextColored(SC::TextDim(), "%u | %s",
                          client->getVersion(), type_str);
       ImGui::EndGroup();
 
@@ -95,8 +95,8 @@ void AvailableClientsPanel::render() {
 
   if (total_count == 0) {
     ImGui::Spacing();
-    ImGui::TextColored(SC::LABEL, "No clients in database.");
-    ImGui::TextColored(SC::EMPTY,
+    ImGui::TextColored(SC::TextDim(), "No clients in database.");
+    ImGui::TextColored(SC::TextDim(),
                        "Use 'Client Config' to add clients.");
   }
 

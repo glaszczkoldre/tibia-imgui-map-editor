@@ -28,17 +28,10 @@ void ThemePanel::Render() {
 
             switch (theme.type) {
             case ThemeType::ModernDark:
-            case ThemeType::MidnightPurple:
-            case ThemeType::ForestGreen:
                 theme_icon = ICON_FA_MOON;
                 break;
-            case ThemeType::ClassicLight:
-            case ThemeType::SunsetOrange:
-            case ThemeType::TibiaRPG:
+            case ThemeType::DocumentLight:
                 theme_icon = ICON_FA_SUN;
-                break;
-            case ThemeType::OtclientTheme:
-                theme_icon = ICON_FA_GAMEPAD;
                 break;
             }
 

@@ -10,7 +10,7 @@ namespace SC = SemanticColors;
 
 void RecentMapsPanel::render(const std::vector<RecentMapEntry> &entries) {
   // Panel header
-  ImGui::TextColored(SC::HEADER_TEXT, "Recent Maps List");
+  ImGui::TextColored(SC::TextPrimary(), "Recent Maps List");
   ImGui::Spacing();
   ImGui::Separator();
   ImGui::Spacing();
@@ -58,6 +58,10 @@ void RecentMapsPanel::render(const std::vector<RecentMapEntry> &entries) {
       }
     }
 
+    if (ImGui::IsItemHovered()) {
+      ImGui::SetTooltip("%s", entry.path.string().c_str());
+    }
+
     // Draw content over the selectable (rewind cursor)
     ImGui::SetCursorPosY(ImGui::GetCursorPosY() - item_height);
     ImGui::Indent(8.0f);
@@ -75,9 +79,9 @@ void RecentMapsPanel::render(const std::vector<RecentMapEntry> &entries) {
     // Map name and date
     ImGui::BeginGroup();
     ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 4.0f);
-    ImGui::TextColored(SC::VALUE, "%s",
+    ImGui::TextColored(SC::TextPrimary(), "%s",
                        entry.filename.c_str());
-    ImGui::TextColored(SC::LABEL, "%s",
+    ImGui::TextColored(SC::TextDim(), "%s",
                        entry.last_modified.c_str());
     ImGui::EndGroup();
 
@@ -95,7 +99,7 @@ void RecentMapsPanel::render(const std::vector<RecentMapEntry> &entries) {
 
   if (entries.empty()) {
     ImGui::Spacing();
-    ImGui::TextColored(SC::LABEL, "No recent maps");
+    ImGui::TextColored(SC::TextDim(), "No recent maps");
   }
 
   ImGui::EndChild();
