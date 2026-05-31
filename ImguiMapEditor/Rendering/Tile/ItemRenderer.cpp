@@ -38,9 +38,6 @@ void ItemRenderer::queueWithColor(
   if (!item_type || item_type->sprite_ids.empty())
     return;
 
-  if (item_type->is_translucent)
-    alpha *= 0.5f;
-
   // Calculate scaling factor for zoom
   float scale = size / TILE_SIZE;
 
