@@ -372,10 +372,14 @@ void DatReaderBase::readSpriteData(ClientItem& item, BinaryReader& reader) {
         }
         
         uint32_t sprite_count = static_cast<uint32_t>(gw) * gh * gl * gpx * gpy * gpz * gf;
-        if (sprite_count > 100000) break;  // Corrupted file guard
-        std::vector<uint32_t> group_sprites(sprite_count);
-        for (uint32_t i = 0; i < sprite_count; ++i) {
-            group_sprites[i] = usesExtendedSprites() ? reader.readU32() : reader.readU16();
+        std::vector<uint32_t> group_sprites;
+        if (sprite_count > 100000) {
+            for (uint32_t i = 0; i < sprite_count; ++i)
+                if (usesExtendedSprites()) reader.readU32(); else reader.readU16();
+        } else {
+            group_sprites.reserve(sprite_count);
+            for (uint32_t i = 0; i < sprite_count; ++i)
+                group_sprites.push_back(usesExtendedSprites() ? reader.readU32() : reader.readU16());
         }
         
         if (g == 0) {
