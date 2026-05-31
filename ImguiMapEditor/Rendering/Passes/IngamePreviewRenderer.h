@@ -67,7 +67,6 @@ private:
 
   // Light system (independent from MapRenderer)
   std::unique_ptr<LightManager> light_manager_;
-  uint8_t last_ambient_light_ = 255;
   uint32_t last_config_hash_ = 0;
 
   // Fading state

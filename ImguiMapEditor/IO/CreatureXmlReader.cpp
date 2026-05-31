@@ -136,12 +136,23 @@ CreatureXmlReader::parseCreatureNode(const pugi::xml_node &node, bool isNpc,
   }
 
   // Light properties (optional)
-  if (auto attr = node.attribute("lightlevel")) {
-    creature->light_level = static_cast<uint8_t>(attr.as_uint());
-  }
-  if (auto attr = node.attribute("lightcolor")) {
-    creature->light_color = static_cast<uint8_t>(attr.as_uint());
-  }
+  const auto read_light_u8 = [&](const char *attribute_name) -> uint8_t {
+    const auto attr = node.attribute(attribute_name);
+    if (!attr) return 0;
+
+    const unsigned int raw_value = attr.as_uint();
+    if (raw_value > 255U) {
+      warnings.push_back(std::string("Creature '") + creature->name +
+                         "' has " + attribute_name + "=" +
+                         std::to_string(raw_value) + "; clamped to 255");
+      return 255;
+    }
+
+    return static_cast<uint8_t>(raw_value);
+  };
+
+  creature->light_level = read_light_u8("lightlevel");
+  creature->light_color = read_light_u8("lightcolor");
 
   return creature;
 }

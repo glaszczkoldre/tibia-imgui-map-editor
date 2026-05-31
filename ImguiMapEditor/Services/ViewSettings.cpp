@@ -32,14 +32,23 @@ void ViewSettings::loadFromConfig(const ConfigService &config) {
 
   // Lighting Settings
   map_lighting_enabled = config.get<bool>("view.map_lighting_enabled", false);
-  map_ambient_light = config.get<int>("view.map_ambient_light", 0);
+  map_ambient_light = config.get<int>(
+      "view.map_ambient_light", Config::Lighting::DEFAULT_MINIMUM_AMBIENT);
   preview_lighting_enabled =
       config.get<bool>("view.preview_lighting_enabled", false);
-  preview_ambient_light = config.get<int>("view.preview_ambient_light", 0);
-  server_light_intensity = static_cast<uint8_t>(config.get<int>("view.server_light_intensity", 200));
-  server_light_color = static_cast<uint8_t>(config.get<int>("view.server_light_color", 215));
-  preview_server_light_intensity = static_cast<uint8_t>(config.get<int>("view.preview_server_light_intensity", 200));
-  preview_server_light_color = static_cast<uint8_t>(config.get<int>("view.preview_server_light_color", 215));
+  preview_ambient_light = config.get<int>(
+      "view.preview_ambient_light", Config::Lighting::DEFAULT_MINIMUM_AMBIENT);
+  server_light_intensity = static_cast<uint8_t>(config.get<int>(
+      "view.server_light_intensity",
+      Config::Lighting::DEFAULT_SERVER_LIGHT_INTENSITY));
+  server_light_color = static_cast<uint8_t>(config.get<int>(
+      "view.server_light_color", Config::Lighting::DEFAULT_SERVER_LIGHT_COLOR));
+  preview_server_light_intensity = static_cast<uint8_t>(config.get<int>(
+      "view.preview_server_light_intensity",
+      Config::Lighting::DEFAULT_SERVER_LIGHT_INTENSITY));
+  preview_server_light_color = static_cast<uint8_t>(config.get<int>(
+      "view.preview_server_light_color",
+      Config::Lighting::DEFAULT_SERVER_LIGHT_COLOR));
 
   show_minimap_window = config.get<bool>("view.show_minimap_window", false);
   show_browse_tile = config.get<bool>("view.show_browse_tile", false);

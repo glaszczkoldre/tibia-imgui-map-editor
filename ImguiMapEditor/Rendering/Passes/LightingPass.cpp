@@ -28,10 +28,8 @@ void LightingPass::render(const RenderContext &context) {
   config.ambient_color = config.global_light.color;
   config.ambient_level = config.global_light.intensity;
 
-  // Auto-invalidate if server light or slider changes
-  uint32_t config_hash = static_cast<uint32_t>(config.global_light.intensity) |
-                         (static_cast<uint32_t>(config.global_light.color) << 8) |
-                         (static_cast<uint32_t>(config.client_slider) << 16);
+  // Auto-invalidate if lighting config changes
+  uint32_t config_hash = config.computeHash();
   if (config_hash != context.state.last_config_hash) {
     context.state.light_manager->invalidateAll();
     context.state.last_config_hash = config_hash;

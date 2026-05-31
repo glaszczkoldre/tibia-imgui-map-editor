@@ -84,6 +84,17 @@ inline constexpr uint16_t DEFAULT_MAP_SIZE = 16384;
 } // namespace Map
 
 // ============================================================================
+// LIGHTING CONFIGURATION
+// ============================================================================
+namespace Lighting {
+inline constexpr uint8_t DEFAULT_SERVER_LIGHT_INTENSITY = 200;
+inline constexpr uint8_t DEFAULT_SERVER_LIGHT_COLOR = 215;
+inline constexpr uint8_t DEFAULT_MINIMUM_AMBIENT = 0;
+inline constexpr uint8_t DEFAULT_PLAYER_LIGHT_INTENSITY = 2;
+inline constexpr uint8_t TRANSLUCENT_PROPAGATION_INTENSITY = 1;
+} // namespace Lighting
+
+// ============================================================================
 // PERFORMANCE CONFIGURATION
 // ============================================================================
 namespace Performance {

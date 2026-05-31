@@ -7,22 +7,12 @@
 
 #include "LightColorPalette.h"
 #include "Core/Config.h"
+#include "Rendering/Light/LightProjection.h"
 #include "Services/ClientDataService.h"
 #include "Rendering/Visibility/FloorVisibilityCalculator.h"
 
 namespace MapEditor {
 namespace Rendering {
-
-namespace {
-
-int32_t projectedFloorOffsetTiles(int16_t current_floor, int16_t tile_floor) {
-    if (tile_floor <= Config::Map::GROUND_LAYER) {
-        return Config::Map::GROUND_LAYER - tile_floor;
-    }
-    return current_floor - tile_floor;
-}
-
-} // namespace
 
 LightManager::LightManager(Services::ClientDataService* client_data)
     : client_data_(client_data)
@@ -206,7 +196,9 @@ void LightManager::computeViewportLight(const ViewportLightBuffer& light_buffer,
                                         const Domain::LightConfig& config)
 {
     const bool above_ground = config.camera_floor <= Config::Map::GROUND_LAYER;
-    const uint8_t ambient_color = above_ground ? config.global_light.color : 215;
+    const uint8_t ambient_color = above_ground
+        ? config.global_light.color
+        : Config::Lighting::DEFAULT_SERVER_LIGHT_COLOR;
     const uint8_t ambient_intensity = above_ground
         ? std::max(config.client_slider, config.global_light.intensity)
         : config.client_slider;

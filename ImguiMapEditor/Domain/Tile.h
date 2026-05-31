@@ -27,7 +27,9 @@ enum class TileFlag : uint16_t {
   NoLogout = 1 << 3,         // 0x0008
   PvpZone = 1 << 4,          // 0x0010
   Refresh = 1 << 5,          // 0x0020
-  TranslucentLight = 1 << 6  // 0x0040 — z=8 tile lit by translucent ground above
+  // TranslucentLight marks an underground tile lit by translucent ground above;
+  // the current RME/OTClient propagation rule applies at z == GROUND_LAYER + 1.
+  TranslucentLight = 1 << 6
 };
 
 inline TileFlag operator|(TileFlag a, TileFlag b) {

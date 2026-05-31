@@ -3,6 +3,7 @@
 #include <algorithm>
 
 #include "Core/Config.h"
+#include "Rendering/Light/LightProjection.h"
 #include "Services/ClientDataService.h"
 #include "Domain/Tile.h"
 #include "Domain/Item.h"
@@ -16,13 +17,6 @@ namespace Rendering {
 namespace {
 
 constexpr int LIGHT_COLLECTION_MARGIN_TILES = 16;
-
-int32_t projectedFloorOffsetTiles(int16_t current_floor, int16_t tile_floor) {
-    if (tile_floor <= Config::Map::GROUND_LAYER) {
-        return Config::Map::GROUND_LAYER - tile_floor;
-    }
-    return current_floor - tile_floor;
-}
 
 bool blocksLightFromBelow(const Domain::ItemType* item_type) {
     if (!item_type) return false;
@@ -235,7 +229,10 @@ void LightGatherer::gatherLightsForViewportFloor(
 
                 const int32_t projected_x = tile->getX() - floor_offset;
                 const int32_t projected_y = tile->getY() - floor_offset;
-                addLight(light_buffer, projected_x, projected_y, 215, 1, floor);
+                addLight(light_buffer, projected_x, projected_y,
+                         Config::Lighting::DEFAULT_SERVER_LIGHT_COLOR,
+                         Config::Lighting::TRANSLUCENT_PROPAGATION_INTENSITY,
+                         floor);
             });
         }
     }

@@ -232,10 +232,8 @@ void IngamePreviewRenderer::render(const Domain::ChunkedMap &map,
     config.ambient_color = config.global_light.color;
     config.ambient_level = config.global_light.intensity;
 
-    // Auto-invalidate if config changed
-    uint32_t config_hash = static_cast<uint32_t>(config.global_light.intensity) |
-                           (static_cast<uint32_t>(config.global_light.color) << 8) |
-                           (static_cast<uint32_t>(config.client_slider) << 16);
+    // Auto-invalidate if lighting config changes
+    uint32_t config_hash = config.computeHash();
     if (config_hash != last_config_hash_) {
       light_manager_->invalidateAll();
       last_config_hash_ = config_hash;
@@ -247,8 +245,8 @@ void IngamePreviewRenderer::render(const Domain::ChunkedMap &map,
     player_lights.push_back(Domain::LightSource{
         .x = static_cast<int32_t>(camera_x),
         .y = static_cast<int32_t>(camera_y),
-        .color = static_cast<uint8_t>(215),
-        .intensity = static_cast<uint8_t>(2),
+        .color = Config::Lighting::DEFAULT_SERVER_LIGHT_COLOR,
+        .intensity = Config::Lighting::DEFAULT_PLAYER_LIGHT_INTENSITY,
         .source_floor = static_cast<int16_t>(floor)
     });
 
