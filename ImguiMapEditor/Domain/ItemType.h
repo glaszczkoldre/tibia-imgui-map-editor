@@ -209,6 +209,8 @@ public:
   // Frame groups (10.57+ creatures with idle/walking animations)
   std::vector<uint32_t> idle_sprite_ids;
   std::vector<uint32_t> walk_sprite_ids;
+  uint8_t idle_frames = 1;
+  uint8_t walk_frames = 1;
   bool has_frame_groups = false;
 
   // Light properties

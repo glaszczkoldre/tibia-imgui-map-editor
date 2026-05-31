@@ -361,16 +361,18 @@ void DatReaderBase::readSpriteData(ClientItem& item, BinaryReader& reader) {
                 item.start_frame = start;
             }
             
-            for (uint8_t f = 0; f < gf; ++f) {
+             for (uint8_t f = 0; f < gf; ++f) {
                 uint32_t min_duration = reader.readU32();
                 uint32_t max_duration = reader.readU32();
                 if (g == 0) {
                     item.frame_durations.emplace_back(min_duration, max_duration);
+                    item.total_duration += (min_duration + max_duration) / 2;
                 }
             }
         }
         
         uint32_t sprite_count = static_cast<uint32_t>(gw) * gh * gl * gpx * gpy * gpz * gf;
+        if (sprite_count > 100000) break;  // Corrupted file guard
         std::vector<uint32_t> group_sprites(sprite_count);
         for (uint32_t i = 0; i < sprite_count; ++i) {
             group_sprites[i] = usesExtendedSprites() ? reader.readU32() : reader.readU16();
@@ -389,8 +391,10 @@ void DatReaderBase::readSpriteData(ClientItem& item, BinaryReader& reader) {
             item.has_frame_groups = true;
             if (group_type == 0) {
                 item.idle_sprite_ids = std::move(group_sprites);
+                item.idle_frames = gf;
             } else {
                 item.walk_sprite_ids = std::move(group_sprites);
+                item.walk_frames = gf;
             }
         }
     }

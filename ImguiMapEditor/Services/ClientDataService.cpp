@@ -404,6 +404,8 @@ void ClientDataService::mergeOtbWithDat(
       // Frame groups (10.57+ creatures)
       merged.idle_sprite_ids = dat->idle_sprite_ids;
       merged.walk_sprite_ids = dat->walk_sprite_ids;
+      merged.idle_frames = dat->idle_frames;
+      merged.walk_frames = dat->walk_frames;
       merged.has_frame_groups = dat->has_frame_groups;
     }
 

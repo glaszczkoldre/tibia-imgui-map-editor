@@ -85,11 +85,18 @@ void CreatureRenderer::queue(const Domain::Creature *creature, float screen_x,
     if (!outfit_data->idle_sprite_ids.empty()) {
       sprites = &outfit_data->idle_sprite_ids;
       frame = ItemAnimation::getPhaseFromFrames(
-          static_cast<int>(outfit_data->frames), anim_ticks.global_ms);
+          static_cast<int>(outfit_data->idle_frames), anim_ticks.global_ms,
+          outfit_data->has_animation_data ? &outfit_data->frame_durations : nullptr,
+          outfit_data->total_duration);
+    } else {
+      frame = ItemAnimation::getPhaseFromFrames(
+          static_cast<int>(outfit_data->frames), anim_ticks.global_ms,
+          outfit_data->has_animation_data ? &outfit_data->frame_durations : nullptr,
+          outfit_data->total_duration);
     }
   } else if (animation_frame > 0 && !outfit_data->walk_sprite_ids.empty()) {
     sprites = &outfit_data->walk_sprite_ids;
-    int walk_frames = std::max<int>(1, outfit_data->frames);
+    int walk_frames = std::max<int>(1, outfit_data->walk_frames);
     frame = animation_frame % walk_frames;
   } else {
     int f = std::max<int>(1, outfit_data->frames);
