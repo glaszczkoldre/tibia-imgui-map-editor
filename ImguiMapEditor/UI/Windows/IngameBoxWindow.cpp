@@ -11,6 +11,7 @@
 #include "Rendering/Map/MapRenderer.h"
 #include "Rendering/Passes/IngamePreviewRenderer.h"
 #include "Services/ViewSettings.h"
+#include "UI/Widgets/LightColorPalettePicker.h"
 
 namespace MapEditor {
 namespace UI {
@@ -83,13 +84,12 @@ void IngameBoxWindow::render(Domain::ChunkedMap* map,
             ImGui::SetTooltip("Server Light Intensity");
         }
         ImGui::SameLine();
-        ImGui::SetNextItemWidth(50);
-        int color = static_cast<int>(settings.preview_server_light_color);
-        if (ImGui::SliderInt("##color", &color, 0, 215)) {
-            settings.preview_server_light_color = static_cast<uint8_t>(color);
-        }
-        if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Server Light Color");
+        uint8_t color = settings.preview_server_light_color;
+        if (LightColorPalettePicker("##previewServerLightColor",
+                                    color,
+                                    false,
+                                    "Server Color: world light color from the Tibia 8-bit palette")) {
+            settings.preview_server_light_color = color;
         }
         ImGui::SameLine();
         ImGui::SetNextItemWidth(70);

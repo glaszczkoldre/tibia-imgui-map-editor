@@ -2,6 +2,7 @@
 #include "Rendering/Frame/RenderingManager.h"
 #include "Services/ClipboardService.h"
 #include "UI/Core/Theme.h"
+#include "UI/Widgets/LightColorPalettePicker.h"
 #include <cmath>
 #include <imgui.h>
 #include <spdlog/spdlog.h>
@@ -142,10 +143,15 @@ void MainWindow::renderEditor(Domain::ChunkedMap *current_map,
               view_settings_.server_light_intensity = static_cast<uint8_t>(intensity);
             }
             ImGui::SameLine();
-            ImGui::SetNextItemWidth(60);
-            int color = static_cast<int>(view_settings_.server_light_color);
-            if (ImGui::SliderInt("Color", &color, 0, 215)) {
-              view_settings_.server_light_color = static_cast<uint8_t>(color);
+            ImGui::TextUnformatted("Color");
+            ImGui::SameLine();
+            uint8_t color = view_settings_.server_light_color;
+            if (UI::LightColorPalettePicker(
+                    "##serverLightColor",
+                    color,
+                    true,
+                    "Server Color: world light color from the Tibia 8-bit palette")) {
+              view_settings_.server_light_color = color;
             }
             ImGui::SameLine();
             ImGui::SetNextItemWidth(120);

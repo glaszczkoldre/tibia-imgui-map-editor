@@ -295,6 +295,7 @@ set(UI_SOURCES
     UI/Ribbon/RibbonController.cpp
     UI/Widgets/Properties/PropertyPanelRenderer.cpp
     UI/Widgets/Properties/PropertyWidgets.cpp
+    UI/Widgets/LightColorPalettePicker.cpp
     UI/Widgets/QuickSearchPopup.cpp
     UI/Widgets/SearchResultsWidget.cpp
     UI/Widgets/TilesetWidget.cpp

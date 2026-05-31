@@ -87,6 +87,8 @@ inline constexpr uint16_t DEFAULT_MAP_SIZE = 16384;
 // LIGHTING CONFIGURATION
 // ============================================================================
 namespace Lighting {
+inline constexpr int LIGHT_COLOR_COUNT = 216;
+inline constexpr uint8_t MAX_SERVER_LIGHT_COLOR = 215;
 inline constexpr uint8_t DEFAULT_SERVER_LIGHT_INTENSITY = 200;
 inline constexpr uint8_t DEFAULT_SERVER_LIGHT_COLOR = 215;
 inline constexpr uint8_t DEFAULT_MINIMUM_AMBIENT = 0;
