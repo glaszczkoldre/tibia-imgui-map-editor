@@ -111,10 +111,13 @@ void LightManager::render(const Domain::ChunkedMap& map,
         config.camera_floor != last_config_.camera_floor ||
         config.enabled != last_config_.enabled;
 
-    // If bounds and config match, we can reuse the texture
+    const bool has_injected_lights = injected_lights && !injected_lights->empty();
+
+    // If bounds and config match, we can reuse the texture.
+    // Injected lights are dynamic preview/player lights, so they always recompute.
     // But we MUST recalculate screen coordinates because sub-pixel camera movement
     // changes where the texture is drawn, even if the integer tile range is same.
-    if (!bounds_changed && !config_changed && !force_update_) {
+    if (!has_injected_lights && !bounds_changed && !config_changed && !force_update_) {
         float world_x = start_x * 32.0f;
         float world_y = start_y * 32.0f;
         float screen_x = (world_x - camera_x * 32.0f) * zoom + viewport_width / 2.0f;

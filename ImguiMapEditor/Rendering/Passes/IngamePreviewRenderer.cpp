@@ -239,8 +239,8 @@ void IngamePreviewRenderer::render(const Domain::ChunkedMap &map,
       last_config_hash_ = config_hash;
     }
 
-    // Player minimum light at center tile (preview only)
-    // Matches OTClient local player: intensity=2, color=215 (white)
+    // Player minimum light at center tile (preview only). The color reuses
+    // Config::Lighting::DEFAULT_SERVER_LIGHT_COLOR, matching OTClient's white light.
     std::vector<Domain::LightSource> player_lights;
     player_lights.push_back(Domain::LightSource{
         .x = static_cast<int32_t>(camera_x),
