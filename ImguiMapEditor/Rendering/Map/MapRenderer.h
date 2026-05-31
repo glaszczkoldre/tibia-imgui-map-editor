@@ -1,6 +1,7 @@
 #pragma once
 #include "Core/Config.h"
 #include "Domain/ChunkedMap.h"
+#include "Domain/Position.h"
 #include "Rendering/Animation/AnimationTicks.h"
 #include "Rendering/Backend/IRenderer.h"
 #include "Rendering/Backend/SpriteBatch.h"
@@ -23,6 +24,7 @@
 #include "Services/ViewSettings.h"
 #include <glm/glm.hpp>
 #include <memory>
+#include <optional>
 #include <vector>
 
 namespace MapEditor {
@@ -85,6 +87,7 @@ public:
   void setGridVisible(bool visible) { show_grid_ = visible; }
   bool isGridVisible() const { return show_grid_; }
   void setViewSettings(Services::ViewSettings *settings) override;
+  void setLightVisibilityOrigin(std::optional<Domain::Position> origin);
 
   /**
    * Set LOD mode to enable/disable simplified rendering and optimizations.
@@ -155,6 +158,7 @@ private:
 
   // Camera component (handles position, zoom, matrix)
   ViewCamera camera_;
+  std::optional<Domain::Position> light_visibility_origin_;
   bool show_grid_ = true;
 
   // Stats

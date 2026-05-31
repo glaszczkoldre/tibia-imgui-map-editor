@@ -1,11 +1,12 @@
 #pragma once
-#include "LightCache.h"
 #include "LightTexture.h"
 #include "LightOverlay.h"
 #include "LightGatherer.h"
 #include "Domain/ChunkedMap.h"
 #include "Domain/LightTypes.h"
+#include "Domain/Position.h"
 #include <memory>
+#include <optional>
 #include <vector>
 
 namespace MapEditor {
@@ -43,6 +44,21 @@ public:
                 const std::vector<MapEditor::Domain::LightSource>* injected_lights = nullptr);
 
     /**
+     * Render using RME's light-mode floor visibility range.
+     *
+     * RME ignores the editor's show-all-floors range when collecting lights and
+     * instead asks the client visibility algorithm which floors are actually
+     * visible through ground/roof blockers.
+     */
+    void renderClientVisible(const MapEditor::Domain::ChunkedMap& map,
+                             int viewport_width, int viewport_height,
+                             float camera_x, float camera_y,
+                             float zoom, int current_floor,
+                             const MapEditor::Domain::LightConfig& config,
+                             std::optional<MapEditor::Domain::Position> visibility_origin = std::nullopt,
+                             const std::vector<MapEditor::Domain::LightSource>* injected_lights = nullptr);
+
+    /**
      * Invalidate light cache for a specific tile position.
      * Should be called when tiles change.
      */
@@ -54,19 +70,15 @@ public:
     void invalidateAll();
 
 private:
-    void computeChunkLight(CachedLightGrid& grid, 
-                           const std::vector<MapEditor::Domain::LightSource>& lights,
-                           const ViewportGroundBlocking& viewport_blocking,
-                           const MapEditor::Domain::LightConfig& config,
-                           int32_t chunk_x, int32_t chunk_y);
+    void computeViewportLight(const ViewportLightBuffer& light_buffer,
+                              const MapEditor::Domain::LightConfig& config);
 
     Services::ClientDataService* client_data_;
     
-    std::unique_ptr<LightCache> cache_;
     std::unique_ptr<LightTexture> texture_;
     std::unique_ptr<LightOverlay> overlay_;
     std::unique_ptr<LightGatherer> gatherer_;
-    ViewportGroundBlocking viewport_blocking_;
+    ViewportLightBuffer light_buffer_;
 
     std::vector<uint8_t> viewport_buffer_;
 

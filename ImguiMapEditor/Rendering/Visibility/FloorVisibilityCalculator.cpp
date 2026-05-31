@@ -12,72 +12,59 @@ FloorVisibilityCalculator::FloorVisibilityCalculator(Services::ClientDataService
 
 const Domain::ItemType* FloorVisibilityCalculator::getItemType(const Domain::Item* item) const {
     if (!item || !client_data_) return nullptr;
+    if (const Domain::ItemType* item_type = item->getType()) {
+        return item_type;
+    }
     return client_data_->getItemTypeByServerId(item->getServerId());
 }
 
 bool FloorVisibilityCalculator::tileLimitsFloorsView(const Domain::Tile* tile, bool is_free_view) const {
     if (!tile) return false;
-    
-    // Check ground first
-    const Domain::Item* ground = tile->getGround();
-    if (!ground) return false;
-    
-    const Domain::ItemType* ground_type = getItemType(ground);
-    if (!ground_type) return false;
-    
-    // Items with isDontHide never block view
-    if (ground_type->is_dont_hide) return false;
-    
-    // Ground tiles block view
-    if (ground_type->is_ground) return true;
-    
-    // isOnBottom items (walls) block view
-    if (ground_type->is_on_bottom) {
-        if (is_free_view) {
-            // Free view: any wall blocks
-            return true;
-        } else {
-            // Player view: only walls that block projectiles
-            return ground_type->blocks_projectile;
-        }
+
+    const Domain::Item* first_thing = tile->getGround();
+    if (!first_thing && !tile->getItems().empty()) {
+        first_thing = tile->getItems().front().get();
     }
-    
-    // Check other items on tile for blocking
-    for (const auto& item : tile->getItems()) {
-        const Domain::ItemType* item_type = getItemType(item.get());
-        if (!item_type) continue;
-        
-        if (item_type->is_dont_hide) continue;
-        
-        if (item_type->is_ground) return true;
-        
-        if (item_type->is_on_bottom) {
-            if (is_free_view) {
-                return true;
-            } else {
-                if (item_type->blocks_projectile) return true;
-            }
-        }
+
+    const Domain::ItemType* item_type = getItemType(first_thing);
+    if (!item_type) return false;
+
+    if (item_type->hasFlag(Domain::ItemFlag::IgnoreLook)) {
+        return false;
     }
-    
-    return false;
+
+    const bool is_ground_tile = item_type->isGround() || item_type->is_ground;
+    const bool is_bottom = item_type->always_on_bottom || item_type->is_on_bottom;
+    const bool blocks_projectile =
+        item_type->blocks_projectile ||
+        item_type->hasFlag(Domain::ItemFlag::BlockMissiles);
+
+    if (is_free_view) {
+        return is_ground_tile || is_bottom;
+    }
+
+    return is_ground_tile || (is_bottom && blocks_projectile);
 }
 
 bool FloorVisibilityCalculator::isLookPossible(const Domain::Tile* tile) const {
-    if (!tile) return true;  // Empty tile is transparent
+    if (!tile) return false;
     
     // Check all items for projectile blocking
     const Domain::Item* ground = tile->getGround();
     if (ground) {
         const Domain::ItemType* ground_type = getItemType(ground);
-        if (ground_type && ground_type->blocks_projectile) {
+        if (ground_type &&
+            (ground_type->blocks_projectile ||
+             ground_type->hasFlag(Domain::ItemFlag::BlockMissiles))) {
             return false;
         }
     }
     
     for (const auto& item : tile->getItems()) {
         const Domain::ItemType* item_type = getItemType(item.get());
-        if (item_type && item_type->blocks_projectile) {
+        if (item_type &&
+            (item_type->blocks_projectile ||
+             item_type->hasFlag(Domain::ItemFlag::BlockMissiles))) {
             return false;
         }
     }
@@ -99,48 +86,44 @@ int FloorVisibilityCalculator::calcFirstVisibleFloor(
                                static_cast<int>(FC::UNDERGROUND_FLOOR));
     }
     
-    // Check 3x3 area around camera for blocking tiles
     for (int ix = -1; ix <= 1 && first_floor < camera_z; ++ix) {
         for (int iy = -1; iy <= 1 && first_floor < camera_z; ++iy) {
-            int pos_x = camera_x + ix;
-            int pos_y = camera_y + iy;
-            
-            // Center tile OR diagonal tiles where we can look through
-            bool is_center = (ix == 0 && iy == 0);
-            bool is_diagonal = (std::abs(ix) == std::abs(iy)) && !is_center;
-            
-            // For diagonal tiles, check if we can look through (window/door)
-            if (!is_center && is_diagonal) {
-                const Domain::Tile* current_tile = map.getTile(pos_x, pos_y, camera_z);
-                if (!isLookPossible(current_tile)) {
-                    continue;  // Can't look diagonally through solid tiles
-                }
+            const int pos_x = camera_x + ix;
+            const int pos_y = camera_y + iy;
+            const bool is_center = ix == 0 && iy == 0;
+            const bool is_straight_neighbor = std::abs(ix) != std::abs(iy);
+            const Domain::Tile* position_tile = map.getTile(pos_x, pos_y, camera_z);
+            const bool look_possible = isLookPossible(position_tile);
+
+            if (!is_center && (!is_straight_neighbor || !look_possible)) {
+                continue;
             }
-            
-            // Walk up through floors checking for blockers
-            // OTClient uses coveredUp which shifts x+1, y+1, z-1
-            int check_x = pos_x;
-            int check_y = pos_y;
-            
-            for (int check_z = camera_z - 1; check_z >= first_floor; --check_z) {
-                // Apply covered position shift (each floor up = x+1, y+1)
-                int z_diff = camera_z - check_z;
-                int covered_x = pos_x + z_diff;
-                int covered_y = pos_y + z_diff;
-                
-                // Check tile directly above (physical position)
-                const Domain::Tile* upper_tile = map.getTile(pos_x, pos_y, check_z);
-                bool can_look = isLookPossible(map.getTile(pos_x, pos_y, camera_z));
-                
-                if (upper_tile && tileLimitsFloorsView(upper_tile, !can_look)) {
-                    first_floor = check_z + 1;
+
+            int upper_x = pos_x;
+            int upper_y = pos_y;
+            int upper_z = camera_z;
+            int covered_x = pos_x;
+            int covered_y = pos_y;
+            int covered_z = camera_z;
+
+            while (upper_z > 0 && covered_z > 0) {
+                --upper_z;
+                --covered_z;
+                ++covered_x;
+                ++covered_y;
+                if (upper_z < first_floor) {
                     break;
                 }
-                
-                // Check tile geometrically above (covered position)
-                const Domain::Tile* covered_tile = map.getTile(covered_x, covered_y, check_z);
-                if (covered_tile && tileLimitsFloorsView(covered_tile, can_look)) {
-                    first_floor = check_z + 1;
+
+                if (const Domain::Tile* upper_tile = map.getTile(upper_x, upper_y, upper_z);
+                    tileLimitsFloorsView(upper_tile, !look_possible)) {
+                    first_floor = upper_z + 1;
+                    break;
+                }
+
+                if (const Domain::Tile* covered_tile = map.getTile(covered_x, covered_y, covered_z);
+                    tileLimitsFloorsView(covered_tile, look_possible)) {
+                    first_floor = covered_z + 1;
                     break;
                 }
             }

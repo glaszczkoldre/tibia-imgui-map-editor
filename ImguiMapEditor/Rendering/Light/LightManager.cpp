@@ -1,13 +1,28 @@
 #include "LightManager.h"
-#include "LightColorPalette.h"
-#include "Services/ClientDataService.h"
-#include <cmath>
+
 #include <algorithm>
+#include <cmath>
+
 #include <spdlog/spdlog.h>
-#include <cstring> // For memcpy
+
+#include "LightColorPalette.h"
+#include "Core/Config.h"
+#include "Services/ClientDataService.h"
+#include "Rendering/Visibility/FloorVisibilityCalculator.h"
 
 namespace MapEditor {
 namespace Rendering {
+
+namespace {
+
+int32_t projectedFloorOffsetTiles(int16_t current_floor, int16_t tile_floor) {
+    if (tile_floor <= Config::Map::GROUND_LAYER) {
+        return Config::Map::GROUND_LAYER - tile_floor;
+    }
+    return current_floor - tile_floor;
+}
+
+} // namespace
 
 LightManager::LightManager(Services::ClientDataService* client_data)
     : client_data_(client_data)
@@ -17,7 +32,6 @@ LightManager::LightManager(Services::ClientDataService* client_data)
 LightManager::~LightManager() = default;
 
 bool LightManager::initialize() {
-    cache_ = std::make_unique<LightCache>();
     texture_ = std::make_unique<LightTexture>();
     overlay_ = std::make_unique<LightOverlay>();
     gatherer_ = std::make_unique<LightGatherer>();
@@ -35,31 +49,35 @@ bool LightManager::initialize() {
 }
 
 void LightManager::invalidateTile(int32_t x, int32_t y) {
-    // Flag that we need to update the light texture next frame
+    (void)x;
+    (void)y;
     force_update_ = true;
-
-    if (cache_) {
-        // Invalidate chunk containing the tile AND its neighbors
-        // to propagate light changes (spilling)
-        
-        // Using explicit shift to match ChunkedMap
-        int32_t cx = x >> 5;
-        int32_t cy = y >> 5;
-        
-        // Since we don't know the floor here yet (interface limitation), 
-        // valid safe approach is to invalidate this column on all floors.
-        // Most map edits are single floor, but 16 iterations is cheap.
-        for (int16_t z = 0; z <= 15; ++z) {
-            cache_->invalidateRegion(cx - 1, cy - 1, cx + 1, cy + 1, z);
-        }
-    }
 }
 
 void LightManager::invalidateAll() {
     force_update_ = true;
-    if (cache_) {
-        cache_->clear();
-    }
+}
+
+void LightManager::renderClientVisible(
+    const Domain::ChunkedMap& map,
+    int viewport_width, int viewport_height,
+    float camera_x, float camera_y,
+    float zoom, int current_floor,
+    const Domain::LightConfig& config,
+    std::optional<Domain::Position> visibility_origin,
+    const std::vector<Domain::LightSource>* injected_lights)
+{
+    FloorVisibilityCalculator floor_visibility(client_data_);
+    const int visibility_x =
+        visibility_origin ? visibility_origin->x : static_cast<int>(camera_x);
+    const int visibility_y =
+        visibility_origin ? visibility_origin->y : static_cast<int>(camera_y);
+    const int start_floor = floor_visibility.calcLastVisibleFloor(current_floor);
+    const int end_floor = floor_visibility.calcFirstVisibleFloor(
+        map, visibility_x, visibility_y, current_floor);
+
+    render(map, viewport_width, viewport_height, camera_x, camera_y, zoom,
+           current_floor, start_floor, end_floor, config, injected_lights);
 }
 
 void LightManager::render(const Domain::ChunkedMap& map,
@@ -131,102 +149,43 @@ void LightManager::render(const Domain::ChunkedMap& map,
     last_config_ = config;
     force_update_ = false;
 
-    // 2. Prepare buffer and viewport blocking grid
+    // 2. Gather one RME-style viewport light buffer and compute brightness globally.
     size_t required_size = width_tiles * height_tiles * 4;
     if (viewport_buffer_.size() < required_size) {
         viewport_buffer_.resize(required_size);
     }
-    
-    // Calculate chunk bounds
-    int chunk_start_x = start_x >> 5;
-    int chunk_start_y = start_y >> 5;
-    int chunk_end_x = end_x >> 5;
-    int chunk_end_y = end_y >> 5;
-    
-    // Initialize viewport-level ground blocking (RME-style global blocking)
-    viewport_blocking_.init(start_x, start_y, width_tiles, height_tiles);
-    
-    // PRE-PASS: Register ground blocking for ALL visible chunks/floors BEFORE computing lights.
-    // This ensures the blocking grid is complete before any light computation,
-    // preventing chunk seams where earlier chunks have incomplete blocking data.
-    constexpr int GROUND_LAYER = 7;
-    for (int16_t floor = static_cast<int16_t>(start_floor); floor >= static_cast<int16_t>(end_floor); --floor) {
-        int32_t floor_offset = 0;
-        if (floor <= GROUND_LAYER) {
-            floor_offset = GROUND_LAYER - floor;
-        }
-        for (int cy = chunk_start_y; cy <= chunk_end_y; ++cy) {
-            for (int cx = chunk_start_x; cx <= chunk_end_x; ++cx) {
-                gatherer_->registerGroundBlockingForChunk(
-                    map, cx, cy, client_data_, floor, floor_offset, viewport_blocking_);
-            }
-        }
-    }
-    
-    // 3. Iterate over chunks in the view
 
-    for (int cy = chunk_start_y; cy <= chunk_end_y; ++cy) {
-        for (int cx = chunk_start_x; cx <= chunk_end_x; ++cx) {
-            
-            // Get or compute the grid
-            // Use current_floor as cache key since all lights are projected to this floor
-            CachedLightGrid& grid = cache_->getOrCreateGrid(cx, cy, static_cast<int16_t>(current_floor));
-            if (!grid.is_valid) {
-                gatherer_->clear();
-                
-                // Use multi-floor gathering if we have a floor range
-                if (start_floor != end_floor) {
-                    gatherer_->gatherForChunkMultiFloor(
-                        map, cx, cy, client_data_,
-                        static_cast<int16_t>(start_floor),
-                        static_cast<int16_t>(end_floor));
-                } else {
-                    // Single floor mode — no blocking needed (only one floor)
-                    gatherer_->gatherForChunk(map, cx, cy, client_data_, static_cast<int16_t>(current_floor));
+    light_buffer_.init(start_x, start_y, width_tiles, height_tiles);
+    gatherer_->gatherViewportLightBuffer(
+        map, client_data_, static_cast<int16_t>(current_floor),
+        static_cast<int16_t>(start_floor), static_cast<int16_t>(end_floor),
+        light_buffer_);
+
+    if (injected_lights) {
+        for (const auto& light : *injected_lights) {
+            Domain::LightSource projected = light;
+            const int32_t floor_offset = projectedFloorOffsetTiles(
+                static_cast<int16_t>(current_floor), light.source_floor);
+            projected.x -= floor_offset;
+            projected.y -= floor_offset;
+
+            if (!light_buffer_.lights.empty()) {
+                auto& prev = light_buffer_.lights.back();
+                if (prev.x == projected.x && prev.y == projected.y &&
+                    prev.color == projected.color &&
+                    prev.source_floor == projected.source_floor) {
+                    prev.intensity = std::max(prev.intensity, projected.intensity);
+                    continue;
                 }
-                
-                // Combine gathered lights with any injected lights
-                if (injected_lights && !injected_lights->empty()) {
-                    std::vector<Domain::LightSource> combined = gatherer_->getLights();
-                    combined.insert(combined.end(), injected_lights->begin(), injected_lights->end());
-                    computeChunkLight(grid, combined, viewport_blocking_, config, cx, cy);
-                } else {
-                    computeChunkLight(grid, gatherer_->getLights(), viewport_blocking_, config, cx, cy);
-                }
-                
-                grid.is_valid = true;
             }
-            
-            // Copy relevant part of the grid to viewport buffer
-            int chunk_pixel_x = cx * 32;
-            int chunk_pixel_y = cy * 32;
-            
-            // Intersection between Chunk and Viewport
-            int ix_start = std::max(start_x, chunk_pixel_x);
-            int ix_end = std::min(end_x, chunk_pixel_x + 32);
-            int iy_start = std::max(start_y, chunk_pixel_y);
-            int iy_end = std::min(end_y, chunk_pixel_y + 32);
-            
-            if (ix_start >= ix_end || iy_start >= iy_end) continue;
-            
-            // Copy loops
-            for (int y = iy_start; y < iy_end; ++y) {
-                int dest_y = y - start_y;
-                int src_y = y - chunk_pixel_y;
-                
-                int dest_row_start = (dest_y * width_tiles + (ix_start - start_x)) * 4;
-                int src_row_start = (src_y * 32 + (ix_start - chunk_pixel_x)) * 4; // Assuming 32 width
-                int row_len = (ix_end - ix_start) * 4; // Bytes
-                
-                // Safety check
-                 std::memcpy(&viewport_buffer_[dest_row_start], 
-                            reinterpret_cast<const uint8_t*>(&grid.pixels[0]) + src_row_start,
-                            row_len);
-            }
+
+            light_buffer_.lights.push_back(projected);
         }
     }
 
-    // 4. Upload and Render
+    computeViewportLight(light_buffer_, config);
+
+    // 3. Upload and Render
     texture_->upload(viewport_buffer_, width_tiles, height_tiles);
     
     // Calc screen rect
@@ -243,87 +202,71 @@ void LightManager::render(const Domain::ChunkedMap& map,
                    glm::vec2(viewport_width, viewport_height));
 }
 
-void LightManager::computeChunkLight(CachedLightGrid& grid,
-                                     const std::vector<Domain::LightSource>& lights,
-                                     const ViewportGroundBlocking& viewport_blocking,
-                                     const Domain::LightConfig& config,
-                                     int32_t chunk_x, int32_t chunk_y)
+void LightManager::computeViewportLight(const ViewportLightBuffer& light_buffer,
+                                        const Domain::LightConfig& config)
 {
-    // Determine ambient based on camera floor (above-ground vs underground)
+    const bool above_ground = config.camera_floor <= Config::Map::GROUND_LAYER;
+    const uint8_t ambient_color = above_ground ? config.global_light.color : 215;
+    const uint8_t ambient_intensity = above_ground
+        ? std::max(config.client_slider, config.global_light.intensity)
+        : config.client_slider;
+
     float ambient_r, ambient_g, ambient_b;
-    
-    constexpr int GROUND_LAYER = 7;
-    if (config.camera_floor <= GROUND_LAYER) {
-        // Above ground: use server global light
-        float scale = static_cast<float>(config.global_light.intensity) / 255.0f;
-        LightColorPalette::from8bitFloat(config.global_light.color, ambient_r, ambient_g, ambient_b);
-        ambient_r *= scale;
-        ambient_g *= scale;
-        ambient_b *= scale;
-    } else {
-        // Underground: zero ambient (pitch black without lights)
-        ambient_r = 0.0f;
-        ambient_g = 0.0f;
-        ambient_b = 0.0f;
-    }
-    
-    // Apply client slider as floor above ground; as absolute underground
-    float slider_scale = static_cast<float>(config.client_slider) / 255.0f;
-    if (config.camera_floor <= GROUND_LAYER) {
-        // Above ground: max(slider, ambient)
-        float slider_r = slider_scale; // White light from slider
-        float slider_g = slider_scale;
-        float slider_b = slider_scale;
-        ambient_r = std::max(ambient_r, slider_r);
-        ambient_g = std::max(ambient_g, slider_g);
-        ambient_b = std::max(ambient_b, slider_b);
-    } else {
-        // Underground: slider is absolute
-        ambient_r = slider_scale;
-        ambient_g = slider_scale;
-        ambient_b = slider_scale;
-    }
+    LightColorPalette::from8bitFloat(ambient_color, ambient_r, ambient_g, ambient_b);
+    const float ambient_scale = static_cast<float>(ambient_intensity) / 255.0f;
+    ambient_r *= ambient_scale;
+    ambient_g *= ambient_scale;
+    ambient_b *= ambient_scale;
     
     uint8_t base_r = static_cast<uint8_t>(std::min(ambient_r * 255.0f, 255.0f));
     uint8_t base_g = static_cast<uint8_t>(std::min(ambient_g * 255.0f, 255.0f));
     uint8_t base_b = static_cast<uint8_t>(std::min(ambient_b * 255.0f, 255.0f));
     
     // Fill with ambient first
-    uint32_t ambient_packed = base_r | (base_g << 8) | (base_b << 16) | (255 << 24);
-    std::fill(grid.pixels.begin(), grid.pixels.end(), ambient_packed);
-    
-    int chunk_start_x = chunk_x * 32;
-    int chunk_start_y = chunk_y * 32;
+    const size_t pixel_count =
+        static_cast<size_t>(light_buffer.width) * static_cast<size_t>(light_buffer.height);
+    for (size_t i = 0; i < pixel_count; ++i) {
+        const size_t base = i * 4;
+        viewport_buffer_[base + 0] = base_r;
+        viewport_buffer_[base + 1] = base_g;
+        viewport_buffer_[base + 2] = base_b;
+        viewport_buffer_[base + 3] = 255;
+    }
     
     // Iterate lights FIRST, then only tiles affected by each light
-    for (const auto& light : lights) {
+    for (size_t light_index = 0; light_index < light_buffer.lights.size(); ++light_index) {
+        const auto& light = light_buffer.lights[light_index];
         // Pre-compute light color once per light
         float lr, lg, lb;
         LightColorPalette::from8bitFloat(light.color, lr, lg, lb);
         
-        // Calculate bounding box of affected tiles (in local chunk coords)
+        // Calculate bounding box of affected tiles (in viewport-local coords)
         int radius = light.intensity;
-        int min_x = std::max(0, light.x - radius - chunk_start_x);
-        int max_x = std::min(31, light.x + radius - chunk_start_x);
-        int min_y = std::max(0, light.y - radius - chunk_start_y);
-        int max_y = std::min(31, light.y + radius - chunk_start_y);
+        int min_x = std::max(0, light.x - radius - light_buffer.origin_x);
+        int max_x = std::min(light_buffer.width - 1,
+                             light.x + radius - light_buffer.origin_x);
+        int min_y = std::max(0, light.y - radius - light_buffer.origin_y);
+        int max_y = std::min(light_buffer.height - 1,
+                             light.y + radius - light_buffer.origin_y);
         
-        // Skip if light doesn't affect this chunk
-        if (min_x > 31 || max_x < 0 || min_y > 31 || max_y < 0) continue;
+        // Skip if light doesn't affect this viewport
+        if (min_x >= light_buffer.width || max_x < 0 ||
+            min_y >= light_buffer.height || max_y < 0) {
+            continue;
+        }
         
         // Only iterate tiles within light's bounding box
         for (int y = min_y; y <= max_y; ++y) {
             for (int x = min_x; x <= max_x; ++x) {
-                int tile_x = chunk_start_x + x;
-                int tile_y = chunk_start_y + y;
-                
-                // Ground blocking check: viewport-level blocking (RME-style)
-                // blocking_floor = nearest floor (lowest Z) with solid ground at this projected position.
-                // Lights from floors BELOW (higher Z) the blocking ground are blocked.
-                int16_t blocking_floor = viewport_blocking.getBlockingFloor(tile_x, tile_y);
-                if (blocking_floor >= 0 && light.source_floor > blocking_floor) {
-                    continue; // Light is from a floor below the solid ground — blocked
+                const size_t tile_index =
+                    static_cast<size_t>(y) * static_cast<size_t>(light_buffer.width) +
+                    static_cast<size_t>(x);
+                if (light_index < light_buffer.tile_start[tile_index]) {
+                    continue;
                 }
+
+                int tile_x = light_buffer.origin_x + x;
+                int tile_y = light_buffer.origin_y + y;
                 
                 float dx = (static_cast<float>(tile_x) + 0.5f) - (static_cast<float>(light.x) + 0.5f);
                 float dy = (static_cast<float>(tile_y) + 0.5f) - (static_cast<float>(light.y) + 0.5f);
@@ -340,15 +283,18 @@ void LightManager::computeChunkLight(CachedLightGrid& grid,
                 if (intensity > 1.0f) intensity = 1.0f;
                 
                 // Update pixel with max blending
-                uint32_t& pixel = grid.pixels[y * 32 + x];
-                int r = std::max(static_cast<int>(pixel & 0xFF), static_cast<int>(lr * intensity * 255.0f));
-                int g = std::max(static_cast<int>((pixel >> 8) & 0xFF), static_cast<int>(lg * intensity * 255.0f));
-                int b = std::max(static_cast<int>((pixel >> 16) & 0xFF), static_cast<int>(lb * intensity * 255.0f));
-                
-                pixel = static_cast<uint32_t>(std::min(r, 255)) |
-                       (static_cast<uint32_t>(std::min(g, 255)) << 8) |
-                       (static_cast<uint32_t>(std::min(b, 255)) << 16) |
-                       (255 << 24);
+                const size_t base = tile_index * 4;
+                int r = std::max(static_cast<int>(viewport_buffer_[base + 0]),
+                                 static_cast<int>(lr * intensity * 255.0f));
+                int g = std::max(static_cast<int>(viewport_buffer_[base + 1]),
+                                 static_cast<int>(lg * intensity * 255.0f));
+                int b = std::max(static_cast<int>(viewport_buffer_[base + 2]),
+                                 static_cast<int>(lb * intensity * 255.0f));
+
+                viewport_buffer_[base + 0] = static_cast<uint8_t>(std::min(r, 255));
+                viewport_buffer_[base + 1] = static_cast<uint8_t>(std::min(g, 255));
+                viewport_buffer_[base + 2] = static_cast<uint8_t>(std::min(b, 255));
+                viewport_buffer_[base + 3] = 255;
             }
         }
     }

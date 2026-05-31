@@ -48,6 +48,7 @@ void MapPanelInput::handlePasteMode(MapViewCamera &camera,
   if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
     glm::vec2 mouse_pos(io.MousePos.x, io.MousePos.y);
     Domain::Position target_pos = camera.screenToTile(mouse_pos);
+    setLightVisibilityOrigin(target_pos);
     bool replace_mode = session->isPasteReplaceMode() || io.KeyShift;
     session->confirmPaste(target_pos, replace_mode);
     return;
@@ -108,8 +109,17 @@ void MapPanelInput::handleMouseZoom(MapViewCamera &camera) {
   }
 }
 
+void MapPanelInput::setLightVisibilityOrigin(const Domain::Position &position) {
+  light_visibility_origin_ = position;
+}
+
+void MapPanelInput::clearLightVisibilityOrigin() {
+  light_visibility_origin_.reset();
+}
+
 void MapPanelInput::handleFloorChange(MapViewCamera &camera, bool is_focused) {
   ImGuiIO &io = ImGui::GetIO();
+  const int16_t previous_floor = camera.getCurrentFloor();
 
   // Ctrl + Scroll for floor change (inverted: scroll down = floor up, scroll up
   // = floor down)
@@ -127,6 +137,10 @@ void MapPanelInput::handleFloorChange(MapViewCamera &camera, bool is_focused) {
       camera.floorUp();
     if (ImGui::IsKeyPressed(ImGuiKey_PageDown))
       camera.floorDown();
+  }
+
+  if (camera.getCurrentFloor() != previous_floor) {
+    clearLightVisibilityOrigin();
   }
 }
 
@@ -211,6 +225,7 @@ void MapPanelInput::handleTileSelection(
 
   // Handle Lasso Start with Alt Key
   if (is_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+    setLightVisibilityOrigin(camera.screenToTile(mouse_pos));
     if (io.KeyAlt) {
       lasso_mode_ = LassoMode::Drawing;
       lasso_points_.clear();
@@ -341,6 +356,7 @@ void MapPanelInput::handleNormalSelectionInput(
 
   // Start tracking on left click (non-lasso)
   if (is_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+    setLightVisibilityOrigin(tile_pos);
     handleSelectionMouseDown(camera, session, input_controller, mouse_pos, tile_pos, mods, io);
   }
 
