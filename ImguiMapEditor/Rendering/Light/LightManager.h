@@ -56,10 +56,9 @@ public:
 private:
     void computeChunkLight(CachedLightGrid& grid, 
                            const std::vector<MapEditor::Domain::LightSource>& lights,
-                           const GroundBrightness& ground_brightness,
+                           const ViewportGroundBlocking& viewport_blocking,
                            const MapEditor::Domain::LightConfig& config,
-                           int32_t chunk_x, int32_t chunk_y,
-                           int16_t current_floor);
+                           int32_t chunk_x, int32_t chunk_y);
 
     Services::ClientDataService* client_data_;
     
@@ -67,6 +66,7 @@ private:
     std::unique_ptr<LightTexture> texture_;
     std::unique_ptr<LightOverlay> overlay_;
     std::unique_ptr<LightGatherer> gatherer_;
+    ViewportGroundBlocking viewport_blocking_;
 
     std::vector<uint8_t> viewport_buffer_;
 

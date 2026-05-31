@@ -13,11 +13,9 @@ namespace Rendering {
 
 void LightGatherer::clear() {
     lights_.clear();
-    ground_brightness_ = GroundBrightness{};
 }
 
 void LightGatherer::addLight(int32_t x, int32_t y, uint8_t color, uint8_t intensity, int16_t floor) {
-    // Dedup: merge consecutive lights with same pos, color, and floor
     if (!lights_.empty()) {
         auto& prev = lights_.back();
         if (prev.x == x && prev.y == y && prev.color == color && prev.source_floor == floor) {
@@ -64,7 +62,6 @@ void LightGatherer::gatherForChunk(
                     int32_t tile_x = tile->getX();
                     int32_t tile_y = tile->getY();
                     
-                    // Check ground item for light
                     const Domain::Item* ground = tile->getGround();
                     if (ground) {
                         const Domain::ItemType* item_type = client_data->getItemTypeByServerId(ground->getServerId());
@@ -73,7 +70,6 @@ void LightGatherer::gatherForChunk(
                         }
                     }
                     
-                    // Check all items on the tile
                     for (const auto& item_ptr : tile->getItems()) {
                         if (!item_ptr) continue;
                         const Domain::ItemType* item_type = client_data->getItemTypeByServerId(item_ptr->getServerId());
@@ -82,7 +78,6 @@ void LightGatherer::gatherForChunk(
                         }
                     }
                     
-                    // Check creature for light
                     const Domain::Creature* creature = tile->getCreature();
                     if (creature) {
                         const Domain::CreatureType* creature_type = client_data->getCreatureType(creature->name);
@@ -107,9 +102,6 @@ void LightGatherer::gatherForChunkMultiFloor(
     
     constexpr int GROUND_LAYER = 7;
     
-    // Reset ground brightness for the target chunk
-    ground_brightness_ = GroundBrightness{};
-    
     for (int16_t floor = start_floor; floor >= end_floor; --floor) {
         int32_t floor_offset = 0;
         if (floor <= GROUND_LAYER) {
@@ -118,12 +110,52 @@ void LightGatherer::gatherForChunkMultiFloor(
         
         for (int dy = -1; dy <= 1; ++dy) {
             for (int dx = -1; dx <= 1; ++dx) {
-                bool is_target = (dx == 0 && dy == 0);
                 gatherLightsFromNeighborChunk(
                     map, chunk_x + dx, chunk_y + dy, 
-                    client_data, floor, floor_offset, is_target);
+                    client_data, floor, floor_offset);
             }
         }
+    }
+}
+
+void LightGatherer::registerGroundBlockingForChunk(
+    const Domain::ChunkedMap& map,
+    int32_t chunk_x, int32_t chunk_y,
+    Services::ClientDataService* client_data,
+    int16_t floor,
+    int32_t floor_offset,
+    ViewportGroundBlocking& viewport_blocking)
+{
+    if (!client_data) return;
+    
+    int32_t tile_start_x = chunk_x * Domain::Chunk::SIZE;
+    int32_t tile_start_y = chunk_y * Domain::Chunk::SIZE;
+    int32_t tile_end_x = tile_start_x + Domain::Chunk::SIZE;
+    int32_t tile_end_y = tile_start_y + Domain::Chunk::SIZE;
+    
+    std::vector<Domain::Chunk*> chunks;
+    map.getVisibleChunks(tile_start_x, tile_start_y, tile_end_x - 1, tile_end_y - 1, floor, chunks);
+    
+    for (Domain::Chunk* chunk : chunks) {
+        if (!chunk) continue;
+        
+        chunk->forEachTile([&](const Domain::Tile* tile) {
+            if (!tile || tile->getZ() != floor) return;
+            
+            const Domain::Item* ground = tile->getGround();
+            if (!ground) return;
+            
+            const Domain::ItemType* ground_type = client_data->getItemTypeByServerId(ground->getServerId());
+            bool is_ground_tile = ground_type && 
+                (ground_type->is_ground || ground_type->group == Domain::ItemGroup::Ground);
+            if (is_ground_tile && ground_type && !ground_type->is_translucent) {
+                int32_t tile_x = tile->getX();
+                int32_t tile_y = tile->getY();
+                int32_t adjusted_x = tile_x - floor_offset;
+                int32_t adjusted_y = tile_y - floor_offset;
+                viewport_blocking.setBlockingFloor(adjusted_x, adjusted_y, floor);
+            }
+        });
     }
 }
 
@@ -131,16 +163,12 @@ void LightGatherer::gatherLightsFromNeighborChunk(
     const Domain::ChunkedMap& map,
     int32_t target_cx, int32_t target_cy,
     Services::ClientDataService* client_data,
-    int16_t floor, int32_t floor_offset,
-    bool is_target_chunk)
+    int16_t floor, int32_t floor_offset)
 {
     int32_t tile_start_x = target_cx * Domain::Chunk::SIZE;
     int32_t tile_start_y = target_cy * Domain::Chunk::SIZE;
     int32_t tile_end_x = tile_start_x + Domain::Chunk::SIZE;
     int32_t tile_end_y = tile_start_y + Domain::Chunk::SIZE;
-    
-    int32_t target_chunk_start_x = target_cx * Domain::Chunk::SIZE;
-    int32_t target_chunk_start_y = target_cy * Domain::Chunk::SIZE;
     
     constexpr int GROUND_LAYER = 7;
     
@@ -159,24 +187,6 @@ void LightGatherer::gatherLightsFromNeighborChunk(
             int32_t adjusted_x = tile_x - floor_offset;
             int32_t adjusted_y = tile_y - floor_offset;
             
-            // Track ground solidity for blocking (only for the target chunk)
-            if (is_target_chunk) {
-                const Domain::Item* ground = tile->getGround();
-                if (ground) {
-                    const Domain::ItemType* ground_type = client_data->getItemTypeByServerId(ground->getServerId());
-                    if (ground_type && ground_type->is_ground && !ground_type->is_translucent) {
-                        int32_t local_x = tile_x - target_chunk_start_x;
-                        int32_t local_y = tile_y - target_chunk_start_y;
-                        if (local_x >= 0 && local_x < 32 && local_y >= 0 && local_y < 32) {
-                            int idx = local_y * 32 + local_x;
-                            if (ground_brightness_.blocking_floor[idx] < 0 || floor < ground_brightness_.blocking_floor[idx]) {
-                                ground_brightness_.blocking_floor[idx] = floor;
-                            }
-                        }
-                    }
-                }
-            }
-            
             // Add light sources from items
             auto addLightFromItem = [&](const Domain::Item* item) {
                 if (!item) return;
@@ -192,7 +202,7 @@ void LightGatherer::gatherLightsFromNeighborChunk(
                 addLightFromItem(item_ptr.get());
             }
             
-            // Check creature for light (Phase 4)
+            // Check creature for light
             const Domain::Creature* creature = tile->getCreature();
             if (creature) {
                 const Domain::CreatureType* creature_type = client_data->getCreatureType(creature->name);
@@ -201,7 +211,7 @@ void LightGatherer::gatherLightsFromNeighborChunk(
                 }
             }
             
-            // Translucent ground propagation (Phase 5)
+            // Translucent ground propagation (z=7 → z=8)
             if (floor == GROUND_LAYER) {
                 bool has_translucent = false;
                 
@@ -224,7 +234,6 @@ void LightGatherer::gatherLightsFromNeighborChunk(
                 }
                 
                 if (has_translucent) {
-                    // Emit dim white light at z=8 (no isometric offset for underground)
                     addLight(tile_x, tile_y, 215, 1, static_cast<int16_t>(GROUND_LAYER + 1));
                 }
             }

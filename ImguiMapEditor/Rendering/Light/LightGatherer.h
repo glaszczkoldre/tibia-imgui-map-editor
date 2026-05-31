@@ -14,17 +14,46 @@ namespace Services {
 namespace Rendering {
 
 /**
- * Per-tile ground blocking data for a chunk.
- * Records the highest floor (lowest Z) with solid ground above each tile.
- * Lights from floors above blocking_floor are blocked.
+ * Viewport-level ground blocking data.
+ * For each tile position in the viewport, records the nearest floor (lowest Z)
+ * with solid ground. Lights from floors BELOW (higher Z) the blocking floor are blocked.
+ * 
+ * This is the equivalent of RME's TileLight::start mechanism, but using
+ * floor numbers instead of light indices.
  */
-struct GroundBrightness {
-    // For each tile (32x32), the floor with solid ground that blocks lights from above.
-    // Value of -1 means no blocking (all lights pass through).
-    std::array<int16_t, 32 * 32> blocking_floor;
+struct ViewportGroundBlocking {
+    std::vector<int16_t> blocking_floor;  // -1 = no blocking, >=0 = floor with solid ground
+    int width = 0;
+    int height = 0;
+    int origin_x = 0;  // tile-space origin (start_x from LightManager)
+    int origin_y = 0;
     
-    GroundBrightness() {
-        blocking_floor.fill(-1);
+    void init(int ox, int oy, int w, int h) {
+        origin_x = ox;
+        origin_y = oy;
+        width = w;
+        height = h;
+        blocking_floor.assign(w * h, -1);
+    }
+    
+    // Get blocking floor for a tile at absolute tile coords (tx, ty)
+    int16_t getBlockingFloor(int tx, int ty) const {
+        int lx = tx - origin_x;
+        int ly = ty - origin_y;
+        if (lx < 0 || lx >= width || ly < 0 || ly >= height) return -1;
+        return blocking_floor[ly * width + lx];
+    }
+    
+    // Set blocking floor for a tile at absolute tile coords (tx, ty)
+    void setBlockingFloor(int tx, int ty, int16_t floor) {
+        int lx = tx - origin_x;
+        int ly = ty - origin_y;
+        if (lx < 0 || lx >= width || ly < 0 || ly >= height) return;
+        int idx = ly * width + lx;
+        // Take the nearest floor (lowest Z) with solid ground
+        if (blocking_floor[idx] < 0 || floor < blocking_floor[idx]) {
+            blocking_floor[idx] = floor;
+        }
     }
 };
 
@@ -53,8 +82,6 @@ public:
     
     /**
      * Gather all light sources from multiple floors for a specific chunk.
-     * Applies isometric offset to light positions based on floor difference.
-     * Also populates ground_brightness_ for light blocking.
      */
     void gatherForChunkMultiFloor(
         const MapEditor::Domain::ChunkedMap& map,
@@ -62,6 +89,19 @@ public:
         Services::ClientDataService* client_data,
         int16_t start_floor,
         int16_t end_floor);
+    
+    /**
+     * Register ground blocking for viewport tiles from a specific chunk/floor.
+     * Does NOT collect lights — only populates the blocking grid.
+     * Used in the pre-pass to build complete blocking data before light computation.
+     */
+    void registerGroundBlockingForChunk(
+        const MapEditor::Domain::ChunkedMap& map,
+        int32_t chunk_x, int32_t chunk_y,
+        Services::ClientDataService* client_data,
+        int16_t floor,
+        int32_t floor_offset,
+        ViewportGroundBlocking& viewport_blocking);
     
     /**
      * Get the collected light sources.
@@ -72,12 +112,6 @@ public:
      * Get number of light sources collected.
      */
     size_t getLightCount() const { return lights_.size(); }
-    
-    /**
-     * Get the ground blocking data for the target chunk.
-     * Only valid after gatherForChunkMultiFloor() has been called.
-     */
-    const GroundBrightness& getGroundBrightness() const { return ground_brightness_; }
 
 private:
     /**
@@ -87,8 +121,7 @@ private:
         const MapEditor::Domain::ChunkedMap& map,
         int32_t target_cx, int32_t target_cy,
         Services::ClientDataService* client_data,
-        int16_t floor, int32_t floor_offset,
-        bool is_target_chunk);
+        int16_t floor, int32_t floor_offset);
 
     /**
      * Add a light source with deduplication.
@@ -97,7 +130,6 @@ private:
     void addLight(int32_t x, int32_t y, uint8_t color, uint8_t intensity, int16_t floor);
 
     std::vector<MapEditor::Domain::LightSource> lights_;
-    GroundBrightness ground_brightness_;
 };
 
 } // namespace Rendering

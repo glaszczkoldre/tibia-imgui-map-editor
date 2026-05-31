@@ -131,18 +131,39 @@ void LightManager::render(const Domain::ChunkedMap& map,
     last_config_ = config;
     force_update_ = false;
 
-    // 2. Prepare buffer
+    // 2. Prepare buffer and viewport blocking grid
     size_t required_size = width_tiles * height_tiles * 4;
     if (viewport_buffer_.size() < required_size) {
         viewport_buffer_.resize(required_size);
     }
     
-    // 3. Iterate over chunks in the view
-    // To optimized cache usage, iterate by chunks visible
+    // Calculate chunk bounds
     int chunk_start_x = start_x >> 5;
     int chunk_start_y = start_y >> 5;
     int chunk_end_x = end_x >> 5;
     int chunk_end_y = end_y >> 5;
+    
+    // Initialize viewport-level ground blocking (RME-style global blocking)
+    viewport_blocking_.init(start_x, start_y, width_tiles, height_tiles);
+    
+    // PRE-PASS: Register ground blocking for ALL visible chunks/floors BEFORE computing lights.
+    // This ensures the blocking grid is complete before any light computation,
+    // preventing chunk seams where earlier chunks have incomplete blocking data.
+    constexpr int GROUND_LAYER = 7;
+    for (int16_t floor = static_cast<int16_t>(start_floor); floor >= static_cast<int16_t>(end_floor); --floor) {
+        int32_t floor_offset = 0;
+        if (floor <= GROUND_LAYER) {
+            floor_offset = GROUND_LAYER - floor;
+        }
+        for (int cy = chunk_start_y; cy <= chunk_end_y; ++cy) {
+            for (int cx = chunk_start_x; cx <= chunk_end_x; ++cx) {
+                gatherer_->registerGroundBlockingForChunk(
+                    map, cx, cy, client_data_, floor, floor_offset, viewport_blocking_);
+            }
+        }
+    }
+    
+    // 3. Iterate over chunks in the view
 
     for (int cy = chunk_start_y; cy <= chunk_end_y; ++cy) {
         for (int cx = chunk_start_x; cx <= chunk_end_x; ++cx) {
@@ -160,7 +181,7 @@ void LightManager::render(const Domain::ChunkedMap& map,
                         static_cast<int16_t>(start_floor),
                         static_cast<int16_t>(end_floor));
                 } else {
-                    // Single floor mode
+                    // Single floor mode — no blocking needed (only one floor)
                     gatherer_->gatherForChunk(map, cx, cy, client_data_, static_cast<int16_t>(current_floor));
                 }
                 
@@ -168,9 +189,9 @@ void LightManager::render(const Domain::ChunkedMap& map,
                 if (injected_lights && !injected_lights->empty()) {
                     std::vector<Domain::LightSource> combined = gatherer_->getLights();
                     combined.insert(combined.end(), injected_lights->begin(), injected_lights->end());
-                    computeChunkLight(grid, combined, gatherer_->getGroundBrightness(), config, cx, cy, static_cast<int16_t>(current_floor));
+                    computeChunkLight(grid, combined, viewport_blocking_, config, cx, cy);
                 } else {
-                    computeChunkLight(grid, gatherer_->getLights(), gatherer_->getGroundBrightness(), config, cx, cy, static_cast<int16_t>(current_floor));
+                    computeChunkLight(grid, gatherer_->getLights(), viewport_blocking_, config, cx, cy);
                 }
                 
                 grid.is_valid = true;
@@ -224,10 +245,9 @@ void LightManager::render(const Domain::ChunkedMap& map,
 
 void LightManager::computeChunkLight(CachedLightGrid& grid,
                                      const std::vector<Domain::LightSource>& lights,
-                                     const GroundBrightness& ground_brightness,
+                                     const ViewportGroundBlocking& viewport_blocking,
                                      const Domain::LightConfig& config,
-                                     int32_t chunk_x, int32_t chunk_y,
-                                     int16_t current_floor)
+                                     int32_t chunk_x, int32_t chunk_y)
 {
     // Determine ambient based on camera floor (above-ground vs underground)
     float ambient_r, ambient_g, ambient_b;
@@ -297,11 +317,12 @@ void LightManager::computeChunkLight(CachedLightGrid& grid,
                 int tile_x = chunk_start_x + x;
                 int tile_y = chunk_start_y + y;
                 
-                // Ground blocking check: skip if solid ground exists between light and tile
-                int tile_idx = y * 32 + x;
-                int16_t blocking_floor = ground_brightness.blocking_floor[tile_idx];
-                if (blocking_floor >= 0 && light.source_floor < blocking_floor) {
-                    continue; // Light is blocked by solid ground above
+                // Ground blocking check: viewport-level blocking (RME-style)
+                // blocking_floor = nearest floor (lowest Z) with solid ground at this projected position.
+                // Lights from floors BELOW (higher Z) the blocking ground are blocked.
+                int16_t blocking_floor = viewport_blocking.getBlockingFloor(tile_x, tile_y);
+                if (blocking_floor >= 0 && light.source_floor > blocking_floor) {
+                    continue; // Light is from a floor below the solid ground — blocked
                 }
                 
                 float dx = (static_cast<float>(tile_x) + 0.5f) - (static_cast<float>(light.x) + 0.5f);
