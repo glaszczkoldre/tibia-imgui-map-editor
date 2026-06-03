@@ -283,6 +283,7 @@ set(UI_SOURCES
     UI/Map/MapViewCamera.cpp
     UI/Map/SelectionMenu.cpp
     UI/Panels/NewMapPanel.cpp
+    UI/Panels/MapPropertiesPanel.cpp
     UI/Panels/BrushSizePanel.cpp
     UI/PreferencesDialog.cpp
     UI/Ribbon/Panels/BrushesPanel.cpp

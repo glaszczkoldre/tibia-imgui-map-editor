@@ -31,15 +31,25 @@ void NewMapDialog::render() {
   ImGui::SetNextWindowSize(
       ImVec2(Config::UI::NEW_MAP_DIALOG_W, Config::UI::NEW_MAP_DIALOG_H),
       ImGuiCond_Appearing);
+  ImGui::SetNextWindowSizeConstraints(
+      ImVec2(Config::UI::NEW_MAP_DIALOG_W, Config::UI::NEW_MAP_DIALOG_H),
+      ImVec2(FLT_MAX, FLT_MAX));
 
   ImGui::PushStyleVar(ImGuiStyleVar_PopupRounding, 8.0f);
   ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 6.0f);
   ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
 
   if (ImGui::BeginPopupModal("New Map##EditorModal", nullptr,
-                              ImGuiWindowFlags_NoResize)) {
+                              ImGuiWindowFlags_None)) {
 
-    // === TABS ===
+    // Content area: fill all space minus footer
+    float footer_h = ImGui::GetFrameHeightWithSpacing() + ImGui::GetStyle().ItemSpacing.y * 2;
+    float content_h = ImGui::GetContentRegionAvail().y - footer_h;
+    if (content_h < 100.0f) content_h = 100.0f;
+
+    // === TABS + CONTENT ===
+    ImGui::BeginChild("##content", ImVec2(0, content_h), ImGuiChildFlags_None);
+
     if (ImGui::BeginTabBar("##NewMapTabs")) {
       if (ImGui::BeginTabItem("OTBM")) {
         ImGui::Spacing();
@@ -60,11 +70,11 @@ void NewMapDialog::render() {
       ImGui::EndTabBar();
     }
 
-    ImGui::Spacing();
-    ImGui::Separator();
-    ImGui::Spacing();
+    ImGui::EndChild();
 
-    // === FOOTER ===
+    // === FOOTER: always visible at the bottom ===
+    ImGui::Separator();
+
     float button_width = Config::UI::MODAL_BUTTON_W;
     float total_width = button_width * 2 + 10.0f;
     ImGui::SetCursorPosX((ImGui::GetWindowWidth() - total_width) / 2.0f);
@@ -108,6 +118,12 @@ void NewMapDialog::render() {
           ImGui::SetTooltip("Select a client version first");
         }
       }
+    }
+
+    if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+      visible_ = false;
+      state_ = {};
+      ImGui::CloseCurrentPopup();
     }
 
     ImGui::EndPopup();

@@ -1,19 +1,27 @@
 #include "MapPropertiesDialog.h"
+#include "Core/Config.h"
 #include "Presentation/NotificationHelper.h"
-#include <IconsFontAwesome6.h>
-#include <algorithm>
+#include "UI/Core/Theme.h"
+#include "ext/fontawesome6/IconsFontAwesome6.h"
+#include <filesystem>
 #include <imgui.h>
 
 namespace MapEditor {
 namespace UI {
+
+namespace SC = SemanticColors;
+
+void MapPropertiesDialog::initialize(Services::ClientVersionRegistry *registry) {
+  panel_.initialize(registry);
+}
 
 void MapPropertiesDialog::show(Domain::ChunkedMap *map) {
   if (!map)
     return;
 
   map_ = map;
+  state_ = panel_.loadFromMap(map);
   should_open_ = true;
-  loadFromMap();
 }
 
 MapPropertiesDialog::Result MapPropertiesDialog::render() {
@@ -25,114 +33,77 @@ MapPropertiesDialog::Result MapPropertiesDialog::render() {
     is_open_ = true;
   }
 
-  // Center dialog
   ImVec2 center = ImGui::GetMainViewport()->GetCenter();
   ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-  ImGui::SetNextWindowSize(ImVec2(450, 420), ImGuiCond_Appearing);
+  constexpr float PROPERTIES_DIALOG_H = Config::UI::NEW_MAP_DIALOG_H + 50.0f;
+  ImGui::SetNextWindowSize(ImVec2(Config::UI::NEW_MAP_DIALOG_W, PROPERTIES_DIALOG_H), ImGuiCond_Appearing);
+  ImGui::SetNextWindowSizeConstraints(ImVec2(Config::UI::NEW_MAP_DIALOG_W, PROPERTIES_DIALOG_H),
+                                      ImVec2(FLT_MAX, FLT_MAX));
+
+  ImGui::PushStyleVar(ImGuiStyleVar_PopupRounding, 8.0f);
+  ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 6.0f);
+  ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
 
   if (ImGui::BeginPopupModal("Map Properties###MapPropertiesDialog", nullptr,
-                             ImGuiWindowFlags_NoResize)) {
+                              ImGuiWindowFlags_None)) {
 
-    // === Description ===
-    ImGui::Text(ICON_FA_FILE_LINES " Description:");
-    ImGui::SetNextItemWidth(-1);
-    ImGui::InputTextMultiline("##Description", description_buffer_,
-                              sizeof(description_buffer_), ImVec2(-1, 80));
+    bool is_otbm = map_ &&
+                   std::filesystem::path(map_->getFilename()).extension() == ".otbm";
 
-    ImGui::Separator();
+    if (!is_otbm) {
+      ImGui::Spacing();
+      ImGui::TextColored(SC::TextDim(),
+                         ICON_FA_TRIANGLE_EXCLAMATION
+                         " Map properties are not supported for SEC maps.");
+      ImGui::Spacing();
+      ImGui::Separator();
+      ImGui::Spacing();
 
-    // === Dimensions ===
-    ImGui::Text(ICON_FA_RULER_COMBINED " Map Size:");
+      float button_width = Config::UI::MODAL_BUTTON_W;
+      ImGui::SetCursorPosX((ImGui::GetWindowWidth() - button_width) / 2.0f);
+      if (ImGui::Button("Close", ImVec2(button_width, 0))) {
+        result = Result::Cancelled;
+        ImGui::CloseCurrentPopup();
+        is_open_ = false;
+      }
+    } else {
+      // Content area: fill all space minus footer
+      float footer_h = ImGui::GetFrameHeightWithSpacing() + ImGui::GetStyle().ItemSpacing.y * 2;
+      float content_h = ImGui::GetContentRegionAvail().y - footer_h;
+      if (content_h < 100.0f) content_h = 100.0f;
 
-    ImGui::Text("Width:");
-    ImGui::SameLine(80);
-    ImGui::SetNextItemWidth(100);
-    ImGui::InputInt("##Width", &width_, 0, 0);
-    if (ImGui::IsItemHovered()) {
-      ImGui::SetTooltip("Map width in tiles (Min: 256, Max: 65535)");
-    }
-    width_ = std::clamp(width_, 256, 65535);
+      ImGui::BeginChild("##content", ImVec2(0, content_h), ImGuiChildFlags_None);
+      panel_.render(state_);
+      ImGui::EndChild();
 
-    ImGui::SameLine();
-    ImGui::Text("Height:");
-    ImGui::SameLine();
-    ImGui::SetNextItemWidth(100);
-    ImGui::InputInt("##Height", &height_, 0, 0);
-    if (ImGui::IsItemHovered()) {
-      ImGui::SetTooltip("Map height in tiles (Min: 256, Max: 65535)");
-    }
-    height_ = std::clamp(height_, 256, 65535);
+      // Footer: always visible at the bottom
+      ImGui::Separator();
+      float button_width = Config::UI::MODAL_BUTTON_W;
+      float total_width = button_width * 2 + 10.0f;
+      ImGui::SetCursorPosX((ImGui::GetWindowWidth() - total_width) / 2.0f);
 
-    ImGui::Separator();
+      if (ImGui::Button("Cancel", ImVec2(button_width, 0))) {
+        result = Result::Cancelled;
+        ImGui::CloseCurrentPopup();
+        is_open_ = false;
+      }
 
-    // === Version Info (read-only for now) ===
-    ImGui::Text(ICON_FA_CODE_BRANCH " Version Information:");
-    ImGui::TextDisabled("(Version conversion coming in future update)");
-    if (ImGui::IsItemHovered()) {
-      ImGui::SetTooltip("To change map version, create a new map and copy "
-                        "content.\nDirect conversion is not yet supported.");
-    }
+      ImGui::SameLine(0, 10.0f);
 
-    ImGui::Text("OTBM Version:");
-    ImGui::SameLine(120);
-    ImGui::Text("%u", otbm_version_);
+      ImGui::PushStyleColor(ImGuiCol_Button, SC::INFO);
+      ImGui::PushStyleColor(ImGuiCol_ButtonHovered, SC::Lighten(SC::INFO));
 
-    ImGui::Text("Client Version:");
-    ImGui::SameLine(120);
-    ImGui::Text("%u", client_version_);
+      if (ImGui::Button(ICON_FA_CHECK " OK", ImVec2(button_width, 0))) {
+        applyToMap();
+        result = Result::Applied;
+        Presentation::showSuccess("Map properties updated!");
+        ImGui::CloseCurrentPopup();
+        is_open_ = false;
+      }
 
-    ImGui::Separator();
-
-    // === External Files ===
-    ImGui::Text(ICON_FA_LINK " External Files:");
-
-    ImGui::Text("House File:");
-    ImGui::SameLine(100);
-    ImGui::SetNextItemWidth(-1);
-    ImGui::InputText("##HouseFile", house_filename_, sizeof(house_filename_));
-    if (ImGui::IsItemHovered()) {
-      ImGui::SetTooltip(
-          "External XML file for house data (e.g., map-houses.xml)");
+      ImGui::PopStyleColor(2);
     }
 
-    ImGui::Text("Spawn File:");
-    ImGui::SameLine(100);
-    ImGui::SetNextItemWidth(-1);
-    ImGui::InputText("##SpawnFile", spawn_filename_, sizeof(spawn_filename_));
-    if (ImGui::IsItemHovered()) {
-      ImGui::SetTooltip(
-          "External XML file for spawn data (e.g., map-spawns.xml)");
-    }
-
-    ImGui::Separator();
-
-    // === OK / Cancel ===
-    float button_width = 120.0f;
-    float spacing = ImGui::GetStyle().ItemSpacing.x;
-    float total_width = button_width * 2 + spacing;
-    float start_x = (ImGui::GetContentRegionAvail().x - total_width) * 0.5f;
-
-    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + start_x);
-
-    if (ImGui::Button(ICON_FA_CHECK " OK", ImVec2(button_width, 0))) {
-      applyToMap();
-      result = Result::Applied;
-      Presentation::showSuccess("Map properties updated!");
-      ImGui::CloseCurrentPopup();
-      is_open_ = false;
-    }
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Apply changes and close");
-
-    ImGui::SameLine();
-
-    if (ImGui::Button(ICON_FA_BAN " Cancel", ImVec2(button_width, 0))) {
-      result = Result::Cancelled;
-      ImGui::CloseCurrentPopup();
-      is_open_ = false;
-    }
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Discard changes (Esc)");
-
-    // Escape to close
     if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
       result = Result::Cancelled;
       ImGui::CloseCurrentPopup();
@@ -141,50 +112,22 @@ MapPropertiesDialog::Result MapPropertiesDialog::render() {
 
     ImGui::EndPopup();
   } else if (is_open_) {
-    // Popup was closed externally
     is_open_ = false;
     result = Result::Cancelled;
   }
 
+  ImGui::PopStyleVar(3);
+
   return result;
-}
-
-void MapPropertiesDialog::loadFromMap() {
-  if (!map_)
-    return;
-
-  // Description
-  strncpy(description_buffer_, map_->getDescription().c_str(),
-          sizeof(description_buffer_) - 1);
-  description_buffer_[sizeof(description_buffer_) - 1] = '\0';
-
-  // Dimensions
-  width_ = map_->getWidth();
-  height_ = map_->getHeight();
-
-  // Version info
-  const auto &version = map_->getVersion();
-  otbm_version_ = version.otbm_version;
-  client_version_ = version.client_version;
-
-  // External files
-  strncpy(house_filename_, map_->getHouseFile().c_str(),
-          sizeof(house_filename_) - 1);
-  house_filename_[sizeof(house_filename_) - 1] = '\0';
-
-  strncpy(spawn_filename_, map_->getSpawnFile().c_str(),
-          sizeof(spawn_filename_) - 1);
-  spawn_filename_[sizeof(spawn_filename_) - 1] = '\0';
 }
 
 void MapPropertiesDialog::applyToMap() {
   if (!map_)
     return;
 
-  map_->setDescription(description_buffer_);
-  map_->setSize(static_cast<uint16_t>(width_), static_cast<uint16_t>(height_));
-  map_->setHouseFile(house_filename_);
-  map_->setSpawnFile(spawn_filename_);
+  map_->setDescription(state_.description);
+  map_->setHouseFile(state_.house_file);
+  map_->setSpawnFile(state_.spawn_file);
 }
 
 } // namespace UI

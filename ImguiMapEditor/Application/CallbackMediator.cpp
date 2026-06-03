@@ -90,6 +90,11 @@ void CallbackMediator::wireAll(Context &ctx) {
     });
   }
 
+  // === Map Properties dialog — inject version registry once ===
+  if (ctx.map_properties && ctx.versions) {
+    ctx.map_properties->initialize(ctx.versions);
+  }
+
   wirePlatformCallbacks(ctx);
   wireTabCallbacks(ctx);
   wireMapOperationCallbacks(ctx);
