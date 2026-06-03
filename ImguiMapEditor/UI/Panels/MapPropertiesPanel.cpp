@@ -34,15 +34,13 @@ MapPropertiesPanel::loadFromMap(Domain::ChunkedMap *map) {
   s.items_major = ver.items_major_version;
   s.items_minor = ver.items_minor_version;
 
+  s.client_version_name = std::format("Unknown (v{})", ver.client_version);
   if (registry_) {
     auto *cv = registry_->findBestMatch(ver.items_minor_version,
                                         ver.items_major_version);
     if (cv) {
       s.client_version_name =
           std::format("{} ({})", cv->getName(), cv->getVersion());
-    } else {
-      s.client_version_name =
-          std::format("Unknown (v{})", ver.client_version);
     }
   }
 
@@ -159,11 +157,9 @@ bool MapPropertiesPanel::render(State &state) {
   ImGui::BeginChild("##right", ImVec2(right_w, avail.y), ImGuiChildFlags_Borders);
   ImGui::TextColored(label, ICON_FA_FILE_LINES " Description");
   ImGui::Spacing();
-  auto desc_before = state.description;
-  ImGui::InputTextMultiline("##desc", &state.description,
-                            ImVec2(-1, ImGui::GetContentRegionAvail().y - 1),
-                            ImGuiInputTextFlags_None);
-  if (state.description != desc_before)
+  if (ImGui::InputTextMultiline("##desc", &state.description,
+                                ImVec2(-1, ImGui::GetContentRegionAvail().y - 1),
+                                ImGuiInputTextFlags_None))
     changed = true;
   ImGui::EndChild();
 
