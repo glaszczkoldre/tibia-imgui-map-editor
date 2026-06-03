@@ -227,6 +227,9 @@ public:
   // Translucency (from DAT)
   bool is_translucent = false;
 
+  // Lens help (from DAT) — items with value > 0 are "see-through" for light propagation
+  uint16_t lens_help = 0;
+
   // Elevation (from DAT) - items on this raise subsequent items visually
   uint16_t elevation = 0;
 

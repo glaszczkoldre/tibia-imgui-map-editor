@@ -11,6 +11,7 @@
 #include "Rendering/Map/MapRenderer.h"
 #include "Rendering/Passes/IngamePreviewRenderer.h"
 #include "Services/ViewSettings.h"
+#include "UI/Widgets/LightColorPalettePicker.h"
 
 namespace MapEditor {
 namespace UI {
@@ -74,10 +75,27 @@ void IngameBoxWindow::render(Domain::ChunkedMap* map,
     // Ambient slider (only when lighting is enabled)
     if (settings.preview_lighting_enabled) {
         ImGui::SameLine();
-        ImGui::SetNextItemWidth(80);
+        ImGui::SetNextItemWidth(70);
+        int intensity = static_cast<int>(settings.preview_server_light_intensity);
+        if (ImGui::SliderInt("##intensity", &intensity, 0, 255)) {
+            settings.preview_server_light_intensity = static_cast<uint8_t>(intensity);
+        }
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Server Light Intensity");
+        }
+        ImGui::SameLine();
+        uint8_t color = settings.preview_server_light_color;
+        if (LightColorPalettePicker("##previewServerLightColor",
+                                    color,
+                                    false,
+                                    "Server Color: world light color from the Tibia 8-bit palette")) {
+            settings.preview_server_light_color = color;
+        }
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(70);
         ImGui::SliderInt("##ambient", &settings.preview_ambient_light, 0, 255);
         if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Ambient Light Level");
+            ImGui::SetTooltip("Min Ambient");
         }
     }
     

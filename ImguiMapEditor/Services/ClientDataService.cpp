@@ -349,6 +349,9 @@ void ClientDataService::mergeOtbWithDat(
       // Translucency — DAT flag already false for pre-10.00 items
       merged.is_translucent = dat->is_translucent;
 
+      // Lens help — items with value > 0 are see-through for light propagation
+      merged.lens_help = dat->lens_help;
+
       // Ground speed from DAT
       if (dat->is_ground && dat->ground_speed > 0) {
         merged.speed = dat->ground_speed;

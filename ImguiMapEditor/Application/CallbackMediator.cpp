@@ -218,6 +218,8 @@ void CallbackMediator::wireTabCallbacks(Context &ctx) {
         state.current_floor = ctx.map_panel->getCurrentFloor();
         state.lighting_enabled = ctx.view_settings->map_lighting_enabled;
         state.ambient_light = ctx.view_settings->map_ambient_light;
+        state.server_light_intensity = ctx.view_settings->server_light_intensity;
+        state.server_light_color = ctx.view_settings->server_light_color;
         state.show_ingame_box = ctx.view_settings->show_ingame_box;
         state.show_minimap = ctx.view_settings->show_minimap_window;
 
@@ -243,6 +245,8 @@ void CallbackMediator::wireTabCallbacks(Context &ctx) {
       ctx.map_panel->setCurrentFloor(static_cast<int16_t>(state.current_floor));
       ctx.view_settings->map_lighting_enabled = state.lighting_enabled;
       ctx.view_settings->map_ambient_light = state.ambient_light;
+      ctx.view_settings->server_light_intensity = state.server_light_intensity;
+      ctx.view_settings->server_light_color = state.server_light_color;
       ctx.view_settings->show_ingame_box = state.show_ingame_box;
       ctx.view_settings->show_minimap_window = state.show_minimap;
       ctx.minimap->setMap(session->getMap(),

@@ -2,6 +2,7 @@
 #include "Domain/Position.h"
 #include "MapViewCamera.h"
 #include <glm/glm.hpp>
+#include <optional>
 #include <vector>
 
 struct ImGuiIO; // Forward declaration
@@ -60,6 +61,9 @@ public:
   bool shouldShowLassoOverlay() const;
   const std::vector<glm::vec2> &getLassoPoints() const { return lasso_points_; }
   glm::vec2 getCurrentMousePos() const { return current_mouse_pos_; }
+  std::optional<Domain::Position> getLightVisibilityOrigin() const {
+    return light_visibility_origin_;
+  }
 
   // Context menu state
   bool shouldShowContextMenu() const { return show_context_menu_; }
@@ -68,6 +72,8 @@ public:
 
 private:
   void handlePasteMode(MapViewCamera &camera, AppLogic::EditorSession *session);
+  void setLightVisibilityOrigin(const Domain::Position &position);
+  void clearLightVisibilityOrigin();
 
   void handleMousePan(MapViewCamera &camera, bool is_focused);
   void handleMouseZoom(MapViewCamera &camera);
@@ -124,6 +130,7 @@ private:
   // Panning state
   bool is_panning_ = false;
   glm::vec2 pan_start_{0, 0};
+  std::optional<Domain::Position> light_visibility_origin_;
 
   // Drag selection state
   bool is_drag_selecting_ = false;

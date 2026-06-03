@@ -2,6 +2,7 @@
 #include "Rendering/Frame/RenderingManager.h"
 #include "Services/ClipboardService.h"
 #include "UI/Core/Theme.h"
+#include "UI/Widgets/LightColorPalettePicker.h"
 #include <cmath>
 #include <imgui.h>
 #include <spdlog/spdlog.h>
@@ -134,10 +135,28 @@ void MainWindow::renderEditor(Domain::ChunkedMap *current_map,
           // Lighting controls toolbar (per-map)
           ImGui::Checkbox("Enable Lighting",
                           &view_settings_.map_lighting_enabled);
-          ImGui::SameLine();
-          ImGui::SetNextItemWidth(120);
-          ImGui::SliderInt("Ambient", &view_settings_.map_ambient_light, 0,
-                           255);
+          if (view_settings_.map_lighting_enabled) {
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(120);
+            int intensity = static_cast<int>(view_settings_.server_light_intensity);
+            if (ImGui::SliderInt("Intensity", &intensity, 0, 255)) {
+              view_settings_.server_light_intensity = static_cast<uint8_t>(intensity);
+            }
+            ImGui::SameLine();
+            ImGui::TextUnformatted("Color");
+            ImGui::SameLine();
+            uint8_t color = view_settings_.server_light_color;
+            if (UI::LightColorPalettePicker(
+                    "##serverLightColor",
+                    color,
+                    true,
+                    "Server Color: world light color from the Tibia 8-bit palette")) {
+              view_settings_.server_light_color = color;
+            }
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(120);
+            ImGui::SliderInt("Min Ambient", &view_settings_.map_ambient_light, 0, 255);
+          }
           ImGui::Separator();
 
           // Render the map panel with explicit animation ticks

@@ -225,19 +225,35 @@ void IngamePreviewRenderer::render(const Domain::ChunkedMap &map,
   if (lighting_enabled && light_manager_ && client_data_) {
     Domain::LightConfig config;
     config.enabled = true;
-    config.ambient_level =
-        static_cast<uint8_t>(view_settings->preview_ambient_light);
-    config.ambient_color = 215;
+    config.global_light.intensity = view_settings->preview_server_light_intensity;
+    config.global_light.color = view_settings->preview_server_light_color;
+    config.client_slider = static_cast<uint8_t>(view_settings->preview_ambient_light);
+    config.camera_floor = floor;
+    config.ambient_color = config.global_light.color;
+    config.ambient_level = config.global_light.intensity;
 
-    if (config.ambient_level != last_ambient_light_) {
+    // Auto-invalidate if lighting config changes
+    uint32_t config_hash = config.computeHash();
+    if (config_hash != last_config_hash_) {
       light_manager_->invalidateAll();
-      last_ambient_light_ = config.ambient_level;
+      last_config_hash_ = config_hash;
     }
+
+    // Player minimum light at center tile (preview only). The color reuses
+    // Config::Lighting::DEFAULT_SERVER_LIGHT_COLOR, matching OTClient's white light.
+    std::vector<Domain::LightSource> player_lights;
+    player_lights.push_back(Domain::LightSource{
+        .x = static_cast<int32_t>(camera_x),
+        .y = static_cast<int32_t>(camera_y),
+        .color = Config::Lighting::DEFAULT_SERVER_LIGHT_COLOR,
+        .intensity = Config::Lighting::DEFAULT_PLAYER_LIGHT_INTENSITY,
+        .source_floor = static_cast<int16_t>(floor)
+    });
 
     light_manager_->render(map, viewport_width, viewport_height, camera_x,
                            camera_y, zoom, floor, 
-                           render_start_z, render_end_z,  // Floor range from fading calculation
-                           config);
+                           render_start_z, render_end_z,
+                           config, &player_lights);
   }
 }
 

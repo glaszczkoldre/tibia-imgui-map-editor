@@ -79,6 +79,11 @@ void MapRenderer::setViewSettings(Services::ViewSettings *settings) {
   }
 }
 
+void MapRenderer::setLightVisibilityOrigin(
+    std::optional<Domain::Position> origin) {
+  light_visibility_origin_ = origin;
+}
+
 void MapRenderer::setLODMode(bool enabled) {
   render_pipeline_.setLODMode(enabled);
 }
@@ -131,7 +136,8 @@ void MapRenderer::render(const Domain::ChunkedMap &map, RenderState &state,
       base_bounds,                                    // Visible bounds
       camera_.getFloor(),                             // Current floor
       frame_data_collector_.getMissingSpriteBuffer(), // Missing sprites buffer
-      view_settings_};                                // View settings
+      view_settings_,                                 // View settings
+      light_visibility_origin_};                      // Light visibility origin
 
   // Execute Pipeline
   render_pipeline_.render(context);

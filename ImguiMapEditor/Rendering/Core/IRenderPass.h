@@ -1,11 +1,13 @@
 #pragma once
 
 #include "Domain/ChunkedMap.h"
+#include "Domain/Position.h"
 #include "Rendering/Animation/AnimationTicks.h"
 #include "Rendering/Camera/ViewCamera.h"
 #include "Rendering/Frame/RenderState.h"
 #include "Rendering/Visibility/VisibleBounds.h"
 #include <glm/glm.hpp>
+#include <optional>
 
 namespace MapEditor {
 namespace Services {
@@ -44,6 +46,9 @@ struct RenderContext {
 
   // View settings (optional, can be nullptr)
   const Services::ViewSettings *view_settings;
+
+  // RME light-mode floor visibility origin, set from the last map click.
+  std::optional<Domain::Position> light_visibility_origin;
 };
 
 /**

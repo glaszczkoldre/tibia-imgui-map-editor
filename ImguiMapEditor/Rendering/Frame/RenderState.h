@@ -45,6 +45,7 @@ public:
   // === State tracking for cache invalidation ===
   float last_zoom = 0.0f;
   uint8_t last_ambient_light = 255;
+  uint32_t last_config_hash = 0;  // Hash of LightConfig fields affecting lighting
 
   // === Invalidation methods ===
 

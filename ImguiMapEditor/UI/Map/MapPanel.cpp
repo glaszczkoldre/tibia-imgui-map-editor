@@ -81,6 +81,7 @@ void MapPanel::renderInternal(MapType *map, Rendering::RenderState &state,
     // Update renderer camera
     renderer->setCameraPosition(camera_.getCameraPosition().x,
                                 camera_.getCameraPosition().y);
+    renderer->setLightVisibilityOrigin(input_.getLightVisibilityOrigin());
 
     // Pass selection provider to renderer (session owns the adapter)
     if (session_) {

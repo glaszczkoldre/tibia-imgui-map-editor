@@ -44,9 +44,16 @@ struct ViewSettings {
 
   // === Lighting Settings ===
   bool map_lighting_enabled = false;     // Enable lighting in main map viewport
-  int map_ambient_light = 128;           // 0 = dark, 255 = full bright
+  int map_ambient_light = Config::Lighting::DEFAULT_MINIMUM_AMBIENT;
   bool preview_lighting_enabled = false; // Enable lighting in ingame preview
-  int preview_ambient_light = 128;       // 0 = dark, 255 = full bright
+  int preview_ambient_light = Config::Lighting::DEFAULT_MINIMUM_AMBIENT;
+  uint8_t server_light_intensity =
+      Config::Lighting::DEFAULT_SERVER_LIGHT_INTENSITY;
+  uint8_t server_light_color = Config::Lighting::DEFAULT_SERVER_LIGHT_COLOR;
+  uint8_t preview_server_light_intensity =
+      Config::Lighting::DEFAULT_SERVER_LIGHT_INTENSITY;
+  uint8_t preview_server_light_color =
+      Config::Lighting::DEFAULT_SERVER_LIGHT_COLOR;
 
   // === Placeholders (menu only, no rendering yet) ===
   bool show_minimap_window = false;
