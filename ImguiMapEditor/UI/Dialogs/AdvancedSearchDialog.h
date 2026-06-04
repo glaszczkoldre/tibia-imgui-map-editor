@@ -2,18 +2,13 @@
 
 #include <imgui.h>
 #include <string>
-#include <functional>
 #include <vector>
-#include <variant>
 #include "Domain/Search/MapSearchResult.h"
 #include "Domain/Search/SearchFilterTypes.h"
 namespace MapEditor {
 namespace Domain { 
     class ItemType; 
     class CreatureType;
-}
-namespace AppLogic { 
-    class ItemPickerService;
 }
 namespace Services { 
     class ClientDataService; 
@@ -57,7 +52,6 @@ public:
     AdvancedSearchDialog& operator=(const AdvancedSearchDialog&) = delete;
     
     // Dependencies
-    void setItemPickerService(AppLogic::ItemPickerService* picker) { (void)picker; }
     void setMapSearchService(Services::MapSearchService* service) { search_service_ = service; }
     void setClientDataService(Services::ClientDataService* service) { client_data_ = service; }
     void setSpriteManager(Services::SpriteManager* sprites) { sprite_manager_ = sprites; }
@@ -95,18 +89,13 @@ private:
     // Dialog state
     bool is_open_ = false;
     bool focus_input_ = false;
-    bool filters_changed_ = true;  // Trigger preview update
+    bool filters_changed_ = false;
     
-    // === COLUMN 1: Find By ===
     char search_buffer_[256] = {};
     
-    // === COLUMN 2: Types (multi-select, OR logic) ===
     Domain::Search::TypeFilter type_filter_;
-    
-    // === COLUMN 3: Properties (multi-select, AND logic) ===
     Domain::Search::PropertyFilter property_filter_;
     
-    // === COLUMN 4: Results Preview ===
     std::vector<PreviewResult> preview_results_;
     int selected_preview_index_ = -1;
 };

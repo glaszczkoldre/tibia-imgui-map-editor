@@ -64,7 +64,6 @@ void SearchController::onMapLoaded(
     if (!item_picker_service_ || current_client_data_ != client_data) {
         item_picker_service_ = std::make_unique<AppLogic::ItemPickerService>(client_data);
         quick_search_popup_->setItemPickerService(item_picker_service_.get());
-        advanced_search_dialog_->setItemPickerService(item_picker_service_.get());
     }
 
     if (!map_search_service_) {
