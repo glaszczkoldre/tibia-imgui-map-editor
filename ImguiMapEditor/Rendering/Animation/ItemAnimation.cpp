@@ -59,28 +59,28 @@ int ItemAnimation::getPhase(const Domain::ItemType &item, int64_t global_ms,
         const int num_phases = static_cast<int>(item.frame_durations.size());
         if (num_phases == 0) return start_phase;
 
-        // Per-phase durations (stack allocation — max 32 phases is more than enough)
+        // Per-phase durations (stack allocation — clamp to prevent overflow)
         constexpr int MAX_PHASES = 32;
+        const int effective_phases = std::min<int>(num_phases, MAX_PHASES);
         int phase_durs[MAX_PHASES];
         int cycle_length = 0;
-        for (int i = 0; i < num_phases && i < MAX_PHASES; ++i) {
+        for (int i = 0; i < effective_phases; ++i) {
             phase_durs[i] = getPhaseDuration(item, i);
             cycle_length += phase_durs[i];
         }
 
         // Ping-pong timeline: [0, 1, ..., N-1, N-2, ..., 1] (omit duplicate endpoints)
-        // Timeline size is at most 2*N-2
         constexpr int MAX_TIMELINE = MAX_PHASES * 2 - 2;
         int timeline[MAX_TIMELINE];
         int timeline_len = 0;
-        for (int i = 0; i < num_phases && i < MAX_PHASES; ++i)
+        for (int i = 0; i < effective_phases; ++i)
             timeline[timeline_len++] = i;
-        for (int i = num_phases - 2; i >= 1; --i)
+        for (int i = effective_phases - 2; i >= 1; --i)
             timeline[timeline_len++] = i;
 
         // Backward portion cycle length
         int backward_length = 0;
-        for (int i = num_phases - 2; i >= 1; --i)
+        for (int i = effective_phases - 2; i >= 1; --i)
             backward_length += phase_durs[i];
         cycle_length += backward_length;
 
@@ -88,7 +88,7 @@ int ItemAnimation::getPhase(const Domain::ItemType &item, int64_t global_ms,
 
         // Start offset: sum durations of first start_phase phases
         int start_offset = 0;
-        for (int i = 0; i < start_phase && i < num_phases; ++i)
+        for (int i = 0; i < start_phase && i < effective_phases; ++i)
             start_offset += phase_durs[i];
 
         int elapsed = static_cast<int>(

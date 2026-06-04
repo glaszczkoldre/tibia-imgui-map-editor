@@ -73,7 +73,7 @@ void CreatureRenderer::queue(const Domain::Creature *creature, float screen_x,
 
   // Draw mount before rider
   int z_pattern = 0;
-  if (outfit.lookMount > 0) {
+  if (outfit.lookMount > 0 && outfit_data->pattern_z > 1) {
     z_pattern = 1;
     drawMount(outfit, dir, animation_frame, screen_x, screen_y, size,
               creature_color, alpha, anim_ticks, missing_sprites);
