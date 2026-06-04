@@ -13,10 +13,6 @@
 #include <imgui.h>
 #include <spdlog/spdlog.h>
 
-namespace {
-constexpr float PULSE_DURATION = 1.5f;
-} // namespace
-
 #include "../../Brushes/BrushController.h"
 #include "../../Brushes/Types/RawBrush.h"
 #include "../../Rendering/Core/Texture.h"
@@ -68,6 +64,25 @@ void TilesetGridWidget::setTileset(Domain::Tileset::Tileset *tileset) {
 Utils::ResolvedBrushPreview
 TilesetGridWidget::getBrushPreview(const Brushes::IBrush *brush) const {
   return Utils::ResolveBrushPreview(brush, clientData_, spriteManager_);
+}
+
+std::pair<bool, float> TilesetGridWidget::computePulseState(const Brushes::IBrush *brush) {
+  bool isPulsing = pulseBrush_ && brush == pulseBrush_;
+  if (!isPulsing && !pulseBrushName_.empty()) {
+    isPulsing = brush->getName() == pulseBrushName_;
+  }
+  if (!isPulsing) return {false, 0.0f};
+
+  float currentTime = ImGui::GetTime();
+  if (pulseStartTime_ < 0) pulseStartTime_ = currentTime;
+  float elapsed = currentTime - pulseStartTime_;
+  if (elapsed >= PULSE_DURATION) {
+    pulseBrush_ = nullptr;
+    pulseBrushName_.clear();
+    pulseStartTime_ = -1.0f;
+    return {false, 0.0f};
+  }
+  return {true, elapsed};
 }
 
 void TilesetGridWidget::syncActiveBrushSelection() {
@@ -133,7 +148,15 @@ void TilesetGridWidget::renderBrushCard(ImVec2 cursorPos, ImVec2 size,
     std::string label = preview.fallbackLabel;
     constexpr float MAX_TEXT_WIDTH = 28.0f; // 32 - 2*padding
     ImVec2 textSize = ImGui::CalcTextSize(label.c_str());
-    if (textSize.x > MAX_TEXT_WIDTH) {
+    if (textSize.x > MAX_TEXT_WIDTH && !label.empty()) {
+      // Estimate truncation length to minimize CalcTextSize calls
+      float avgCharWidth = textSize.x / static_cast<float>(label.size());
+      size_t estimated = static_cast<size_t>(MAX_TEXT_WIDTH / avgCharWidth);
+      if (estimated > 3) {
+        label = label.substr(0, estimated - 3);
+      } else {
+        label = label.substr(0, 1);
+      }
       while (label.size() > 1 && ImGui::CalcTextSize((label + "...").c_str()).x > MAX_TEXT_WIDTH) {
         label.pop_back();
       }
@@ -383,20 +406,7 @@ void TilesetGridWidget::renderBrushGrid() {
           selectedBrush_ == brush ||
           (brushController_ && brushController_->getCurrentBrush() == brush);
 
-      bool isPulsing = isSelected && !pulseBrushName_.empty() &&
-                       brush->getName() == pulseBrushName_;
-      float pulseElapsed = 0.0f;
-      if (isPulsing) {
-        float currentTime = ImGui::GetTime();
-        if (pulseStartTime_ < 0)
-          pulseStartTime_ = currentTime;
-        pulseElapsed = currentTime - pulseStartTime_;
-        if (pulseElapsed >= PULSE_DURATION) {
-          pulseBrushName_.clear();
-          pulseStartTime_ = -1.0f;
-          isPulsing = false;
-        }
-      }
+      auto [isPulsing, pulseElapsed] = computePulseState(brush);
 
       renderBrushCard(cursorPos, tileSize, preview, isSelected, isHovered,
                       isPulsing, pulseElapsed);
@@ -547,20 +557,7 @@ void TilesetGridWidget::renderBrushGrid() {
       ImDrawList *dl = ImGui::GetWindowDrawList();
 
       // Render card with pulse animation support
-      bool isPulsing = isSelected && !pulseBrushName_.empty() &&
-                       brush->getName() == pulseBrushName_;
-      float pulseElapsed = 0.0f;
-      if (isPulsing) {
-        float currentTime = ImGui::GetTime();
-        if (pulseStartTime_ < 0)
-          pulseStartTime_ = currentTime;
-        pulseElapsed = currentTime - pulseStartTime_;
-        if (pulseElapsed >= PULSE_DURATION) {
-          pulseBrushName_.clear();
-          pulseStartTime_ = -1.0f;
-          isPulsing = false;
-        }
-      }
+      auto [isPulsing, pulseElapsed] = computePulseState(brush);
       renderBrushCard(cursorPos, tileSize, preview, isSelected, isHovered,
                       isPulsing, pulseElapsed);
 

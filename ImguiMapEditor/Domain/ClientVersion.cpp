@@ -18,16 +18,8 @@ std::filesystem::path ClientVersion::getItemMetadataPath() const {
     }
 
     // 2. Default: data/[dataDirectory]/items.otb (or items.srv)
-    if (!data_directory_.empty()) {
-        // Handle both "1098" and "data/1098" formats
-        auto data_dir = std::filesystem::current_path() / "data" / data_directory_;
-        if (!std::filesystem::exists(data_dir)) {
-            // Try stripping "data/" prefix if present
-            std::filesystem::path dir_path(data_directory_);
-            if (dir_path.has_parent_path() && dir_path.parent_path().filename() == "data") {
-                data_dir = std::filesystem::current_path() / "data" / dir_path.filename();
-            }
-        }
+    auto data_dir = resolveDataPath();
+    if (!data_dir.empty()) {
         switch (data_source_) {
         case ItemDataSource::SRV: {
             auto srv = data_dir / "items.srv";

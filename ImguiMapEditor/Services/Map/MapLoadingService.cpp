@@ -567,15 +567,8 @@ bool MapLoadingService::loadClientData(
                            ? pending_path
                            : pending_path.parent_path();
 
-  // Compute version data path for creatures.xml and items.xml lookup
-  std::string data_dir_for_resources = version_info->getDataDirectory();
-  std::filesystem::path version_data_path;
-  if (!data_dir_for_resources.empty()) {
-    auto candidate = std::filesystem::current_path() / "data" / data_dir_for_resources;
-    if (std::filesystem::exists(candidate)) {
-      version_data_path = candidate;
-    }
-  }
+  // Resolve version data path once — used for creatures, items, tilesets, palettes
+  const std::filesystem::path version_data_path = version_info->resolveDataPath();
 
   if (!tryLoadCreatures(map_dir, client_path, version_data_path)) {
     spdlog::warn("No creature data loaded. Spawns may look incorrect.");
@@ -605,45 +598,22 @@ bool MapLoadingService::loadClientData(
     }
   }
 
-  // Use version-specific data directory for tilesets, palettes, brushes, etc.
-  // dataDirectory should be just the folder name (e.g., "1098"), not a path.
-  // Handle both "1098" and "data/1098" gracefully.
-  std::string data_dir = version_info->getDataDirectory();
-  std::filesystem::path app_data_path;
-
-  if (!data_dir.empty()) {
-    auto candidate = std::filesystem::current_path() / "data" / data_dir;
-    if (std::filesystem::exists(candidate)) {
-      app_data_path = candidate;
-    } else {
-      // Maybe data_dir already contains "data/" prefix — try stripping it
-      std::filesystem::path dir_path(data_dir);
-      if (dir_path.has_parent_path() && dir_path.parent_path().filename() == "data") {
-        auto stripped = std::filesystem::current_path() / "data" / dir_path.filename();
-        if (std::filesystem::exists(stripped)) {
-          app_data_path = stripped;
-          spdlog::warn("Data directory '{}' had 'data/' prefix, stripped to '{}'",
-                       data_dir, dir_path.filename().string());
-        }
-      }
-    }
-  }
-
-  if (app_data_path.empty() || !std::filesystem::exists(app_data_path)) {
+  // Load tilesets, palettes, brushes from version data directory
+  if (version_data_path.empty()) {
     spdlog::warn("Data directory '{}' not found. Skipping materials/tilesets/palettes loading.",
-                 data_dir);
+                 version_info->getDataDirectory());
   } else {
-    spdlog::info("Loading materials from: {}", app_data_path.string());
-    bool tilesets_loaded = tileset_service_.loadMaterials(app_data_path);
+    spdlog::info("Loading materials from: {}", version_data_path.string());
+    bool tilesets_loaded = tileset_service_.loadMaterials(version_data_path);
     if (!tilesets_loaded) {
       spdlog::warn("materials.xml not found in '{}'. Falling back to direct loading.",
-                   app_data_path.string());
-      tilesets_loaded = tileset_service_.loadTilesets(app_data_path);
+                   version_data_path.string());
+      tilesets_loaded = tileset_service_.loadTilesets(version_data_path);
       if (!tilesets_loaded) {
-        spdlog::warn("No tilesets found in '{}'.", app_data_path.string());
+        spdlog::warn("No tilesets found in '{}'.", version_data_path.string());
       }
-      if (!tileset_service_.loadPalettes(app_data_path)) {
-        spdlog::warn("No palettes found in '{}'.", app_data_path.string());
+      if (!tileset_service_.loadPalettes(version_data_path)) {
+        spdlog::warn("No palettes found in '{}'.", version_data_path.string());
       }
     }
   }
