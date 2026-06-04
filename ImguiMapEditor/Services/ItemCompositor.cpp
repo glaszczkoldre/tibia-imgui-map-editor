@@ -25,7 +25,8 @@ ItemCompositor::getCompositedItemTexture(const Domain::ItemType *type) {
   }
 
   // Single-tile single-layer: load directly
-  if (type->width == 1 && type->height == 1 && type->layers <= 1) {
+  if (type->width == 1 && type->height == 1 && type->layers <= 1 &&
+      !type->sprite_ids.empty()) {
     uint32_t sprite_id = type->sprite_ids[0];
     auto sprite_data =
         Utils::SpriteUtils::loadDecodedSprite(spr_reader_, sprite_id);

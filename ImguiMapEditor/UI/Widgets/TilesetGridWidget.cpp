@@ -329,7 +329,9 @@ void TilesetGridWidget::renderBrushGrid() {
       ImVec2 cursorPos = ImGui::GetCursorScreenPos();
       ImGui::Dummy(tileSize);
 
-      renderBrushCard(cursorPos, tileSize, tex, false, ImGui::IsItemHovered());
+      bool isCrossSelected = brush->getName() == selectedBrushName_;
+      renderBrushCard(cursorPos, tileSize, tex, isCrossSelected,
+                      ImGui::IsItemHovered());
 
       if (ImGui::IsItemHovered()) {
         ImGui::BeginTooltip();

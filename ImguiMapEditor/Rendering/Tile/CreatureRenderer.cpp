@@ -150,9 +150,11 @@ void CreatureRenderer::drawMount(const Domain::Outfit &outfit, int dir,
   const std::vector<uint32_t> *mount_sprites = &mount_data->sprite_ids;
   int mount_dir = dir % std::max<int>(1, mount_data->pattern_x);
 
-  // Select walk sprites if rider is walking
+  // Select sprite source based on rider state (idle vs walk)
   if (animation_frame > 0 && !mount_data->walk_sprite_ids.empty()) {
     mount_sprites = &mount_data->walk_sprite_ids;
+  } else if (mount_data->has_frame_groups && !mount_data->idle_sprite_ids.empty()) {
+    mount_sprites = &mount_data->idle_sprite_ids;
   }
 
   int mount_frame = selectMountFrame(mount_data, animation_frame,
