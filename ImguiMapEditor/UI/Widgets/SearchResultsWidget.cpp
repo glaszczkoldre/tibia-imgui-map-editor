@@ -431,10 +431,10 @@ void SearchResultsWidget::doSearch() {
 
     if (std::string_view(search_buffer_).empty()) return;
 
+    if (!on_search_async_) return;
+
     is_searching_ = true;
-    if (on_search_async_) {
-        on_search_async_(search_buffer_, search_items_, search_creatures_);
-    }
+    on_search_async_(search_buffer_, search_items_, search_creatures_);
 }
 
 } // namespace MapEditor::UI

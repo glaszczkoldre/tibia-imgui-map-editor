@@ -397,19 +397,19 @@ void AdvancedSearchDialog::updatePreviewResults() {
     std::transform(query_lower.begin(), query_lower.end(), query_lower.begin(),
                    [](unsigned char c) { return std::tolower(c); });
 
-    bool search_items = !type_filter_.creature || type_filter_.hasAnySelected();
-    if (search_items && search_service_ && !property_filter_.hasAnySelected() || !type_filter_.creature) {
-        if (!(type_filter_.creature && !type_filter_.depot && !type_filter_.mailbox &&
-              !type_filter_.trash_holder && !type_filter_.container && !type_filter_.door &&
-              !type_filter_.magic_field && !type_filter_.teleport && !type_filter_.bed &&
-              !type_filter_.key && !type_filter_.podium)) {
+    // Search items (skip if only creature/combat types selected — searchItemDatabase handles type+property filtering)
+    bool creature_only = type_filter_.creature && !type_filter_.depot && !type_filter_.mailbox &&
+        !type_filter_.trash_holder && !type_filter_.container && !type_filter_.door &&
+        !type_filter_.magic_field && !type_filter_.teleport && !type_filter_.bed &&
+        !type_filter_.key && !type_filter_.podium && !type_filter_.weapon &&
+        !type_filter_.armor && !type_filter_.ammo && !type_filter_.rune;
 
-            auto item_results = search_service_->searchItemDatabase(
-                search_buffer_, type_filter_, property_filter_, 10000);
+    if (search_service_ && !creature_only) {
+        auto item_results = search_service_->searchItemDatabase(
+            search_buffer_, type_filter_, property_filter_, 10000);
 
-            for (const auto* item : item_results) {
-                preview_results_.push_back({false, item, nullptr});
-            }
+        for (const auto* item : item_results) {
+            preview_results_.push_back({false, item, nullptr});
         }
     }
 

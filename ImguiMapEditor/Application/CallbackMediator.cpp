@@ -542,7 +542,7 @@ void CallbackMediator::wireSearchCallbacks(Context &ctx) {
   // Wire Ctrl+Shift+F to toggle Search Results Widget
   if (ctx.hotkey && ctx.view_settings) {
     ctx.hotkey->setAdvancedSearchCallback(
-        [vs = ctx.view_settings]() { vs->show_search_results = true; });
+        [vs = ctx.view_settings]() { vs->show_search_results = !vs->show_search_results; });
   }
 
   // Wire SearchResultsWidget navigate callback

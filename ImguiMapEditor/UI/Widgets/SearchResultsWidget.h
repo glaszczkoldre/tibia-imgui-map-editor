@@ -49,7 +49,7 @@ public:
     
     void setResults(const std::vector<Domain::Search::MapSearchResult>& results);
     void setSearching(bool searching) { is_searching_ = searching; }
-    void setSearchBuffer(const char* query) { strncpy(search_buffer_, query, sizeof(search_buffer_) - 1); search_buffer_[sizeof(search_buffer_) - 1] = '\0'; }
+    void setSearchBuffer(const char* query) { snprintf(search_buffer_, sizeof(search_buffer_), "%s", query); }
     void clear();
     void invalidateFilter();
     size_t getResultCount() const { return total_results_; }
