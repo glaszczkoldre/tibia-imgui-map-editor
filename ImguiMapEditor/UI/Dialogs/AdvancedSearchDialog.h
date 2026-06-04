@@ -2,18 +2,13 @@
 
 #include <imgui.h>
 #include <string>
-#include <functional>
 #include <vector>
-#include <variant>
 #include "Domain/Search/MapSearchResult.h"
 #include "Domain/Search/SearchFilterTypes.h"
 namespace MapEditor {
 namespace Domain { 
     class ItemType; 
     class CreatureType;
-}
-namespace AppLogic { 
-    class ItemPickerService;
 }
 namespace Services { 
     class ClientDataService; 
@@ -39,15 +34,13 @@ struct PreviewResult {
 };
 
 /**
- * Advanced Search dialog (Ctrl+Shift+F) - RME-style item/map search.
+ * Advanced Search dialog - RME-style item/map search.
  * 
- * 4-column layout:
- * 1. Find By - unified fuzzy search (auto-detects name vs ID)
- * 2. Types - multi-select toggles (OR logic)
- * 3. Properties - multi-select toggles (AND logic)  
- * 4. Results - preview of matching items/creatures from database
+ * 2-column layout:
+ * Left column: 4 bordered sections (Search, OR types, AND properties, Hints)
+ * Right column: Results preview of matching items/creatures from database
  * 
- * Bottom buttons: Search Map, Select Item (placeholder), Cancel
+ * Footer: result count + Search Map, Select Item (placeholder), Cancel buttons
  */
 class AdvancedSearchDialog {
 public:
@@ -59,7 +52,6 @@ public:
     AdvancedSearchDialog& operator=(const AdvancedSearchDialog&) = delete;
     
     // Dependencies
-    void setItemPickerService(AppLogic::ItemPickerService* picker) { (void)picker; }
     void setMapSearchService(Services::MapSearchService* service) { search_service_ = service; }
     void setClientDataService(Services::ClientDataService* service) { client_data_ = service; }
     void setSpriteManager(Services::SpriteManager* sprites) { sprite_manager_ = sprites; }
@@ -73,16 +65,19 @@ public:
     void render();
     
 private:
-    // Render helpers for 4-column layout
-    void renderFindByColumn();
-    void renderTypesColumn();
-    void renderPropertiesColumn();
+    // Render helpers for 2-column layout
+    void renderFiltersPanel();
+    void renderSearchSection();
+    void renderOrSection();
+    void renderAndSection();
+    void renderHintsSection();
     void renderResultsColumn();
     void renderBottomBar();
     
     // Actions
     void updatePreviewResults();
     void onSearchMap();
+    void executeMapSearch();
     void onSelectItem();
     
     // Dependencies
@@ -95,18 +90,14 @@ private:
     // Dialog state
     bool is_open_ = false;
     bool focus_input_ = false;
-    bool filters_changed_ = true;  // Trigger preview update
+    bool filters_changed_ = false;
+    bool pending_map_search_ = false;
     
-    // === COLUMN 1: Find By ===
     char search_buffer_[256] = {};
     
-    // === COLUMN 2: Types (multi-select, OR logic) ===
     Domain::Search::TypeFilter type_filter_;
-    
-    // === COLUMN 3: Properties (multi-select, AND logic) ===
     Domain::Search::PropertyFilter property_filter_;
     
-    // === COLUMN 4: Results Preview ===
     std::vector<PreviewResult> preview_results_;
     int selected_preview_index_ = -1;
 };

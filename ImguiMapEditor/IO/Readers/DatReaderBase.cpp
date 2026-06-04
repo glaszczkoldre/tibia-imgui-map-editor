@@ -330,59 +330,76 @@ void DatReaderBase::readSpriteData(ClientItem& item, BinaryReader& reader) {
     }
     
     for (uint8_t g = 0; g < group_count; ++g) {
-        // Frame group type (10.50+ for outfits only)
+        uint8_t group_type = 0;
         if (hasFrameGroups() && item.category == DatCategory::Outfit) {
-            reader.readU8();  // group type (idle=0, moving=1)
+            group_type = reader.readU8();
+        }
+
+        // Store frame group data for each group
+        uint8_t gw = reader.readU8();
+        uint8_t gh = reader.readU8();
+        
+        if (gw > 1 || gh > 1) {
+            reader.readU8();  // exact size
         }
         
-        item.width = reader.readU8();
-        item.height = reader.readU8();
+        uint8_t gl = reader.readU8();
+        uint8_t gpx = reader.readU8();
+        uint8_t gpy = reader.readU8();
+        uint8_t gpz = shouldReadPatternZ() ? reader.readU8() : 1;
+        uint8_t gf = reader.readU8();
         
-        // Exact size (only if larger than 1x1)
-        if (item.width > 1 || item.height > 1) {
-            reader.readU8();  // exact size (unused)
-        }
-        
-        item.layers = reader.readU8();
-        item.pattern_x = reader.readU8();
-        item.pattern_y = reader.readU8();
-        
-        // PatternZ - version specific
-        if (shouldReadPatternZ()) {
-            item.pattern_z = reader.readU8();
-        } else {
-            item.pattern_z = 1;  // Hardcoded for 7.10-7.54
-        }
-        
-        item.frames = reader.readU8();
-        
-        // Animation data (10.50+ with animations)
-        if (item.frames > 1 && hasFrameDurations()) {
-            item.has_animation_data = true;
-            item.animation_mode = reader.readU8();
-            item.loop_count = static_cast<int32_t>(reader.readU32());
-            item.start_frame = reader.readU8();
+        if (gf > 1 && hasFrameDurations()) {
+            uint8_t anim_mode = reader.readU8();
+            int32_t loop = static_cast<int32_t>(reader.readU32());
+            uint8_t start = reader.readU8();
             
-            item.frame_durations.reserve(item.frames);
-            for (uint8_t f = 0; f < item.frames; ++f) {
+            if (g == 0) {
+                item.has_animation_data = true;
+                item.animation_mode = anim_mode;
+                item.loop_count = loop;
+                item.start_frame = start;
+            }
+            
+             for (uint8_t f = 0; f < gf; ++f) {
                 uint32_t min_duration = reader.readU32();
                 uint32_t max_duration = reader.readU32();
-                item.frame_durations.emplace_back(min_duration, max_duration);
+                if (g == 0) {
+                    item.frame_durations.emplace_back(min_duration, max_duration);
+                    item.total_duration += (min_duration + max_duration) / 2;
+                }
             }
         }
         
-        // Read sprite IDs
-        uint32_t sprite_count = item.getTotalSprites();
-        item.sprite_ids.reserve(sprite_count);
+        uint32_t sprite_count = static_cast<uint32_t>(gw) * gh * gl * gpx * gpy * gpz * gf;
+        std::vector<uint32_t> group_sprites;
+        if (sprite_count > 100000) {
+            for (uint32_t i = 0; i < sprite_count; ++i)
+                if (usesExtendedSprites()) reader.readU32(); else reader.readU16();
+        } else {
+            group_sprites.reserve(sprite_count);
+            for (uint32_t i = 0; i < sprite_count; ++i)
+                group_sprites.push_back(usesExtendedSprites() ? reader.readU32() : reader.readU16());
+        }
         
-        std::generate_n(std::back_inserter(item.sprite_ids), sprite_count, [&]() {
-            return usesExtendedSprites() ? reader.readU32() : reader.readU16();
-        });
-        
-        // Only use first frame group's data
-        if (g > 0) {
-            // Skip additional frame groups for main item data
-            break;
+        if (g == 0) {
+            item.width = gw;
+            item.height = gh;
+            item.layers = gl;
+            item.pattern_x = gpx;
+            item.pattern_y = gpy;
+            item.pattern_z = gpz;
+            item.frames = gf;
+            item.sprite_ids = std::move(group_sprites);
+        } else {
+            item.has_frame_groups = true;
+            if (group_type == 0) {
+                item.idle_sprite_ids = std::move(group_sprites);
+                item.idle_frames = gf;
+            } else {
+                item.walk_sprite_ids = std::move(group_sprites);
+                item.walk_frames = gf;
+            }
         }
     }
 }

@@ -1,4 +1,5 @@
 #include "StartupDialog.h"
+#include "UI/Core/Theme.h"
 #include "Utils/FormatUtils.h"
 #include <IconsFontAwesome6.h>
 #include <imgui.h>
@@ -7,6 +8,8 @@
 
 namespace MapEditor {
 namespace UI {
+
+namespace SC = SemanticColors;
 
 void StartupDialog::initialize(Services::ClientVersionRegistry *registry,
                                Services::ConfigService *config) {
@@ -19,19 +22,12 @@ void StartupDialog::initialize(Services::ClientVersionRegistry *registry,
     pending_result_.action = Action::NewMapConfirmed;
     pending_result_.new_map_config = config;
   });
-  
-  open_sec_dialog_.initialize(registry);
-  open_sec_dialog_.setOnConfirm([this](const std::filesystem::path& folder, uint32_t version) {
-    pending_result_.action = Action::OpenSecMapConfirmed;
-    pending_result_.sec_map_folder = folder;
-    pending_result_.sec_map_version = version;
-  });
 
   // Wire up extracted panel components
   available_clients_panel_.setRegistry(registry);
-  available_clients_panel_.setSelectionCallback([this](uint32_t version) {
+  available_clients_panel_.setSelectionCallback([this](uint32_t index) {
     pending_result_.action = Action::SelectClient;
-    pending_result_.selected_version = version;
+    pending_result_.selected_client_index = index;
   });
 
   recent_maps_panel_.setSelectionCallback(
@@ -39,7 +35,6 @@ void StartupDialog::initialize(Services::ClientVersionRegistry *registry,
         selected_recent_index_ = index;
         pending_result_.action = Action::SelectRecentMap;
         pending_result_.selected_path = entry.path;
-        pending_result_.selected_version = entry.detected_version;
         pending_result_.selected_index = index;
       });
 
@@ -88,7 +83,7 @@ void StartupDialog::setSelectedIndex(int index) {
 }
 
 void StartupDialog::render(const std::vector<RecentMapEntry> &recent_maps,
-                           const std::vector<uint32_t> &recent_clients) {
+                           uint32_t matched_client_index) {
   ImGuiIO &io = ImGui::GetIO();
 
   // Centered modal window with default size 1280x720
@@ -99,9 +94,7 @@ void StartupDialog::render(const std::vector<RecentMapEntry> &recent_maps,
   ImGui::SetNextWindowSizeConstraints(ImVec2(900, 550),
                                       ImVec2(FLT_MAX, FLT_MAX));
 
-  // Dark modern styling
-  ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.10f, 0.12f, 0.14f, 1.0f));
-  ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.12f, 0.14f, 0.16f, 1.0f));
+  // Theme-aware styling — dark overlay removed, uses active theme
   ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 8.0f);
   ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 6.0f);
   ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
@@ -162,7 +155,7 @@ void StartupDialog::render(const std::vector<RecentMapEntry> &recent_maps,
     // ===== PANEL 4: Latest Used Clients =====
     ImGui::BeginChild("##RecentClients", ImVec2(panel_width, main_height),
                       true);
-    renderRecentClientsPanel(recent_clients);
+    renderRecentClientsPanel(matched_client_index);
     ImGui::EndChild();
 
     // ===== FOOTER SECTION =====
@@ -172,7 +165,6 @@ void StartupDialog::render(const std::vector<RecentMapEntry> &recent_maps,
   ImGui::End();
 
   ImGui::PopStyleVar(4);
-  ImGui::PopStyleColor(2);
 
   // ===== RENDER MODALS (using standalone dialogs - DRY) =====
   
@@ -182,14 +174,8 @@ void StartupDialog::render(const std::vector<RecentMapEntry> &recent_maps,
     show_new_map_modal_ = false;
   }
   
-  if (show_sec_map_modal_) {
-    open_sec_dialog_.show();
-    show_sec_map_modal_ = false;
-  }
-  
   // Render dialogs (handles their own popup modals)
   new_map_dialog_.render();
-  open_sec_dialog_.render();
 
   // Render sub-dialogs if open
   if (client_config_dialog_.isOpen()) {
@@ -203,13 +189,13 @@ void StartupDialog::renderHeader() {
   const float header_height = 60.0f;
 
   // Card-style header background (no scrolling)
-  ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.14f, 0.16f, 0.18f, 1.0f));
+  ImGui::PushStyleColor(ImGuiCol_ChildBg, ImGui::GetStyleColorVec4(ImGuiCol_Header));
   ImGui::BeginChild("##HeaderCard", ImVec2(0, header_height), true,
                     ImGuiWindowFlags_NoScrollbar |
                         ImGuiWindowFlags_NoScrollWithMouse);
 
   // Title with larger text
-  ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
+  ImGui::PushStyleColor(ImGuiCol_Text, SC::TextPrimary());
   ImGui::SetWindowFontScale(1.4f);
   ImGui::Text("Tibia Map Editor");
   ImGui::SetWindowFontScale(1.0f);
@@ -217,7 +203,7 @@ void StartupDialog::renderHeader() {
 
   // Subtitle
   ImGui::TextColored(
-      ImVec4(0.6f, 0.65f, 0.7f, 1.0f),
+      SC::TextDim(),
       "Welcome! Start a new project or continue where you left off.");
 
   // Header buttons on the right (Preferences + Client Configuration)
@@ -231,26 +217,17 @@ void StartupDialog::renderHeader() {
                   right_padding);
   ImGui::SetCursorPosY(button_y);
 
-  ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.25f, 0.28f, 0.32f, 1.0f));
-  ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-                        ImVec4(0.35f, 0.38f, 0.42f, 1.0f));
   if (ImGui::Button(ICON_FA_GEAR " Preferences", kUniformButtonSize)) {
     pending_result_.action = Action::Preferences;
   }
-  ImGui::PopStyleColor(2);
 
   // Position second button at same Y level
   ImGui::SameLine(0, button_spacing);
   ImGui::SetCursorPosY(button_y);
 
-  // Client Configuration button (moved from footer)
-  ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.25f, 0.28f, 0.32f, 1.0f));
-  ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-                        ImVec4(0.35f, 0.38f, 0.42f, 1.0f));
   if (ImGui::Button(ICON_FA_SLIDERS " Client Config", kUniformButtonSize)) {
     pending_result_.action = Action::ClientConfiguration;
   }
-  ImGui::PopStyleColor(2);
 
   ImGui::EndChild();
   ImGui::PopStyleColor(); // ChildBg
@@ -262,12 +239,10 @@ void StartupDialog::renderSidebar() {
 
   ImGui::Spacing();
 
-  // New Map button (primary action - blue)
-  ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.20f, 0.45f, 0.70f, 1.0f));
-  ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-                        ImVec4(0.25f, 0.55f, 0.80f, 1.0f));
-  ImGui::PushStyleColor(ImGuiCol_ButtonActive,
-                        ImVec4(0.15f, 0.40f, 0.65f, 1.0f));
+  // New Map button (primary action)
+  ImGui::PushStyleColor(ImGuiCol_Button, SC::INFO);
+  ImGui::PushStyleColor(ImGuiCol_ButtonHovered, SC::Lighten(SC::INFO));
+  ImGui::PushStyleColor(ImGuiCol_ButtonActive, SC::Darken(SC::INFO));
   if (ImGui::Button(ICON_FA_FILE " New map", kUniformButtonSize)) {
     pending_result_.action = Action::NewMap;
   }
@@ -276,31 +251,19 @@ void StartupDialog::renderSidebar() {
   ImGui::Spacing();
   ImGui::Spacing();
 
-  // Browse Map button (secondary - dark gray)
-  ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.20f, 0.22f, 0.25f, 1.0f));
-  ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-                        ImVec4(0.28f, 0.30f, 0.34f, 1.0f));
-  ImGui::PushStyleColor(ImGuiCol_ButtonActive,
-                        ImVec4(0.16f, 0.18f, 0.20f, 1.0f));
+  // Browse Map button
   if (ImGui::Button(ICON_FA_FOLDER_OPEN " Browse Map", kUniformButtonSize)) {
     pending_result_.action = Action::BrowseMap;
   }
-  ImGui::PopStyleColor(3);
 
   ImGui::Spacing();
   ImGui::Spacing();
 
-  // Browse .sec MAP button (secondary - dark gray)
-  ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.20f, 0.22f, 0.25f, 1.0f));
-  ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-                        ImVec4(0.28f, 0.30f, 0.34f, 1.0f));
-  ImGui::PushStyleColor(ImGuiCol_ButtonActive,
-                        ImVec4(0.16f, 0.18f, 0.20f, 1.0f));
+  // Browse .sec MAP button
   if (ImGui::Button(ICON_FA_MAGNIFYING_GLASS " Browse .sec",
                     kUniformButtonSize)) {
     pending_result_.action = Action::BrowseSecMap;
   }
-  ImGui::PopStyleColor(3);
 }
 
 void StartupDialog::renderRecentMapsPanel(
@@ -333,9 +296,8 @@ void StartupDialog::renderClientInfoPanel() {
 }
 
 void StartupDialog::renderRecentClientsPanel(
-    const std::vector<uint32_t> &clients) {
-  // Sync state and delegate to extracted component
-  available_clients_panel_.setSelectedVersion(client_info_.version);
+    uint32_t selected_client_index) {
+  available_clients_panel_.setSelectedIndex(selected_client_index);
   available_clients_panel_.render();
 }
 
@@ -354,17 +316,13 @@ void StartupDialog::renderFooter() {
 
   // Exit button (left)
   ImGui::SetCursorPosY(button_y);
-  ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.25f, 0.28f, 0.32f, 1.0f));
-  ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-                        ImVec4(0.35f, 0.38f, 0.42f, 1.0f));
   if (ImGui::Button(ICON_FA_POWER_OFF " Exit", kUniformButtonSize)) {
     pending_result_.action = Action::Exit;
   }
-  ImGui::PopStyleColor(2);
 
   ImGui::SameLine();
   ImGui::SetCursorPosY(button_y + 8.0f);
-  ImGui::TextColored(ImVec4(0.5f, 0.52f, 0.55f, 1.0f), "Version 2.4.1");
+  ImGui::TextColored(SC::TextDim(), "Version 2.4.1");
 
   // Right side buttons: Ignore Signatures toggle + Load Map
   float button_spacing = 8.0f;
@@ -374,21 +332,12 @@ void StartupDialog::renderFooter() {
   ImGui::SameLine(region.x - right_buttons_width - right_padding);
   ImGui::SetCursorPosY(button_y);
 
-  // Ignore signatures toggle button (converted from checkbox)
-  if (ignore_signatures_) {
-    // Active state - more prominent color
-    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.35f, 0.50f, 0.65f, 1.0f));
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-                          ImVec4(0.40f, 0.55f, 0.70f, 1.0f));
-    ImGui::PushStyleColor(ImGuiCol_ButtonActive,
-                          ImVec4(0.30f, 0.45f, 0.60f, 1.0f));
-  } else {
-    // Inactive state - standard gray
-    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.25f, 0.28f, 0.32f, 1.0f));
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-                          ImVec4(0.35f, 0.38f, 0.42f, 1.0f));
-    ImGui::PushStyleColor(ImGuiCol_ButtonActive,
-                          ImVec4(0.20f, 0.22f, 0.26f, 1.0f));
+  // Ignore signatures toggle button
+  const bool pushed_color = ignore_signatures_;
+  if (pushed_color) {
+    ImGui::PushStyleColor(ImGuiCol_Button, SC::INFO);
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, SC::Lighten(SC::INFO));
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, SC::Darken(SC::INFO));
   }
 
   const char *sig_label = ignore_signatures_ ? ICON_FA_CHECK " Ignore Sigs"
@@ -396,21 +345,22 @@ void StartupDialog::renderFooter() {
   if (ImGui::Button(sig_label, kUniformButtonSize)) {
     ignore_signatures_ = !ignore_signatures_;
   }
-  ImGui::PopStyleColor(3);
+
+  if (pushed_color) {
+    ImGui::PopStyleColor(3);
+  }
 
   ImGui::SameLine(0, button_spacing);
 
-  // Load Map button (primary - blue)
+  // Load Map button (primary)
   bool can_load = load_enabled_ || ignore_signatures_;
 
-  ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.20f, 0.50f, 0.85f, 1.0f));
-  ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-                        ImVec4(0.25f, 0.55f, 0.90f, 1.0f));
-  ImGui::PushStyleColor(ImGuiCol_ButtonActive,
-                        ImVec4(0.15f, 0.45f, 0.80f, 1.0f));
+  ImGui::PushStyleColor(ImGuiCol_Button, SC::INFO);
+  ImGui::PushStyleColor(ImGuiCol_ButtonHovered, SC::Lighten(SC::INFO));
+  ImGui::PushStyleColor(ImGuiCol_ButtonActive, SC::Darken(SC::INFO));
 
   if (!can_load) {
-    ImGui::PushStyleVar(ImGuiStyleVar_Alpha, 0.5f);
+    ImGui::PushStyleVar(ImGuiStyleVar_Alpha, SC::DISABLED_ALPHA);
   }
 
   if (ImGui::Button(ICON_FA_UPLOAD " Load Map", kUniformButtonSize) &&

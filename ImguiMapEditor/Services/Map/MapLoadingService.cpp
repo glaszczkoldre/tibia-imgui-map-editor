@@ -5,6 +5,7 @@
 #include "IO/Otbm/OtbmReader.h"
 #include "IO/SecReader.h"
 #include "IO/SpawnXmlReader.h"
+#include "IO/WaypointXmlReader.h"
 #include "Services/TilesetService.h"
 #include <climits>
 #include <spdlog/spdlog.h>
@@ -14,14 +15,16 @@ namespace Services {
 
 MapLoadingService::MapLoadingService(ClientVersionRegistry &version_registry,
                                      ViewSettings &view_settings,
-                                     MapEditor::Brushes::BrushRegistry &brush_registry,
-                                     TilesetService &tileset_service)
+                                     Brushes::BrushRegistry &brush_registry,
+                                     TilesetService &tileset_service,
+                                     const OtbmSettings &otbm_settings)
     : version_registry_(version_registry), view_settings_(view_settings),
-      brush_registry_(brush_registry), tileset_service_(tileset_service) {}
+      brush_registry_(brush_registry), tileset_service_(tileset_service),
+      otbm_settings_(otbm_settings) {}
 
 MapLoadingResult
 MapLoadingService::loadMap(const std::filesystem::path &path,
-                           uint32_t &current_version,
+                           uint32_t &current_client_index,
                            const std::filesystem::path &pending_path) {
   MapLoadingResult result;
   spdlog::info("Loading map: {}", path.string());
@@ -38,13 +41,14 @@ MapLoadingService::loadMap(const std::filesystem::path &path,
   uint32_t otb_minor = header.version.client_version_minor;
   spdlog::info("Map OTB minor version: {}", otb_minor);
 
-  // If user already selected a version, use that; otherwise auto-detect
-  if (current_version == 0) {
-    auto *version = version_registry_.findVersionForOtb(otb_minor);
+  // If user already selected a client, use that; otherwise auto-detect
+  if (current_client_index == 0) {
+    auto *version = version_registry_.findBestMatch(otb_minor, header.version.client_version_major);
     if (version) {
-      current_version = version->getVersion();
-      spdlog::info("Auto-detected client version {} for OTB minor version {}",
-                   current_version, otb_minor);
+      current_client_index = version->getIndex();
+      spdlog::info("Auto-detected client index {} (version {}) for OTB {}.{}",
+                   current_client_index, version->getVersion(), otb_minor,
+                   header.version.client_version_major);
     } else {
       // OTB minor 0 is common for ancient 7.x maps - don't fail, just warn
       if (otb_minor == 0) {
@@ -60,11 +64,11 @@ MapLoadingService::loadMap(const std::filesystem::path &path,
       return result;
     }
   } else {
-    spdlog::info("Using user-selected client version: {}", current_version);
+    spdlog::info("Using user-selected client index: {}", current_client_index);
   }
 
   // Load client data
-  if (!loadClientData(current_version, pending_path)) {
+  if (!loadClientData(current_client_index, pending_path)) {
     result.error = "Failed to load client data";
     return result;
   }
@@ -88,7 +92,9 @@ MapLoadingService::loadMap(const std::filesystem::path &path,
   // Copy version info from OTBM result to map for saving
   Domain::ChunkedMap::MapVersion map_version;
   map_version.otbm_version = otbm_result.version.otbm_version;
-  map_version.client_version = current_version;
+  if (auto *cv = version_registry_.getVersion(current_client_index)) {
+    map_version.client_version = cv->getVersion();
+  }
   map_version.items_major_version = otbm_result.version.client_version_major;
   map_version.items_minor_version = otbm_result.version.client_version_minor;
   current_map_->setVersion(map_version);
@@ -105,6 +111,9 @@ MapLoadingService::loadMap(const std::filesystem::path &path,
   std::filesystem::path house_path =
       path.parent_path() / (path.stem().string() + "-house.xml");
   IO::HouseXmlReader::read(house_path, *current_map_);
+
+  // Load Waypoints — conditional on OTBM preference
+  loadWaypoints(path, *current_map_);
 
   // Cache sprites for performance
   if (client_data_service_ && sprite_manager_) {
@@ -206,6 +215,9 @@ MapLoadingResult MapLoadingService::loadMapWithExistingClientData(
       path.parent_path() / (path.stem().string() + "-house.xml");
   IO::HouseXmlReader::read(house_path, *loaded_map);
 
+  // Load Waypoints — conditional on OTBM preference
+  loadWaypoints(path, *loaded_map);
+
   spdlog::info("Map loaded: {} tiles, version {}", otbm_result.tile_count,
                otbm_result.version.client_version);
 
@@ -231,19 +243,77 @@ MapLoadingResult MapLoadingService::loadMapWithExistingClientData(
 }
 
 MapLoadingResult
+MapLoadingService::loadSecMapCore(const std::filesystem::path &directory,
+                                  Services::ClientDataService &client_data) {
+  MapLoadingResult result;
+
+  current_map_ = std::make_unique<Domain::ChunkedMap>();
+
+  IO::SecResult sec_result = IO::SecReader::read(
+      directory, *current_map_, &client_data,
+      [](int percent, const std::string &status) {
+        spdlog::debug("SEC load: {}% - {}", percent, status);
+      });
+
+  if (!sec_result.success) {
+    result.error = sec_result.error;
+    spdlog::error("Failed to load SEC map: {}", sec_result.error);
+    current_map_.reset();
+    return result;
+  }
+
+  current_map_->setName(directory.filename().string());
+
+  result.camera_center = findCameraCenter();
+  result.map = std::move(current_map_);
+  result.success = true;
+  return result;
+}
+
+MapLoadingResult MapLoadingService::loadSecMapWithExistingClientData(
+    const std::filesystem::path &directory,
+    Services::ClientDataService *existing_client_data,
+    Services::SpriteManager *existing_sprite_manager) {
+  if (!existing_client_data || !existing_sprite_manager) {
+    spdlog::error("loadSecMapWithExistingClientData failed: "
+                  "existing_client_data={}, existing_sprite_manager={}",
+                  static_cast<const void*>(existing_client_data),
+                  static_cast<const void*>(existing_sprite_manager));
+    MapLoadingResult result;
+    result.error = "Existing client data and sprite manager are required";
+    return result;
+  }
+
+  spdlog::info("Loading SEC map with existing client data: {}", directory.string());
+
+  auto result = loadSecMapCore(directory, *existing_client_data);
+
+  if (result.success) {
+    Domain::ChunkedMap::MapVersion map_version;
+    map_version.otbm_version = 1;
+    map_version.client_version = existing_client_data->getClientVersion();
+    map_version.items_major_version = 0;
+    map_version.items_minor_version = 0;
+    result.map->setVersion(map_version);
+  }
+
+  return result;
+}
+
+MapLoadingResult
 MapLoadingService::loadSecMap(const std::filesystem::path &directory,
-                              uint32_t current_version) {
+                              uint32_t current_client_index) {
   MapLoadingResult result;
   spdlog::info("Loading SEC map from: {}", directory.string());
 
-  if (current_version == 0) {
+  if (current_client_index == 0) {
     result.error =
         "Client version must be specified for SEC maps (no auto-detect)";
     return result;
   }
 
-  // Load client data first
-  if (!loadClientData(current_version, directory)) {
+  // Load client data first - force SRV for SEC maps
+  if (!loadClientData(current_client_index, directory, Domain::ItemDataSource::SRV)) {
     result.error = "Failed to load client data. SEC maps require items.srv.";
     return result;
   }
@@ -256,30 +326,23 @@ MapLoadingService::loadSecMap(const std::filesystem::path &directory,
   }
 
   // Create map and load SEC
-  current_map_ = std::make_unique<Domain::ChunkedMap>();
+  result = loadSecMapCore(directory, *client_data_service_);
 
-  IO::SecResult sec_result = IO::SecReader::read(
-      directory, *current_map_, client_data_service_.get(),
-      [](int percent, const std::string &status) {
-        spdlog::debug("SEC load: {}% - {}", percent, status);
-      });
-
-  if (!sec_result.success) {
-    result.error = sec_result.error;
-    spdlog::error("Failed to load SEC map: {}", sec_result.error);
-    current_map_.reset();
+  if (!result.success) {
+    client_data_service_.reset();
+    sprite_manager_.reset();
     return result;
   }
 
-  // Set map version info
+  // Set map version info with actual client version
   Domain::ChunkedMap::MapVersion map_version;
-  map_version.otbm_version = 1; // SEC maps are ancient
-  map_version.client_version = current_version;
+  map_version.otbm_version = 1;
+  if (auto *cv = version_registry_.getVersion(current_client_index)) {
+    map_version.client_version = cv->getVersion();
+  }
   map_version.items_major_version = 0;
   map_version.items_minor_version = 0;
-  current_map_->setVersion(map_version);
-
-  current_map_->setName(directory.filename().string());
+  result.map->setVersion(map_version);
 
   // Cache sprites for performance
   if (client_data_service_ && sprite_manager_) {
@@ -288,51 +351,45 @@ MapLoadingService::loadSecMap(const std::filesystem::path &directory,
     spdlog::info("Sprite caching: {} item types now use direct lookup", cached);
   }
 
-  spdlog::info("SEC map loaded: {} sectors, {} tiles, {} items",
-               sec_result.sector_count, sec_result.tile_count,
-               sec_result.item_count);
-
-  // Find camera center before transferring ownership
-  result.camera_center = findCameraCenter();
-
   // Transfer ownership of resources to result
   // NOTE: Renderer is NOT transferred - caller uses
   // RenderingManager::createRenderer()
-  result.map = std::move(current_map_);
   result.client_data = std::move(client_data_service_);
   result.sprite_manager = std::move(sprite_manager_);
 
-  result.success = true;
   return result;
 }
 
 MapLoadingResult MapLoadingService::createNewMap(const NewMapConfig &config,
-                                                 uint32_t current_version) {
+                                                 uint32_t current_client_index) {
   MapLoadingResult result;
 
   spdlog::info("Creating new map: {} ({}x{})", config.map_name,
                config.map_width, config.map_height);
 
   // Load client data first
-  if (!loadClientData(current_version, {})) {
+  if (!loadClientData(current_client_index, {})) {
     result.error = "Failed to load client data";
     return result;
   }
 
   current_map_ = std::make_unique<Domain::ChunkedMap>();
-  current_map_->createNew(config.map_width, config.map_height, current_version);
+  current_map_->createNew(config.map_width, config.map_height,
+                          current_client_index, config.otbm_version,
+                          config.items_major, config.items_minor,
+                          config.description);
   current_map_->setName(config.map_name);
 
   // Set full version info from ClientVersion registry
   // This ensures items_major_version and items_minor_version are properly set
   // for saving
-  auto *version_info = version_registry_.getVersion(current_version);
+  auto *version_info = version_registry_.getVersion(current_client_index);
   if (version_info) {
     Domain::ChunkedMap::MapVersion map_version;
-    map_version.otbm_version = version_info->getOtbmVersion();
-    map_version.client_version = current_version;
-    map_version.items_major_version = version_info->getOtbMajor();
-    map_version.items_minor_version = version_info->getOtbVersion();
+    map_version.otbm_version = config.otbm_version;
+    map_version.client_version = version_info->getVersion();
+    map_version.items_major_version = config.items_major ? config.items_major : version_info->getOtbMajor();
+    map_version.items_minor_version = config.items_minor ? config.items_minor : version_info->getOtbVersion();
     current_map_->setVersion(map_version);
     spdlog::info("New map version set: OTBM v{}, client {}, items {}.{}",
                  map_version.otbm_version, map_version.client_version,
@@ -355,73 +412,124 @@ MapLoadingResult MapLoadingService::createNewMap(const NewMapConfig &config,
   result.sprite_manager = std::move(sprite_manager_);
 
   result.success = true;
+  result.camera_center = Domain::Position(
+      static_cast<int32_t>(config.map_width / 2),
+      static_cast<int32_t>(config.map_height / 2), 7);
+  return result;
+}
+
+MapLoadingResult MapLoadingService::createNewMapWithExistingClientData(
+    const NewMapConfig &config,
+    Services::ClientDataService *existing_client_data,
+    Services::SpriteManager *existing_sprite_manager) {
+  MapLoadingResult result;
+
+  spdlog::info("Creating new map with existing client data: {} ({}x{})",
+               config.map_name, config.map_width, config.map_height);
+
+  current_map_ = std::make_unique<Domain::ChunkedMap>();
+  uint32_t client_ver = existing_client_data ? existing_client_data->getClientVersion() : 0;
+  current_map_->createNew(config.map_width, config.map_height, client_ver,
+                          config.otbm_version, config.items_major,
+                          config.items_minor, config.description);
+  current_map_->setName(config.map_name);
+
+  Domain::ChunkedMap::MapVersion map_version;
+  map_version.otbm_version = config.otbm_version;
+  map_version.client_version = client_ver;
+  map_version.items_major_version = config.items_major;
+  map_version.items_minor_version = config.items_minor;
+
+  // Normalize: fall back to registry values if config provides zero
+  if (!map_version.items_major_version || !map_version.items_minor_version) {
+    if (auto *cv = version_registry_.findBestByVersion(client_ver)) {
+      if (!map_version.items_major_version) map_version.items_major_version = cv->getOtbMajor();
+      if (!map_version.items_minor_version) map_version.items_minor_version = cv->getOtbVersion();
+    }
+  }
+  current_map_->setVersion(map_version);
+
+  // Cache sprites for performance using existing sprite manager
+  if (existing_client_data && existing_sprite_manager) {
+    existing_client_data->optimizeItemSprites(*existing_sprite_manager, true);
+  }
+
+  result.map = std::move(current_map_);
+  result.success = true;
+  result.camera_center = Domain::Position(
+      static_cast<int32_t>(config.map_width / 2),
+      static_cast<int32_t>(config.map_height / 2), 7);
   return result;
 }
 
 bool MapLoadingService::loadClientData(
-    uint32_t client_version, const std::filesystem::path &pending_path) {
-  // Get client version info
-  auto *version_info = version_registry_.getVersion(client_version);
+    uint32_t client_index, const std::filesystem::path &pending_path,
+    std::optional<Domain::ItemDataSource> source_override) {
+  // Get client version info by index
+  auto *version_info = version_registry_.getVersion(client_index);
   if (!version_info) {
-    spdlog::error("Unknown client version: {}", client_version);
+    spdlog::error("Unknown client index: {}", client_index);
     return false;
   }
 
   // Log expected signatures
-  spdlog::info("Client version {} expected signatures:", client_version);
+  spdlog::info("Client index {} (version {}) expected signatures:", client_index,
+               version_info->getVersion());
   spdlog::info("  Expected DAT signature: 0x{:08X}",
                version_info->getDatSignature());
   spdlog::info("  Expected SPR signature: 0x{:08X}",
                version_info->getSprSignature());
   spdlog::info("  Expected OTB version: {}", version_info->getOtbVersion());
 
-  // Check if client path is configured
-  auto version_client_path = version_info->getClientPath();
-  spdlog::info("Configured client path: '{}'", version_client_path.string());
+  auto client_path = version_info->getClientPath();
+  auto effective_source = source_override.value_or(version_info->getDataSource());
 
-  // If not configured, try to find client files in common locations
-  if (version_client_path.empty() ||
-      !std::filesystem::exists(version_client_path)) {
-    if (!pending_path.empty()) {
-      auto map_dir = pending_path.parent_path();
-      spdlog::info("Trying client files in map directory: {}",
-                   map_dir.string());
+  // Use the configured metadata path (honors custom_items_db_path_ override)
+  auto metadata_path = version_info->getItemMetadataPath();
+  auto metadata_filename = metadata_path.filename().string();
+  auto metadata_fallback_path = std::filesystem::current_path() / "data" / metadata_filename;
 
-      if (std::filesystem::exists(map_dir / "Tibia.dat") &&
-          std::filesystem::exists(map_dir / "Tibia.spr")) {
-        version_info->setClientPath(map_dir);
-        spdlog::info("Found client files in map directory");
-      }
-    }
-  }
-
-  // Debug: check what files exist
   auto dat_path = version_info->getDatPath();
   auto spr_path = version_info->getSprPath();
-  auto otb_path = version_info->getOtbPath();
 
-  spdlog::info("Checking client files:");
+  spdlog::info("Checking client files (source mode: {}):",
+               (effective_source == Domain::ItemDataSource::SRV) ? "SRV" :
+               ((effective_source == Domain::ItemDataSource::DAT) ? "DAT-only" : "OTB"));
   spdlog::info("  DAT: {} -> {}", dat_path.string(),
                std::filesystem::exists(dat_path) ? "EXISTS" : "NOT FOUND");
   spdlog::info("  SPR: {} -> {}", spr_path.string(),
                std::filesystem::exists(spr_path) ? "EXISTS" : "NOT FOUND");
-  spdlog::info("  OTB: {} -> {}", otb_path.string(),
-               std::filesystem::exists(otb_path) ? "EXISTS" : "NOT FOUND");
 
-  // Also check for items.srv (ancient 7.x format)
-  auto srv_path = version_info->getClientPath() / "items.srv";
-  if (!std::filesystem::exists(otb_path) && std::filesystem::exists(srv_path)) {
-    spdlog::info("  SRV: {} -> EXISTS (will use as fallback)",
-                 srv_path.string());
+  if (effective_source != Domain::ItemDataSource::DAT) {
+      spdlog::info("  Metadata ({}): {} -> {}", metadata_filename, metadata_path.string(),
+                   std::filesystem::exists(metadata_path) ? "EXISTS" : "NOT FOUND");
   }
 
   // Validate required files exist
-  if (!version_info->validateFiles()) {
+  bool valid = true;
+  if (dat_path.empty() || spr_path.empty() ||
+      !std::filesystem::exists(dat_path) || !std::filesystem::exists(spr_path)) {
+      valid = false;
+  } else if (effective_source != Domain::ItemDataSource::DAT) {
+      if ((metadata_path.empty() || !std::filesystem::exists(metadata_path)) &&
+          (metadata_fallback_path.empty() || !std::filesystem::exists(metadata_fallback_path))) {
+          valid = false;
+      }
+  }
+
+  if (!valid) {
+    std::string missing_list;
+    if (!std::filesystem::exists(dat_path)) missing_list += " Tibia.dat";
+    if (!std::filesystem::exists(spr_path)) missing_list += " Tibia.spr";
+    if (effective_source != Domain::ItemDataSource::DAT) {
+        if (!std::filesystem::exists(metadata_path) &&
+            !std::filesystem::exists(metadata_fallback_path)) {
+            missing_list += " " + std::string(metadata_filename);
+        }
+    }
     spdlog::error(
-        "Client files not found for version {}. Please configure client path.",
-        client_version);
-    spdlog::error("Required files: Tibia.dat, Tibia.spr, and items.otb (or "
-                  "items.srv for 7.x)");
+        "Client files not found for index {} in path '{}'. Missing:{}",
+        client_index, client_path.string(), missing_list);
     return false;
   }
 
@@ -430,22 +538,20 @@ bool MapLoadingService::loadClientData(
     client_data_service_ = std::make_unique<Services::ClientDataService>();
   }
 
-  // Use OTB or SRV path from client version
-  // ClientDataService::load() handles format detection automatically
-  auto final_item_path = otb_path;
-  if (!std::filesystem::exists(final_item_path)) {
-    // Check for items.srv fallback (ancient 7.x format)
-    if (std::filesystem::exists(srv_path)) {
-      final_item_path = srv_path;
-      spdlog::info("Using items.srv (ancient format) instead of items.otb");
-    } else {
-      final_item_path = std::filesystem::path("data") / "items.otb";
-    }
+  // Resolve final metadata path
+  std::filesystem::path final_metadata_path;
+  if (effective_source != Domain::ItemDataSource::DAT) {
+      final_metadata_path = metadata_path;
+      if (!std::filesystem::exists(final_metadata_path)) {
+          final_metadata_path = metadata_fallback_path;
+          spdlog::info("Using metadata from editor data directory: {}", final_metadata_path.string());
+      }
   }
 
   // Load client data
   auto result = client_data_service_->load(
-      version_info->getClientPath(), final_item_path, client_version,
+      client_path, final_metadata_path, *version_info,
+      effective_source,
       [](int percent, const std::string &status) {
         spdlog::info("Loading: {}% - {}", percent, status);
       });
@@ -455,14 +561,17 @@ bool MapLoadingService::loadClientData(
     return false;
   }
 
-  auto map_dir = pending_path.empty() ? std::filesystem::path()
-                                      : pending_path.parent_path();
+  auto map_dir = pending_path.empty()
+                     ? std::filesystem::path()
+                     : (effective_source == Domain::ItemDataSource::SRV)
+                           ? pending_path
+                           : pending_path.parent_path();
 
-  if (!tryLoadCreatures(map_dir, version_client_path)) {
+  if (!tryLoadCreatures(map_dir, client_path)) {
     spdlog::warn("No creature data loaded. Spawns may look incorrect.");
   }
 
-  if (!tryLoadItems(map_dir, version_client_path)) {
+  if (!tryLoadItems(map_dir, client_path)) {
     spdlog::warn("No items.xml loaded. Item names may be missing.");
   }
 
@@ -506,7 +615,7 @@ bool MapLoadingService::loadClientData(
 
   // Create sprite manager with the loaded sprites
   sprite_manager_ = std::make_unique<Services::SpriteManager>(
-      client_data_service_->getSpriteReader());
+      client_data_service_->getSpriteReader(), version_info->isTransparent());
 
   // Initialize SpriteManager (async loading and GPU resources)
   // This must be done here (on main thread) to ensure service is ready for
@@ -590,6 +699,32 @@ bool MapLoadingService::tryLoadItems(const std::filesystem::path &map_dir,
   }
   return tryLoadResource(std::filesystem::path("items") / "items.xml", map_dir,
                          client_path, load);
+}
+
+void MapLoadingService::loadWaypoints(const std::filesystem::path &otbm_path,
+                                       Domain::ChunkedMap &map) {
+    auto waypoint_path = otbm_path.parent_path() / (otbm_path.stem().string() + "-waypoints.xml");
+
+    if (otbm_settings_.waypoint_read == Domain::OtbmReadSource::Otbm) {
+        if (map.getWaypoints().empty()) {
+            if (std::filesystem::exists(waypoint_path)) {
+                auto result = IO::WaypointXmlReader::read(waypoint_path, map);
+                if (!result.success) {
+                    spdlog::warn("XML waypoint fallback failed for {}: {}",
+                                 waypoint_path.string(), result.error);
+                }
+            }
+        }
+    } else {
+        if (std::filesystem::exists(waypoint_path)) {
+            map.clearWaypoints();
+            auto result = IO::WaypointXmlReader::read(waypoint_path, map);
+            if (!result.success) {
+                spdlog::warn("XML waypoint load failed for {}: {}",
+                             waypoint_path.string(), result.error);
+            }
+        }
+    }
 }
 
 } // namespace Services

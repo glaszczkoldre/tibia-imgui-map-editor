@@ -1,20 +1,42 @@
 // Prevent GLFW from including OpenGL headers (glad provides them)
 #define GLFW_INCLUDE_NONE
 #include "PreferencesDialog.h"
-#include "../Utils/StringCopy.h"
+#include "UI/Core/Theme.h"
 #include "../ext/imhotkey/imHotKey.h"
 #include "IO/HotkeyJsonReader.h"
 #include "Presentation/NotificationHelper.h"
 #include "Services/AppSettings.h"
 #include "Services/HotkeyRegistry.h"
+#include "Services/OtbmSettings.h"
 #include "Services/SecondaryClientData.h"
 #include "ext/fontawesome6/IconsFontAwesome6.h"
+#include <algorithm>
+#include <format>
 #include <glad/glad.h>
 #include <imgui.h>
+#include <iterator>
 #include <nfd.hpp>
 
 namespace MapEditor {
 namespace UI {
+
+namespace SC = SemanticColors;
+
+namespace {
+
+bool saveHotkeysToFile(const Domain::HotkeyBindingMap& bindings) {
+    std::vector<std::filesystem::path> save_paths = {"data/hotkeys.json",
+                                                      "../data/hotkeys.json"};
+    for (const auto& path : save_paths) {
+        if (std::filesystem::exists(path.parent_path()) ||
+            path.parent_path().empty()) {
+            return IO::HotkeyJsonReader::save(path, bindings);
+        }
+    }
+    return false;
+}
+
+} // namespace
 
 void PreferencesDialog::show() { should_open_ = true; }
 
@@ -58,6 +80,10 @@ PreferencesDialog::Result PreferencesDialog::render() {
         renderHotkeysTab();
         ImGui::EndTabItem();
       }
+      if (ImGui::BeginTabItem(ICON_FA_FILE " OTBM")) {
+        renderOtbmTab();
+        ImGui::EndTabItem();
+      }
       if (ImGui::BeginTabItem(ICON_FA_CLONE " Secondary Client")) {
         renderSecondaryClientTab();
         ImGui::EndTabItem();
@@ -65,7 +91,8 @@ PreferencesDialog::Result PreferencesDialog::render() {
       ImGui::EndTabBar();
     }
 
-    // Close button at bottom
+    // Close button at bottom (hidden when OTBM tab has its own footer)
+    if (!otbm_tab_active_) {
     float button_width = 100.0f;
     ImGui::SetCursorPosY(ImGui::GetWindowHeight() - 40);
     ImGui::Separator();
@@ -75,12 +102,15 @@ PreferencesDialog::Result PreferencesDialog::render() {
       ImGui::CloseCurrentPopup();
       is_open_ = false;
     }
+    }
 
     if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
       result = Result::Closed;
       ImGui::CloseCurrentPopup();
       is_open_ = false;
     }
+
+    otbm_tab_active_ = false;
 
     ImGui::EndPopup();
   } else if (is_open_) {
@@ -93,7 +123,65 @@ PreferencesDialog::Result PreferencesDialog::render() {
 
 void PreferencesDialog::renderEditorTab() {
   ImGui::Spacing();
-  ImGui::TextDisabled("General editor settings will be added here.");
+
+  // === Theme ===
+  if (ImGui::CollapsingHeader(ICON_FA_PALETTE " Theme", ImGuiTreeNodeFlags_DefaultOpen)) {
+    ImGui::Spacing();
+
+    float combo_width = 220.0f;
+    ImGui::TextUnformatted("Select Theme");
+
+    const char* current_name = "Select Theme";
+    if (theme_ptr_) {
+      current_name = GetThemeName(*theme_ptr_);
+    }
+
+    ImGui::SetNextItemWidth(combo_width);
+    if (ImGui::BeginCombo("##ThemeCombo", current_name)) {
+      for (const auto& theme : AVAILABLE_THEMES) {
+        bool is_selected = theme_ptr_ && (*theme_ptr_ == theme.type);
+
+        const char* theme_icon = ICON_FA_CIRCLE;
+        switch (theme.type) {
+          case ThemeType::DocumentDark:   theme_icon = ICON_FA_MOON; break;
+          case ThemeType::DocumentMidnight: theme_icon = ICON_FA_MOON; break;
+          case ThemeType::DocumentLight:  theme_icon = ICON_FA_SUN; break;
+        }
+
+        ImGui::PushStyleColor(ImGuiCol_Text, theme.preview_color);
+        ImGui::Text("%s", ICON_FA_SQUARE);
+        ImGui::PopStyleColor();
+        ImGui::SameLine();
+
+        std::string label = std::string(theme_icon) + " " + theme.name;
+
+        if (ImGui::Selectable(label.c_str(), is_selected)) {
+          ApplyTheme(theme.type);
+          if (theme_ptr_) {
+            *theme_ptr_ = theme.type;
+          }
+          if (on_apply_settings_) {
+            on_apply_settings_();
+          }
+        }
+        if (ImGui::IsItemHovered() && theme.description) {
+          ImGui::SetTooltip("%s", theme.description);
+        }
+      }
+      ImGui::EndCombo();
+    }
+
+    if (theme_ptr_) {
+      ImGui::SameLine();
+      auto it = std::ranges::find_if(
+          AVAILABLE_THEMES, [this](const ThemeInfo& ti) { return ti.type == *theme_ptr_; });
+      if (it != std::end(AVAILABLE_THEMES)) {
+        ImGui::TextUnformatted(it->description);
+      }
+    }
+
+    ImGui::Spacing();
+  }
 }
 
 void PreferencesDialog::renderSecondaryClientTab() {
@@ -118,10 +206,10 @@ void PreferencesDialog::renderSecondaryClientTab() {
     bool is_active = sec_client->isActive();
 
     if (is_active) {
-      ImGui::TextColored(ImVec4(0.2f, 0.8f, 0.2f, 1.0f),
+      ImGui::TextColored(SC::SAVED,
                          ICON_FA_CHECK " Secondary Client Active");
     } else {
-      ImGui::TextColored(ImVec4(0.8f, 0.6f, 0.2f, 1.0f),
+      ImGui::TextColored(SC::WARNING,
                          ICON_FA_PAUSE " Secondary Client Loaded (Inactive)");
     }
 
@@ -203,7 +291,7 @@ void PreferencesDialog::renderSecondaryClientTab() {
 
     // Error display
     if (!secondary_error_.empty()) {
-      ImGui::TextColored(ImVec4(1.0f, 0.3f, 0.3f, 1.0f),
+      ImGui::TextColored(SC::DANGER,
                          ICON_FA_TRIANGLE_EXCLAMATION " %s",
                          secondary_error_.c_str());
       ImGui::Spacing();
@@ -299,7 +387,7 @@ void PreferencesDialog::renderHotkeysTab() {
   // When Apply is clicked, sync immediately
   if (result == ImHotKey::EditResult::Applied && appliedIndex >= 0) {
     // Update registry with the changed binding
-    Services::HotkeyBinding binding;
+    Domain::HotkeyBinding binding;
     binding.action_id = hotkeys[appliedIndex].functionName;
     binding.key = hotkeys[appliedIndex].key;
     binding.mods = hotkeys[appliedIndex].mods;
@@ -307,27 +395,17 @@ void PreferencesDialog::renderHotkeysTab() {
     binding.is_mouse = hotkeys[appliedIndex].isMouse;
     hotkey_registry_->registerBinding(binding);
 
-    // Save to JSON file
-    std::vector<std::filesystem::path> save_paths = {"data/hotkeys.json",
-                                                     "../data/hotkeys.json"};
-    for (const auto &path : save_paths) {
-      if (std::filesystem::exists(path.parent_path()) ||
-          path.parent_path().empty()) {
-        IO::HotkeyJsonReader::save(path, *hotkey_registry_);
-        break;
-      }
+    if (saveHotkeysToFile(hotkey_registry_->getAllBindings())) {
+      // Show toast notification
+      char shortcut[64];
+      ImHotKey::GetHotKeyLib(hotkeys[appliedIndex], shortcut, sizeof(shortcut));
+      Presentation::showSuccess(std::string("Set ") +
+                                    hotkeys[appliedIndex].functionName + " to " +
+                                    shortcut,
+                                2000);
+    } else {
+      Presentation::showError("Failed to save hotkeys to file", 3000);
     }
-
-    // Show toast notification
-    char shortcut[64];
-    ImHotKey::GetHotKeyLib(hotkeys[appliedIndex], shortcut, sizeof(shortcut));
-    char msg[128];
-    snprintf(msg, sizeof(msg), "Set %s to %s",
-             hotkeys[appliedIndex].functionName, shortcut);
-    Presentation::showSuccess(std::string("Set ") +
-                                  hotkeys[appliedIndex].functionName + " to " +
-                                  shortcut,
-                              2000);
   }
 
   ImGui::Spacing();
@@ -355,7 +433,7 @@ void PreferencesDialog::renderHotkeysTab() {
           ImGui::TableNextColumn();
           char shortcut[64];
           ImHotKey::GetHotKeyLib(hotkeys[i], shortcut, sizeof(shortcut));
-          ImGui::TextColored(ImVec4(0.5f, 0.8f, 1.0f, 1.0f), "%s",
+          ImGui::TextColored(SC::INFO, "%s",
                              shortcut[0] ? shortcut : "(none)");
 
           ImGui::TableNextColumn();
@@ -375,18 +453,228 @@ void PreferencesDialog::renderHotkeysTab() {
     *hotkey_registry_ = Services::HotkeyRegistry::createDefaults();
     reloadFromRegistry();
 
-    // Save defaults to JSON
-    std::vector<std::filesystem::path> save_paths = {"data/hotkeys.json",
-                                                     "../data/hotkeys.json"};
-    for (const auto &path : save_paths) {
-      if (std::filesystem::exists(path.parent_path()) ||
-          path.parent_path().empty()) {
-        IO::HotkeyJsonReader::save(path, *hotkey_registry_);
-        break;
+    if (saveHotkeysToFile(hotkey_registry_->getAllBindings())) {
+      Presentation::showSuccess("Hotkeys reset to defaults", 2000);
+    } else {
+      Presentation::showError("Failed to save hotkeys to file", 3000);
+    }
+  }
+}
+
+// ========== OTBM Tab ==========
+
+namespace {
+const char* kOtbmTypeNames[] = { "Waypoints", "Spawns", "Houses", "Towns", "Zones" };
+const char* kOtbmTypeDescs[] = {
+    "Read source and write target for waypoint data",
+    "Coming soon",
+    "Coming soon",
+    "Coming soon",
+    "Coming soon"
+};
+const char* kOtbmReadSourceItems[] = { "OTBM", "XML" };
+const char* kOtbmReadSourceIcons[] = { ICON_FA_FLOPPY_DISK " ", ICON_FA_FILE " " };
+const char* kOtbmWriteTargetItems[] = { "OTBM", "XML" };
+const char* kOtbmWriteTargetIcons[] = { ICON_FA_FLOPPY_DISK " ", ICON_FA_FILE " " };
+} // namespace
+
+void PreferencesDialog::renderOtbmTab() {
+  if (!otbm_settings_) {
+    ImGui::TextDisabled("OTBM settings are not available.");
+    return;
+  }
+  otbm_tab_active_ = true;
+  auto& style = ImGui::GetStyle();
+  bool settings_disabled = !otbm_destructive_ack_;
+
+  // ---- Warning Banner ----
+  {
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(12, 10));
+    ImGui::BeginChild("##otbm_warning", ImVec2(0, 0),
+                      ImGuiChildFlags_Borders | ImGuiChildFlags_AutoResizeY);
+    ImGui::PushStyleColor(ImGuiCol_Text, style.Colors[ImGuiCol_Text]);
+    ImGui::Text("%s  Changing OTBM read/write settings can be destructive.",
+                 ICON_FA_TRIANGLE_EXCLAMATION);
+    ImGui::PopStyleColor();
+    ImGui::Spacing();
+    ImGui::TextDisabled("Switching formats may cause data to be cleared "
+                        "from the previous format on save.");
+    ImGui::EndChild();
+    ImGui::PopStyleVar();
+  }
+
+  ImGui::Spacing();
+  ImGui::Checkbox("I understand — enable OTBM preferences", &otbm_destructive_ack_);
+  ImGui::Spacing();
+  ImGui::Spacing();
+
+  // ---- Main Two-Panel Layout ----
+  float category_list_width = 160.0f;
+  float footer_height = 52.0f;
+  float child_height = ImGui::GetContentRegionAvail().y - footer_height;
+
+  // Left: category list
+  {
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8, 6));
+    ImGui::BeginGroup();
+    if (ImGui::BeginChild("##otbm_type_list", ImVec2(category_list_width, child_height),
+                          ImGuiChildFlags_Borders)) {
+      ImGui::TextUnformatted("OTBM Categories");
+      ImGui::Separator();
+      ImGui::Spacing();
+
+      ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8, 6));
+      for (size_t i = 0; i < std::size(kOtbmTypeNames); i++) {
+        ImGui::PushID(static_cast<int>(i));
+        bool is_selected = (selected_otbm_type_ == static_cast<int>(i));
+        if (ImGui::Selectable(kOtbmTypeNames[i], is_selected)) {
+          selected_otbm_type_ = static_cast<int>(i);
+        }
+        ImGui::PopID();
+      }
+      ImGui::PopStyleVar();
+    }
+    ImGui::EndChild();
+    ImGui::EndGroup();
+    ImGui::PopStyleVar();
+  }
+
+  ImGui::SameLine();
+
+  // Right: settings panel
+  {
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(16, 12));
+    ImGui::BeginGroup();
+    if (ImGui::BeginChild("##otbm_settings_panel", ImVec2(0, child_height),
+                          ImGuiChildFlags_Borders)) {
+      if (settings_disabled) {
+        ImGui::BeginDisabled();
+      }
+
+      ImGui::PushStyleColor(ImGuiCol_Text, style.Colors[ImGuiCol_Text]);
+      ImGui::TextUnformatted(kOtbmTypeNames[selected_otbm_type_]);
+      ImGui::PopStyleColor();
+      ImGui::TextDisabled("%s", kOtbmTypeDescs[selected_otbm_type_]);
+      ImGui::Spacing();
+      ImGui::Separator();
+      ImGui::Spacing();
+
+      renderOtbmSettingsPanel();
+
+      if (settings_disabled) {
+        ImGui::EndDisabled();
       }
     }
+    ImGui::EndChild();
+    ImGui::EndGroup();
+    ImGui::PopStyleVar();
+  }
 
-    Presentation::showSuccess("Hotkeys reset to defaults", 2000);
+  // ---- Footer ----
+  float btn_width = 120.0f;
+  float btn_area_width = btn_width * 3 + style.ItemSpacing.x * 2;
+
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(12, 8));
+  ImGui::BeginChild("##otbm_footer", ImVec2(0, 0),
+                    ImGuiChildFlags_Borders | ImGuiChildFlags_AutoResizeY);
+  ImGui::PopStyleVar();
+
+  ImGui::AlignTextToFramePadding();
+  ImGui::TextColored(style.Colors[ImGuiCol_TextDisabled],
+                     "%s  Changes take effect after restart.",
+                     ICON_FA_CIRCLE_INFO);
+  ImGui::SameLine();
+  ImGui::SetCursorPosX(ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - btn_area_width);
+
+  if (ImGui::Button("Defaults", ImVec2(btn_width, 0))) {
+    otbm_settings_->waypoint_read = Domain::OtbmReadSource::Otbm;
+    otbm_settings_->waypoint_write = Domain::OtbmWriteTarget::Otbm;
+    if (on_apply_settings_) {
+      on_apply_settings_();
+    }
+    Presentation::showSuccess("OTBM settings restored to defaults", 2000);
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("Apply", ImVec2(btn_width, 0))) {
+    if (on_apply_settings_) {
+      on_apply_settings_();
+      Presentation::showSuccess("OTBM settings saved", 2000);
+    }
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("Close", ImVec2(btn_width, 0))) {
+    ImGui::CloseCurrentPopup();
+    is_open_ = false;
+  }
+
+  ImGui::EndChild();
+}
+
+void PreferencesDialog::renderOtbmSettingsPanel() {
+  if (!otbm_settings_) return;
+
+  float panel_width = ImGui::GetContentRegionAvail().x;
+  float combo_width = panel_width * 0.48f;
+
+  auto renderCombo = [](const char* label, int* val, const char* const items[],
+                        const char* const icons[], int count) -> bool {
+    const char* preview = (items[*val]);
+    const char* preview_icon = (icons[*val]);
+    bool changed = false;
+    ImGui::SetNextItemWidth(-1.0f);
+    if (ImGui::BeginCombo(label, std::format("{}{}", preview_icon, preview).c_str())) {
+      for (int i = 0; i < count; i++) {
+        ImGui::PushID(i);
+        bool sel = (*val == i);
+        if (ImGui::Selectable(std::format("{}{}", icons[i], items[i]).c_str(), sel)) {
+          *val = i;
+          changed = true;
+        }
+        if (sel) {
+          ImGui::SetItemDefaultFocus();
+        }
+        ImGui::PopID();
+      }
+      ImGui::EndCombo();
+    }
+    return changed;
+  };
+
+  switch (selected_otbm_type_) {
+  case 0: { // Waypoints
+    ImGui::SetNextItemWidth(combo_width);
+    ImGui::TextUnformatted("Read source");
+    ImGui::Spacing();
+    int read_val = static_cast<int>(otbm_settings_->waypoint_read);
+    if (renderCombo("##ws_read", &read_val, kOtbmReadSourceItems, kOtbmReadSourceIcons, 2)) {
+      otbm_settings_->waypoint_read = static_cast<Domain::OtbmReadSource>(read_val);
+    }
+    ImGui::Spacing();
+    ImGui::TextDisabled("Select the format used as source for reading.");
+
+    ImGui::Spacing();
+    ImGui::Spacing();
+    ImGui::Separator();
+    ImGui::Spacing();
+    ImGui::Spacing();
+
+    ImGui::TextUnformatted("Write target");
+    ImGui::Spacing();
+    int write_val = static_cast<int>(otbm_settings_->waypoint_write);
+    if (renderCombo("##ws_write", &write_val, kOtbmWriteTargetItems, kOtbmWriteTargetIcons, 2)) {
+      otbm_settings_->waypoint_write = static_cast<Domain::OtbmWriteTarget>(write_val);
+    }
+    ImGui::Spacing();
+    ImGui::TextDisabled("Select the format used as target for writing.");
+
+    break;
+  }
+  case 1: // Spawns
+  case 2: // Houses
+  case 3: // Towns
+  case 4: // Zones
+    ImGui::TextDisabled("No settings available yet.");
+    break;
   }
 }
 

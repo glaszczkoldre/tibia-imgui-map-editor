@@ -1,6 +1,7 @@
 #include "Tile.h"
 #include "ChunkedMap.h" // Needed for Chunk definition
 #include "ItemType.h"
+#include "IO/Otbm/OtbmOpaqueData.h"
 #include <spdlog/spdlog.h>
 
 namespace MapEditor {
@@ -46,6 +47,13 @@ void Tile::setZoneBrushId(TileFlag flag, Brushes::BrushId brushId) {
   case TileFlag::None:
     break;
   }
+}
+
+Tile::~Tile() = default;
+
+void Tile::setOpaqueData(std::unique_ptr<IO::InvalidZoneState> data) {
+    opaque_data_ = std::move(data);
+}
 }
 
 void Tile::setGround(std::unique_ptr<Item> item) {
@@ -226,6 +234,10 @@ std::unique_ptr<Tile> Tile::clone() const {
 
   if (creature_) {
     tile->creature_ = std::make_unique<Creature>(*creature_);
+  }
+
+  if (opaque_data_) {
+    tile->opaque_data_ = std::make_unique<IO::InvalidZoneState>(*opaque_data_);
   }
 
   return tile;

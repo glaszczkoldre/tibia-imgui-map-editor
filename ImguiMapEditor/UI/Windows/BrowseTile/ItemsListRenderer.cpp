@@ -7,6 +7,7 @@
 #include "Domain/Tile.h"
 #include "Rendering/Core/Texture.h"
 #include "Services/SpriteManager.h"
+#include "UI/Utils/PreviewUtils.hpp"
 #include "../../ext/fontawesome6/IconsFontAwesome6.h"
 #include <format>
 
@@ -76,8 +77,9 @@ void ItemsListRenderer::renderItemRow(const Domain::Item *item,
 
   bool image_rendered = false;
   if (sprite_manager_ && type) {
-    if (auto *texture = sprite_manager_->getItemCompositor().getCompositedItemTexture(type)) {
-      ImGui::Image((void *)(intptr_t)texture->id(), ImVec2(32, 32));
+    if (auto *texture = Utils::GetItemPreview(*sprite_manager_, type)) {
+      bool is_sel = (selected_index == display_index);
+      Utils::RenderPreviewCard(texture, 32.0f, is_sel);
       image_rendered = true;
     }
   }

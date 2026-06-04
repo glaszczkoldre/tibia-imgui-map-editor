@@ -3,6 +3,7 @@
 // NOTE: TilesetXmlReader, TilesetRegistry, BrushRegistry, CreatureBrush
 // includes removed - tileset logic moved to TilesetService
 #include <algorithm>
+#include <format>
 #include <spdlog/spdlog.h>
 
 namespace MapEditor {
@@ -10,12 +11,14 @@ namespace Services {
 
 ClientDataResult
 ClientDataService::load(const std::filesystem::path &client_path,
-                        const std::filesystem::path &otb_path,
-                        uint32_t client_version,
+                        const std::filesystem::path &item_metadata_path,
+                        const Domain::ClientVersion &client_version,
+                        ::MapEditor::Domain::ItemDataSource data_source,
                         LoadProgressCallback progress) {
   ClientDataResult result;
-  // Clear any existing data first
   clear();
+
+  uint32_t version_num = client_version.getVersion();
 
   if (progress)
     progress(0, "Loading item database...");
@@ -25,13 +28,12 @@ ClientDataService::load(const std::filesystem::path &client_path,
   // OTB is the modern binary format
   std::vector<Domain::ItemType> item_definitions;
 
-  bool is_srv = otb_path.extension() == ".srv";
-
-  if (is_srv) {
+  if (data_source == ::MapEditor::Domain::ItemDataSource::DAT) {
+    spdlog::info("ClientDataService: Using DAT-only mode (Client IDs as Server IDs)");
+    // item_definitions will be generated later during merge
+  } else if (data_source == ::MapEditor::Domain::ItemDataSource::SRV) {
     // Load SRV format
-    std::filesystem::path srv_path = otb_path.extension() == ".srv"
-                                         ? otb_path
-                                         : otb_path.parent_path() / "items.srv";
+    std::filesystem::path srv_path = item_metadata_path;
 
     IO::SrvResult srv_result = IO::SrvReader::read(srv_path);
     if (!srv_result.success) {
@@ -51,7 +53,7 @@ ClientDataService::load(const std::filesystem::path &client_path,
                  item_definitions.size());
   } else {
     // Load OTB format (default)
-    IO::OtbResult otb_result = IO::OtbReader::read(otb_path);
+    IO::OtbResult otb_result = IO::OtbReader::read(item_metadata_path);
     if (!otb_result.success) {
       result.error = "Failed to load OTB: " + otb_result.error;
       return result;
@@ -71,11 +73,11 @@ ClientDataService::load(const std::filesystem::path &client_path,
 
   // 2. Load DAT (client item appearances)
   std::filesystem::path dat_path = client_path / "Tibia.dat";
-  auto dat_reader = IO::DatReaderFactory::create(client_version);
+  auto dat_reader = IO::DatReaderFactory::create(version_num);
 
   if (!dat_reader) {
     result.error =
-        "Unsupported client version: " + std::to_string(client_version);
+        "Unsupported client version: " + std::to_string(version_num);
     return result;
   }
 
@@ -107,6 +109,18 @@ ClientDataService::load(const std::filesystem::path &client_path,
     progress(60, "Merging data...");
 
   // 3. Merge data
+  if (data_source == ::MapEditor::Domain::ItemDataSource::DAT) {
+      // Generate item definitions directly from DAT
+      item_definitions.reserve(dat_result.items.size());
+      for (const auto& dat_item : dat_result.items) {
+          Domain::ItemType it;
+          it.server_id = dat_item.id;
+          it.client_id = dat_item.id;
+          it.name = std::format("Item {}", dat_item.id);
+          item_definitions.push_back(std::move(it));
+      }
+  }
+
   mergeOtbWithDat(item_definitions, dat_result, client_version);
 
   // 4. Store outfit data for creature sprite lookup
@@ -133,7 +147,7 @@ ClientDataService::load(const std::filesystem::path &client_path,
   // Need to handle result object, no implicit bool conversion
   // spr_reader_ instance is preserved, only calling open() to reset internal
   // state and load new file
-  bool extended = client_version >= 960;
+  bool extended = client_version.isExtended();
   auto spr_result = spr_reader_->open(spr_path, 0, extended);
 
   if (spr_result.success) {
@@ -150,18 +164,7 @@ ClientDataService::load(const std::filesystem::path &client_path,
   result.success = true;
 
   loaded_ = true;
-  client_version_ = client_version;
-
-  if (progress)
-    progress(100, "Done");
-
-  // ...
-
-  // Final success update
-  result.success = true;
-
-  loaded_ = true;
-  client_version_ = client_version;
+  client_version_ = version_num;
 
   if (progress)
     progress(100, "Done");
@@ -297,9 +300,8 @@ void ClientDataService::clear() {
 }
 
 void ClientDataService::mergeOtbWithDat(
-    // ...
     const std::vector<Domain::ItemType> &otb_items,
-    const IO::DatResult &dat_result, uint32_t client_version) {
+    const IO::DatResult &dat_result, const Domain::ClientVersion &client_version) {
 
   // Build a map of client_id -> DAT item for quick lookup
   std::unordered_map<uint16_t, const IO::ClientItem *> dat_items;
@@ -344,13 +346,8 @@ void ClientDataService::mergeOtbWithDat(
         merged.light_color = static_cast<uint8_t>(dat->light_color);
       }
 
-      // Translucency - ONLY for client 10.00+
-      // Older clients ignore this flag for visibility calculations
-      if (client_version >= 1000) {
-        merged.is_translucent = dat->is_translucent;
-      } else {
-        merged.is_translucent = false;
-      }
+      // Translucency — DAT flag already false for pre-10.00 items
+      merged.is_translucent = dat->is_translucent;
 
       // Ground speed from DAT
       if (dat->is_ground && dat->ground_speed > 0) {
@@ -392,6 +389,27 @@ void ClientDataService::mergeOtbWithDat(
       // Fluid container flag from DAT (for proper subtype-based sprite
       // rendering)
       merged.is_fluid_container = dat->is_fluid_container;
+
+      // Animation data (from DAT)
+      merged.animate_always = dat->animate_always;
+      merged.animation_mode = dat->animation_mode;
+      merged.loop_count = dat->loop_count;
+      merged.start_frame = dat->start_frame;
+      merged.frame_durations = dat->frame_durations;
+      merged.total_duration = 0;
+      for (const auto &d : dat->frame_durations) {
+        merged.total_duration += (d.first + d.second) / 2;
+      }
+
+      // Lying object (multi-tile corpses)
+      merged.is_lying_object = dat->is_lying_object;
+
+      // Frame groups (10.57+ creatures)
+      merged.idle_sprite_ids = dat->idle_sprite_ids;
+      merged.walk_sprite_ids = dat->walk_sprite_ids;
+      merged.idle_frames = dat->idle_frames;
+      merged.walk_frames = dat->walk_frames;
+      merged.has_frame_groups = dat->has_frame_groups;
     }
 
     // Store the item

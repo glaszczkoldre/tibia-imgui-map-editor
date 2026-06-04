@@ -28,6 +28,7 @@
 // UI Components
 #include "Presentation/MainWindow.h"
 #include "Presentation/MenuBar.h"
+#include "UI/Core/Theme.h"
 #include "UI/Dialogs/Startup/StartupDialog.h"
 #include "UI/Map/MapPanel.h"
 #include "UI/Ribbon/RibbonController.h"
@@ -63,6 +64,13 @@ bool Application::initialize() {
   // === Final Wiring ===
   dialogs_.preferences.setHotkeyRegistry(
       &settings_registry_->getHotkeyRegistry());
+  dialogs_.preferences.setOtbmSettings(
+      &settings_registry_->getOtbmSettings());
+  dialogs_.preferences.setThemePtr(
+      &settings_registry_->getAppSettings().theme);
+  dialogs_.preferences.setApplySettingsCallback([this]() {
+    settings_registry_->save();
+  });
 
   // === State Handlers ===
   state_manager_.setStartupUpdater([this]() { onUpdateStartup(); });
@@ -82,7 +90,7 @@ bool Application::initializePlatform() {
     return false;
 
   // Load app settings AFTER ImGui is initialized (theme needs ImGui context)
-  settings_registry_->getAppSettings().apply();
+  ApplyTheme(settings_registry_->getAppSettings().theme);
 
   return true;
 }
@@ -110,6 +118,7 @@ void Application::initializeUIComponents() {
       .config = settings_registry_->getConfig(),
       .version_registry = settings_registry_->getVersionRegistry(),
       .recent_locations = settings_registry_->getRecentLocations(),
+      .otbm_settings = settings_registry_->getOtbmSettings(),
       .tab_manager = tab_manager_,
       .state_manager = state_manager_,
       .tileset_widget = brush_system_->getTilesetWidget(),
@@ -164,9 +173,9 @@ void Application::wireCallbacks() {
       .edit_towns = &dialogs_.edit_towns,
       .map_properties = &dialogs_.map_properties,
       // Search components
-      .quick_search = ui_.search_controller->getQuickSearchPopup(),
       .advanced_search = ui_.search_controller->getAdvancedSearchDialog(),
       .search_results = ui_.search_controller->getSearchResultsWidget(),
+      .search_controller = ui_.search_controller.get(),
       .cleanup_confirm = &dialogs_.cleanup_confirm,
       // Callbacks back to Application
       .quit_callback = [this]() { quit(); },
@@ -199,9 +208,17 @@ void Application::wireCallbacks() {
             Presentation::showNotification(type, message);
           }};
 
+  // Wire session-destroy callback to evict cached search results
+  if (session_lifecycle_ && ui_.search_controller) {
+    session_lifecycle_->setSessionDestroyCallback(
+        [sc = ui_.search_controller.get()](const AppLogic::EditorSession& session) {
+          if (auto* map = session.getMap()) {
+            sc->forgetSessionMap(map);
+          }
+        });
+  }
+
   callback_mediator_.wireAll(ctx);
-  // MainWindow dialog callbacks are wired in
-  // CallbackMediator::wireMapOperationCallbacks
 }
 
 void Application::onMapLoaded(
@@ -319,6 +336,11 @@ void Application::update() {
   // Update version manager resources (e.g. async sprite loading)
   version_manager_.update();
 
+  // Drain completed async search results on the main thread
+  if (ui_.search_controller) {
+    ui_.search_controller->processAsyncSearch();
+  }
+
   state_manager_.update();
 }
 
@@ -344,7 +366,6 @@ void Application::render() {
       .ribbon = ui_.ribbon_controller.get(),
       .file_panel = ui_.file_panel_ptr,
       .main_window = ui_.main_window.get(),
-      .quick_search_popup = ui_.search_controller->getQuickSearchPopup(),
       .advanced_search_dialog =
           ui_.search_controller->getAdvancedSearchDialog(),
       .search_results_widget = ui_.search_controller->getSearchResultsWidget(),

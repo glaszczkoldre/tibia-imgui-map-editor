@@ -4,6 +4,11 @@
 #include "IO/Readers/DatReaderBase.h"
 #include "IO/SprReader.h"
 #include "ItemCompositor.h"
+// INTENTIONAL LAYER EXCEPTION: SpriteManager is the architectural bridge
+// between async I/O and GPU resource management. It owns Rendering-layer
+// types (AtlasManager, SpriteAtlasLUT, Texture) but does NOT issue GL calls
+// itself — all GPU uploads are delegated to SpriteAsyncLoader::process()
+// which runs on the main thread via the frame-tick contract.
 #include "Rendering/Core/Texture.h"
 #include "Rendering/Overlays/OverlaySpriteCache.h"
 #include "Rendering/Resources/AtlasManager.h"
@@ -43,8 +48,10 @@ public:
   /**
    * Create sprite manager with sprite reader
    * @param spr_reader Shared pointer to sprite reader
+   * @param use_transparency Enable 4-byte RGBA decode for transparency-enabled SPRs
    */
-  explicit SpriteManager(std::shared_ptr<IO::SprReader> spr_reader);
+  explicit SpriteManager(std::shared_ptr<IO::SprReader> spr_reader,
+                         bool use_transparency = false);
   ~SpriteManager();
 
   // Non-copyable
@@ -235,6 +242,7 @@ private:
 
   // Callback for cache invalidation when sprites load
   SpritesLoadedCallback on_sprites_loaded_;
+  bool use_transparency_ = false;
 };
 
 } // namespace Services

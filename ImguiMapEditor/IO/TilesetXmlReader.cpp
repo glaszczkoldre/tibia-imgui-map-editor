@@ -87,8 +87,12 @@ void TilesetXmlReader::parseTilesetNode(const pugi::xml_node &node,
       tileset_registry_.getTilesetBySourceFile(absoluteSourceFile);
 
   if (tileset) {
-    // Tileset already exists for this exact source file.
-    spdlog::debug("[TilesetXmlReader] Updating existing tileset: {}", name);
+    // Tileset already loaded — skip re-parsing to prevent entry duplication
+    if (tileset->getSourceFile().empty()) {
+      tileset->setSourceFile(fs::absolute(sourceFile));
+    }
+    spdlog::debug("[TilesetXmlReader] Tileset '{}' already loaded, skipping", name);
+    return;
   } else {
     // Create new tileset
     auto newTileset = std::make_unique<Tileset>(name);

@@ -8,8 +8,6 @@
 #include "UI/Dialogs/Properties/CreaturePropertiesDialog.h"
 #include "UI/Dialogs/Properties/ItemPropertiesDialog.h"
 #include "UI/Dialogs/Properties/SpawnPropertiesDialog.h"
-#include "UI/Dialogs/NewMapDialog.h"
-#include "UI/Dialogs/OpenSecDialog.h"
 #include "UI/Map/MapContextMenu.h"
 #include "UI/Map/MapPanel.h"
 #include "UI/Windows/IngameBoxWindow.h"
@@ -155,12 +153,6 @@ private:
   UI::ItemPropertiesDialog properties_dialog_;
   UI::SpawnPropertiesDialog spawn_properties_dialog_;
   UI::CreaturePropertiesDialog creature_properties_dialog_;
-  
-  // Editor-state modal dialogs
-  UI::NewMapDialog new_map_dialog_;
-  UI::OpenSecDialog open_sec_dialog_;
-  std::function<void(const UI::NewMapPanel::State&)> new_map_callback_;
-  std::function<void(const std::filesystem::path&, uint32_t)> open_sec_callback_;
 };
 
 } // namespace Presentation

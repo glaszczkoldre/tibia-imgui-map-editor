@@ -5,6 +5,7 @@
 #include "Services/ConfigService.h"
 #include "Services/Map/MapLoadingService.h"
 #include "Services/Map/MapSavingService.h"
+#include "Services/OtbmSettings.h"
 #include "Services/RecentLocationsService.h"
 #include "Services/ViewSettings.h"
 #include "UI/Dialogs/MapCompatibilityPopup.h"
@@ -58,12 +59,13 @@ public:
       std::function<void(NotificationType type, const std::string &message)>;
 
   MapOperationHandler(Services::ConfigService &config,
-                      Services::ClientVersionRegistry &versions,
-                      Services::RecentLocationsService &recent_locations,
-                      Services::ViewSettings &view_settings,
-                      AppLogic::MapTabManager &tab_manager,
-                      Brushes::BrushRegistry &brush_registry,
-                      Services::TilesetService &tileset_service);
+                       Services::ClientVersionRegistry &versions,
+                       Services::RecentLocationsService &recent_locations,
+                       Services::ViewSettings &view_settings,
+                       AppLogic::MapTabManager &tab_manager,
+                       Brushes::BrushRegistry &brush_registry,
+                       Services::TilesetService &tileset_service,
+                       const Services::OtbmSettings &otbm_settings);
 
   // Destructor must be declared here and defined in .cpp due to
   // forward-declared unique_ptr member
@@ -74,21 +76,36 @@ public:
   void handleSaveMap();     // Saves current map
   void handleSaveAsMap();   // Save as dialog
   void handleSaveAllMaps(); // Saves all open maps
-  void handleOpenRecentMap(const std::filesystem::path &path, uint32_t version);
+  void handleOpenRecentMap(const std::filesystem::path &path, uint32_t index);
 
   /**
-   * Create a new map directly.
-   * Called from StartupController after NewMap modal is confirmed.
+   * Create a new map directly and load it into the editor.
+   * Called from editor-state shortcut (Ctrl+N / Menu / Ribbon).
+   * Creates an unnamed map with header data copied from the current map.
    */
-  void handleNewMapDirect(const std::string &map_name, uint16_t width,
-                          uint16_t height, uint32_t client_version);
+  void handleNewMapDirect(const Services::NewMapConfig &config);
+
+  /**
+   * Create a new map and save it to disk without loading into editor.
+   * Called from StartupDialog's New Map dialog (Option B flow).
+   * Returns true if save succeeded.
+   */
+  bool createAndSaveNewMap(const Services::NewMapConfig &config,
+                           const std::filesystem::path &save_path);
 
   /**
    * Open a SEC map directly.
    * Called from StartupController after OpenSecMap modal is confirmed.
    */
   void handleOpenSecMapDirect(const std::filesystem::path &sec_folder,
-                              uint32_t client_version);
+                               uint32_t index);
+
+  /**
+   * Open a SEC map from the File menu (Editor state).
+   * Handles folder picking and client auto-matching, then delegates to
+   * handleOpenSecMapDirect.
+   */
+  void handleOpenSecMapFromMenu(const std::filesystem::path &folder);
 
   // ID conversion operations
   void handleConvertToServerId();
@@ -108,7 +125,7 @@ public:
   const std::filesystem::path &getPendingMapPath() const {
     return pending_map_path_;
   }
-  uint32_t getCurrentVersion() const { return current_version_; }
+  uint32_t getCurrentVersion() const { return current_client_index_; }
 
   // State accessor
   bool isLoading() const { return is_loading_; }
@@ -129,12 +146,12 @@ public:
 
   // Deferred map loading (to avoid mid-frame state changes)
   void requestDeferredMapLoad(const std::filesystem::path &path,
-                              uint32_t version);
+                               uint32_t index);
   void processPendingMapLoad();
   bool hasPendingMapLoad() const { return deferred_load_pending_; }
 
 private:
-  void loadMapFromPath(const std::filesystem::path &path, uint32_t version);
+  void loadMapFromPath(const std::filesystem::path &path, uint32_t index);
   void transferNewResources(Services::MapLoadingResult result);
   void performSave(EditorSession &session,
                    const std::filesystem::path &save_path, bool is_save_as);
@@ -148,13 +165,14 @@ private:
   AppLogic::MapTabManager &tab_manager_;
   Brushes::BrushRegistry &brush_registry_;
   Services::TilesetService &tileset_service_;
+  const Services::OtbmSettings &otbm_settings_;
 
   // Loading service (owned)
   std::unique_ptr<Services::MapLoadingService> loading_service_;
 
   // State
   std::filesystem::path pending_map_path_;
-  uint32_t current_version_ = 0;
+  uint32_t current_client_index_ = 0;
   bool is_loading_ = false;
 
   // Existing resources (not owned, for reuse check)
@@ -170,7 +188,7 @@ private:
   // Deferred map load state (to avoid mid-frame state changes)
   bool deferred_load_pending_ = false;
   std::filesystem::path deferred_load_path_;
-  uint32_t deferred_load_version_ = 0;
+  uint32_t deferred_load_index_ = 0;
 
   // Callbacks
   MapLoadedCallback on_map_loaded_;

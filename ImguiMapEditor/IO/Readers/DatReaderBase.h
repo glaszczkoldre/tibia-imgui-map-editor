@@ -36,6 +36,13 @@ struct ClientItem {
     
     // Sprite IDs
     std::vector<uint32_t> sprite_ids;
+
+    // Frame groups (10.57+ creatures with idle/walking animations)
+    std::vector<uint32_t> idle_sprite_ids;
+    std::vector<uint32_t> walk_sprite_ids;
+    uint8_t idle_frames = 1;
+    uint8_t walk_frames = 1;
+    bool has_frame_groups = false;
     
     // Properties from flags
     bool is_ground = false;
@@ -99,6 +106,7 @@ struct ClientItem {
     int32_t loop_count = 0;
     uint8_t start_frame = 0;
     std::vector<std::pair<uint32_t, uint32_t>> frame_durations;
+    uint32_t total_duration = 0;
     
     // Calculate total sprite count
     uint32_t getTotalSprites() const {
@@ -149,6 +157,21 @@ public:
      */
     virtual const char* getName() const = 0;
 
+    /**
+     * Whether this version uses extended (32-bit) sprite IDs
+     */
+    virtual bool usesExtendedSprites() const { return false; }
+    
+    /**
+     * Whether this version has frame duration data
+     */
+    virtual bool hasFrameDurations() const { return false; }
+    
+    /**
+     * Whether this version uses frame groups (10.50+ for outfits)
+     */
+    virtual bool hasFrameGroups() const { return false; }
+
 protected:
     /**
      * Version-specific flag reading.
@@ -174,21 +197,6 @@ protected:
      * Whether this version reads patternZ from file (false for 7.10-7.54)
      */
     virtual bool shouldReadPatternZ() const { return true; }
-    
-    /**
-     * Whether this version uses extended (32-bit) sprite IDs
-     */
-    virtual bool usesExtendedSprites() const { return false; }
-    
-    /**
-     * Whether this version has frame duration data
-     */
-    virtual bool hasFrameDurations() const { return false; }
-    
-    /**
-     * Whether this version uses frame groups (10.50+ for outfits)
-     */
-    virtual bool hasFrameGroups() const { return false; }
 
 private:
     void readCategory(BinaryReader& reader, std::vector<ClientItem>& items,

@@ -8,6 +8,13 @@ project(TibiaMapEditor VERSION 1.0.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+option(TME_UNITY_BUILD "Enable unity build for faster compilation." OFF)
+option(TME_ENABLE_IPO "Enable interprocedural optimization in optimized builds." ON)
+option(TME_ENABLE_PCH "Enable precompiled headers for faster compilation." ON)
+option(TME_ENABLE_ARCH_OPTIMIZATIONS "Enable host-specific CPU optimizations for local optimized builds." OFF)
+option(TME_BUILD_IMGUI_DEMO "Compile Dear ImGui demo sources." OFF)
 
 # Find packages (works with both vcpkg and Conan)
 find_package(glad CONFIG REQUIRED)
@@ -46,10 +53,12 @@ endif()
 
 # Fetch ImGui with docking support
 include(FetchContent)
+set(FETCHCONTENT_UPDATES_DISCONNECTED ON)
 FetchContent_Declare(
     imgui
     GIT_REPOSITORY https://github.com/ocornut/imgui.git
-    GIT_TAG        docking
+    GIT_TAG        v1.92.8-docking
+    GIT_SHALLOW    TRUE
 )
 FetchContent_MakeAvailable(imgui)
 
@@ -59,10 +68,24 @@ set(IMGUI_SOURCES
     ${IMGUI_DIR}/imgui_draw.cpp
     ${IMGUI_DIR}/imgui_tables.cpp
     ${IMGUI_DIR}/imgui_widgets.cpp
-    ${IMGUI_DIR}/imgui_demo.cpp
     ${IMGUI_DIR}/backends/imgui_impl_glfw.cpp
     ${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp
     ${IMGUI_DIR}/misc/cpp/imgui_stdlib.cpp
+)
+
+if(TME_BUILD_IMGUI_DEMO)
+    list(APPEND IMGUI_SOURCES ${IMGUI_DIR}/imgui_demo.cpp)
+endif()
+
+set_source_files_properties(${IMGUI_SOURCES} PROPERTIES
+    SKIP_PRECOMPILE_HEADERS ON
+    SKIP_UNITY_BUILD_INCLUSION ON
+)
+
+set_source_files_properties(
+    IO/Sec/SecTileParser.cpp
+    IO/Sec/SecItemParser.cpp
+    PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON
 )
 
 # Collect source files
@@ -73,7 +96,6 @@ set(DOMAIN_SOURCES
     Domain/MapInstance.cpp
     Domain/ChunkedMap.cpp
     Domain/CopyBuffer.cpp
-    Domain/SelectionSettings.cpp
     Domain/Selection/SelectionBucket.cpp
     Domain/History/TileSnapshot.cpp
     Domain/History/TileSnapshotCodec.cpp
@@ -83,6 +105,7 @@ set(DOMAIN_SOURCES
 )
 
 set(RENDERING_SOURCES
+    Rendering/Animation/ItemAnimation.cpp
     Rendering/Core/Texture.cpp
     Rendering/Core/Shader.cpp
     Rendering/Core/VertexArray.cpp
@@ -137,7 +160,7 @@ set(RENDERING_SOURCES
     Rendering/Passes/GhostFloorRenderer.cpp
     Rendering/Tile/CreatureSpriteHelper.cpp
     Rendering/Passes/BackgroundRenderer.cpp
-    Rendering/Frame/RenderOrchestrator.cpp
+    Application/Frame/RenderOrchestrator.cpp
     Rendering/Frame/RenderingManager.cpp
     Rendering/Frame/FrameDataCollector.cpp
     Rendering/Passes/TerrainPass.cpp
@@ -167,6 +190,8 @@ set(IO_SOURCES
     IO/SpawnXmlWriter.cpp
     IO/HouseXmlReader.cpp
     IO/HouseXmlWriter.cpp
+    IO/WaypointXmlWriter.cpp
+    IO/WaypointXmlReader.cpp
     IO/XmlUtils.cpp
     IO/HotkeyJsonReader.cpp
     IO/Readers/DatReaderBase.cpp
@@ -190,6 +215,7 @@ set(SERVICES_SOURCES
     Services/ClientVersionRegistry.cpp
     Services/ClientVersionPersistence.cpp
     Services/ClientSignatureDetector.cpp
+    Services/ClientAssetDetector.cpp
     Services/ClientDataService.cpp
     Services/SpriteManager.cpp
     Services/SpriteAsyncLoader.cpp
@@ -219,10 +245,10 @@ set(SERVICES_SOURCES
     Services/Map/MapCleanupService.cpp
     Services/Map/MapSearchService.cpp
     Services/ClipboardService.cpp
-    Services/ItemPickerService.cpp
     Services/MapMergeService.cpp
     Services/SessionWiringService.cpp
     Services/SettingsRegistry.cpp
+    Services/OtbmSettings.cpp
     Services/Selection/SelectionService.cpp
     Services/Map/MapEditingService.cpp
     # Phase 0: Lookup Table Services
@@ -235,9 +261,7 @@ set(SERVICES_SOURCES
 set(UI_SOURCES
     UI/Dialogs/AdvancedSearchDialog.cpp
     UI/Dialogs/ClientConfiguration/ClientConfigurationDialog.cpp
-    UI/Dialogs/ClientConfiguration/ClientDetailsCard.cpp
-    UI/Dialogs/ClientConfiguration/ClientEditModal.cpp
-    UI/Dialogs/ClientConfiguration/ClientTableWidget.cpp
+    UI/Dialogs/ClientConfiguration/ClientPropertyEditor.cpp
     UI/Dialogs/ConfirmationDialog.cpp
     UI/Dialogs/EditTownsDialog.cpp
     UI/Dialogs/Import/ImportMapDialog.cpp
@@ -252,7 +276,6 @@ set(UI_SOURCES
     UI/Dialogs/Startup/SelectedMapPanel.cpp
     UI/Dialogs/Startup/StartupDialog.cpp
     UI/Dialogs/NewMapDialog.cpp
-    UI/Dialogs/OpenSecDialog.cpp
     UI/Dialogs/UnsavedChangesModal.cpp
     UI/Dialogs/MapCompatibilityPopup.cpp
     UI/Map/MapContextMenu.cpp
@@ -261,19 +284,19 @@ set(UI_SOURCES
     UI/Map/MapViewCamera.cpp
     UI/Map/SelectionMenu.cpp
     UI/Panels/NewMapPanel.cpp
-    UI/Panels/OpenSecPanel.cpp
+    UI/Panels/MapPropertiesPanel.cpp
     UI/Panels/BrushSizePanel.cpp
     UI/PreferencesDialog.cpp
     UI/Ribbon/Panels/BrushesPanel.cpp
     UI/Ribbon/Panels/EditPanel.cpp
     UI/Ribbon/Panels/FilePanel.cpp
+    UI/Ribbon/Panels/PalettesPanel.cpp
     UI/Ribbon/Panels/SelectionPanel.cpp
     UI/Ribbon/Panels/ThemePanel.cpp
     UI/Ribbon/Panels/ViewPanel.cpp
     UI/Ribbon/RibbonController.cpp
     UI/Widgets/Properties/PropertyPanelRenderer.cpp
     UI/Widgets/Properties/PropertyWidgets.cpp
-    UI/Widgets/QuickSearchPopup.cpp
     UI/Widgets/SearchResultsWidget.cpp
     UI/Widgets/TilesetWidget.cpp
     UI/Widgets/TilesetGridWidget.cpp
@@ -330,17 +353,7 @@ set(PRESENTATION_SOURCES
     Presentation/Dialogs/ImportMapController.cpp
     Presentation/Dialogs/CleanupController.cpp
     Presentation/Dialogs/TownPickController.cpp
-)
-
-set(RIBBON_SOURCES
-    UI/Ribbon/RibbonController.cpp
-    UI/Ribbon/Panels/FilePanel.cpp
-    UI/Ribbon/Panels/EditPanel.cpp
-    UI/Ribbon/Panels/ViewPanel.cpp
-    UI/Ribbon/Panels/ThemePanel.cpp
-    UI/Ribbon/Panels/SelectionPanel.cpp
-    UI/Ribbon/Panels/BrushesPanel.cpp
-    UI/Ribbon/Panels/PalettesPanel.cpp
+    Presentation/Dialogs/ClientConfigurationController.cpp
 )
 
 set(BRUSHES_SOURCES
@@ -389,7 +402,6 @@ add_executable(${PROJECT_NAME}
     ${APPLICATION_SOURCES}
     ${CONTROLLER_SOURCES}
     ${PRESENTATION_SOURCES}
-    ${RIBBON_SOURCES}
     ${BRUSHES_SOURCES}
     ${APP_SOURCES}
     ${IMGUI_SOURCES}
@@ -410,6 +422,21 @@ set(BRUSH_SMOKE_SOURCES
     Application.cpp
     Tests/BrushSmoke.cpp
     ${IMGUI_SOURCES}
+)
+
+set_target_properties(${PROJECT_NAME} PROPERTIES UNITY_BUILD ${TME_UNITY_BUILD})
+
+# Include directories
+target_include_directories(${PROJECT_NAME} PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+    ${IMGUI_DIR}
+    ${IMGUI_DIR}/backends
+    ${CMAKE_CURRENT_SOURCE_DIR}/ext/fontawesome6
+    ${CMAKE_CURRENT_SOURCE_DIR}/ext/imguinotify
+    ${CMAKE_CURRENT_SOURCE_DIR}/ext/stb
+    ${Stb_INCLUDE_DIR}
+)
 )
 
 add_executable(BrushSmoke
@@ -465,15 +492,51 @@ target_compile_definitions(BrushSmoke PRIVATE
     BRUSH_SMOKE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
 )
 
+if(TME_ENABLE_PCH)
+    target_precompile_headers(${PROJECT_NAME} PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/Pch.h"
+    )
+endif()
+
+if(TME_ENABLE_IPO)
+    include(CheckIPOSupported)
+    check_ipo_supported(RESULT TME_IPO_SUPPORTED OUTPUT TME_IPO_ERROR)
+
+    if(TME_IPO_SUPPORTED)
+        set_target_properties(${PROJECT_NAME} PROPERTIES
+            INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE
+            INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO TRUE
+        )
+    else()
+        message(STATUS "IPO/LTO disabled for ${PROJECT_NAME}: ${TME_IPO_ERROR}")
+    endif()
+endif()
+
+if(TME_ENABLE_ARCH_OPTIMIZATIONS)
+    if(MSVC)
+        target_compile_options(${PROJECT_NAME} PRIVATE
+            "$<$<CONFIG:Release>:/arch:AVX2>"
+            "$<$<CONFIG:RelWithDebInfo>:/arch:AVX2>"
+        )
+    elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+        target_compile_options(${PROJECT_NAME} PRIVATE
+            "$<$<CONFIG:Release>:-march=native>"
+            "$<$<CONFIG:RelWithDebInfo>:-march=native>"
+        )
+    else()
+        message(STATUS "Host-specific architecture optimizations are not configured for compiler ${CMAKE_CXX_COMPILER_ID}.")
+    endif()
+endif()
+
 # Copy data files
 add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${PROJECT_NAME}>/data"
     COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${PROJECT_NAME}>/data/shaders"
     COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${PROJECT_NAME}>/data/fonts"
-    # Copy clients.json
+    # Copy clients_templates.json
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${CMAKE_CURRENT_SOURCE_DIR}/clients.json"
-        "$<TARGET_FILE_DIR:${PROJECT_NAME}>/data/clients.json"
+        "${CMAKE_CURRENT_SOURCE_DIR}/clients_templates.json"
+        "$<TARGET_FILE_DIR:${PROJECT_NAME}>/data/clients_templates.json"
     # Copy entire sample_data directory tree (includes tilesets/, creatures/, items/, etc.)
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         "${CMAKE_CURRENT_SOURCE_DIR}/sample_data"

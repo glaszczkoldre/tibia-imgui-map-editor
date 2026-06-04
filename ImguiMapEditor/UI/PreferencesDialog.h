@@ -1,5 +1,7 @@
 #pragma once
+#include "Domain/OtbmDataTypes.h"
 #include "Services/SecondaryClientConstants.h"
+#include "UI/Core/Theme.h"
 #include <filesystem>
 #include <functional>
 #include <string>
@@ -7,8 +9,9 @@
 namespace MapEditor {
 
 namespace Services {
-class SecondaryClientData;
 class HotkeyRegistry;
+class OtbmSettings;
+class SecondaryClientData;
 } // namespace Services
 
 namespace UI {
@@ -67,6 +70,19 @@ public:
     hotkey_registry_ = registry;
   }
 
+  void setOtbmSettings(Services::OtbmSettings *settings) {
+    otbm_settings_ = settings;
+  }
+
+  void setThemePtr(ThemeType* theme_ptr) {
+    theme_ptr_ = theme_ptr;
+  }
+
+  using ApplySettingsCallback = std::function<void()>;
+  void setApplySettingsCallback(ApplySettingsCallback callback) {
+    on_apply_settings_ = std::move(callback);
+  }
+
 private:
   bool is_open_ = false;
   bool should_open_ = false;
@@ -80,13 +96,25 @@ private:
   Services::HotkeyRegistry *hotkey_registry_ = nullptr;
   bool hotkeys_dirty_ = false;
 
+  // OTBM settings
+  Services::OtbmSettings *otbm_settings_ = nullptr;
+  bool otbm_destructive_ack_ = false;
+  int selected_otbm_type_ = 0;
+  bool otbm_tab_active_ = false;
+
+  // Theme
+  ThemeType* theme_ptr_ = nullptr;
+
   // Callbacks
   LoadSecondaryCallback on_load_secondary_;
   UnloadSecondaryCallback on_unload_secondary_;
   ToggleSecondaryCallback on_toggle_secondary_;
+  ApplySettingsCallback on_apply_settings_;
 
   // Tab renderers
   void renderEditorTab();
+  void renderOtbmTab();
+  void renderOtbmSettingsPanel();
   void renderSecondaryClientTab();
   void renderHotkeysTab();
 };

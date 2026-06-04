@@ -16,6 +16,10 @@ struct AppSettings;
 
 namespace MapEditor {
 
+namespace Rendering {
+class Texture;
+}
+
 namespace Services {
 class ClientDataService;
 class SpriteManager;

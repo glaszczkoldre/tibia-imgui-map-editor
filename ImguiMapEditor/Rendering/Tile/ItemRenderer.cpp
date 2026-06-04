@@ -1,6 +1,7 @@
 #include "ItemRenderer.h"
 #include "../../Core/Config.h"
 #include "../ColorFilter.h"
+#include "../Animation/ItemAnimation.h"
 #include "Services/ClientDataService.h"
 #include "Services/SecondaryClientConstants.h"
 #include "Services/SecondaryClientData.h"
@@ -172,7 +173,8 @@ void ItemRenderer::queueWithColor(
 
   int frame = 0;
   if (frames > 1) {
-    frame = anim_ticks.tick_500ms % frames;
+    frame = ItemAnimation::getPhase(*item_type, anim_ticks.global_ms,
+                                     tile_x, tile_y, tile_z);
   }
 
   float draw_adjusted_x = std::round(adjusted_x);

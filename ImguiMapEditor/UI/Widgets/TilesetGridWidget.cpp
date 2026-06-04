@@ -1,5 +1,7 @@
 #include "TilesetGridWidget.h"
 
+#include "UI/Core/Theme.h"
+
 #include <algorithm>
 #include <cctype>
 #include <cmath>
@@ -91,6 +93,45 @@ void TilesetGridWidget::syncActiveBrushSelection() {
                     }) != activeBrush->getName().end();
     if (!matchesFilter) {
       clearFilter();
+    }
+  }
+}
+
+void TilesetGridWidget::renderBrushCard(ImVec2 cursorPos, ImVec2 size,
+                                         Rendering::Texture *tex,
+                                         bool isSelected, bool isHovered,
+                                         bool isPulsing, float pulseElapsed) {
+  ImDrawList *dl = ImGui::GetWindowDrawList();
+  constexpr float ROUNDING = 4.0f;
+  constexpr float PADDING = 2.0f;
+  ImVec2 rectMax(cursorPos.x + size.x, cursorPos.y + size.y);
+
+  ImU32 bgCol = ImGui::GetColorU32(ImGuiCol_FrameBg);
+  if (isSelected) {
+    bgCol = ImGui::GetColorU32(ImGuiCol_Header);
+  } else if (isHovered) {
+    bgCol = ImGui::GetColorU32(ImGuiCol_HeaderHovered);
+  }
+  dl->AddRectFilled(cursorPos, rectMax, bgCol, ROUNDING);
+
+  if (tex) {
+    ImVec2 imgMin(cursorPos.x + PADDING, cursorPos.y + PADDING);
+    ImVec2 imgMax(rectMax.x - PADDING, rectMax.y - PADDING);
+    dl->AddImageRounded((void *)(intptr_t)tex->id(), imgMin, imgMax,
+                        ImVec2(0, 0), ImVec2(1, 1), IM_COL32_WHITE, ROUNDING);
+  }
+
+  if (isSelected) {
+    if (isPulsing && pulseElapsed < PULSE_DURATION) {
+      float pulse = 0.5f + 0.5f * std::sin(pulseElapsed * 8.0f);
+      ImU32 pulseCol = IM_COL32(static_cast<int>(50 * (1 - pulse)),
+                                 static_cast<int>(220 * pulse + 35),
+                                 static_cast<int>(80 * pulse), 255);
+      float thickness = 2.0f + pulse * 2.0f;
+      dl->AddRect(cursorPos, rectMax, pulseCol, ROUNDING, 0, thickness);
+    } else {
+      dl->AddRect(cursorPos, rectMax, IM_COL32(100, 180, 255, 255), ROUNDING,
+                  0, 2.0f);
     }
   }
 }
@@ -302,10 +343,6 @@ void TilesetGridWidget::renderBrushGrid() {
 
       ImGui::PushID(static_cast<int>(i));
 
-      // Render brush tile
-      ImVec2 tileSize(getIconSize(), getIconSize());
-      ImVec2 cursorPos = ImGui::GetCursorScreenPos();
-
       const auto preview = getBrushPreview(brush);
 
       ImGui::InvisibleButton("##tile", tileSize);
@@ -345,7 +382,6 @@ void TilesetGridWidget::renderBrushGrid() {
         ImGui::EndTooltip();
       }
 
-      // Double-click handling
       if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0)) {
         if (onBrushDoubleClicked_) {
           onBrushDoubleClicked_(bws.sourceTileset, brush->getName());
@@ -536,7 +572,6 @@ void TilesetGridWidget::renderBrushGrid() {
               ImVec2(cursorPos.x + tileSize.x, cursorPos.y + tileSize.y),
               IM_COL32(100, 180, 255, 255), 0, 0, 2.0f);
         }
-      }
 
       // Tooltip
       if (isHovered) {

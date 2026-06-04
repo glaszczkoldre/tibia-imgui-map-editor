@@ -1,13 +1,16 @@
 #pragma once
+#include "Core/Config.h"
 #include "Domain/ChunkedMap.h"
 #include "Domain/Position.h"
 #include "Services/ClientDataService.h"
 #include "Services/ClientVersionRegistry.h"
+#include "Services/OtbmSettings.h"
 #include "Services/SpriteManager.h"
 #include "Services/ViewSettings.h"
 #include <filesystem>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <spdlog/spdlog.h>
 #include <string_view>
 
@@ -28,8 +31,12 @@ namespace Services {
  */
 struct NewMapConfig {
   std::string map_name;
-  int map_width = 256;
-  int map_height = 256;
+  uint16_t map_width = Config::Map::DEFAULT_MAP_SIZE;
+  uint16_t map_height = Config::Map::DEFAULT_MAP_SIZE;
+  uint32_t otbm_version = 2;
+  uint32_t items_major = 1;
+  uint32_t items_minor = 1;
+  std::string description;
 };
 
 /**
@@ -63,8 +70,9 @@ public:
 
   MapLoadingService(Services::ClientVersionRegistry &version_registry,
                     Services::ViewSettings &view_settings,
-                    MapEditor::Brushes::BrushRegistry &brush_registry,
-                    Services::TilesetService &tileset_service);
+                    Brushes::BrushRegistry &brush_registry,
+                    Services::TilesetService &tileset_service,
+                    const OtbmSettings &otbm_settings);
 
   ~MapLoadingService() = default;
 
@@ -75,12 +83,12 @@ public:
   /**
    * Load an existing map from file.
    * @param path Path to OTBM file
-   * @param current_version Client version (0 for auto-detect)
+   * @param current_client_index Client index (0 for auto-detect)
    * @param pending_path Optional pending map path for client file discovery
    * @return Load result with success/error and camera center
    */
   MapLoadingResult loadMap(const std::filesystem::path &path,
-                           uint32_t &current_version,
+                           uint32_t &current_client_index,
                            const std::filesystem::path &pending_path = {});
 
   /**
@@ -98,39 +106,66 @@ public:
       Services::SpriteManager *existing_sprite_manager);
 
   /**
+   * Load SEC format map using existing client data.
+   * Use this when loading a second SEC map after client data is already loaded.
+   */
+  MapLoadingResult loadSecMapWithExistingClientData(
+      const std::filesystem::path &directory,
+      Services::ClientDataService *existing_client_data,
+      Services::SpriteManager *existing_sprite_manager);
+
+  /**
    * Create a new empty map.
    * @param config New map configuration
-   * @param current_version Client version to use
+   * @param current_client_index Client index to use
    * @return Load result with success/error
    */
   MapLoadingResult createNewMap(const NewMapConfig &config,
-                                uint32_t current_version);
+                                 uint32_t current_client_index);
 
   /**
-   * Load client data (OTB, DAT, SPR) for the specified version.
-   * @param client_version Version to load
+   * Create a new empty map reusing existing client data.
+   * Use this when creating a new map after client data is already loaded
+   * (e.g., editor-state shortcut Ctrl+N).
+   * Does NOT reload or destroy the existing ClientDataService.
+   */
+  MapLoadingResult createNewMapWithExistingClientData(
+      const NewMapConfig &config,
+      Services::ClientDataService *existing_client_data,
+      Services::SpriteManager *existing_sprite_manager);
+
+  /**
+   * Load client data (OTB, DAT, SPR) for the specified client index.
+   * @param client_index Client index to load
    * @param pending_path Optional path for client file discovery
    * @return true if successful
    */
-  bool loadClientData(uint32_t client_version,
-                      const std::filesystem::path &pending_path = {});
+  bool loadClientData(uint32_t client_index,
+                      const std::filesystem::path &pending_path,
+                      std::optional<Domain::ItemDataSource> source_override = std::nullopt);
 
   /**
    * Load SEC format map from directory.
    * @param directory Folder containing *.sec files
-   * @param current_version Client version (must match items.srv)
+   * @param current_client_index Client index (must match items.srv)
    * @return Load result
    */
   MapLoadingResult loadSecMap(const std::filesystem::path &directory,
-                              uint32_t current_version);
+                              uint32_t current_client_index);
 
 private:
   Domain::Position findCameraCenter() const;
+
+  MapLoadingResult loadSecMapCore(const std::filesystem::path &directory,
+                                  Services::ClientDataService &client_data);
 
   bool tryLoadCreatures(const std::filesystem::path &map_dir,
                         const std::filesystem::path &client_path);
   bool tryLoadItems(const std::filesystem::path &map_dir,
                     const std::filesystem::path &client_path);
+
+  void loadWaypoints(const std::filesystem::path &otbm_path,
+                     Domain::ChunkedMap &map);
 
   template <typename LoaderFunc>
   bool tryLoadResource(const std::filesystem::path &filename,
@@ -169,6 +204,7 @@ private:
   Services::ViewSettings &view_settings_;
   MapEditor::Brushes::BrushRegistry &brush_registry_;
   Services::TilesetService &tileset_service_;
+  const OtbmSettings &otbm_settings_;
 
   // Temporary storage during loading (moved to result after load completes)
   std::unique_ptr<Domain::ChunkedMap> current_map_;

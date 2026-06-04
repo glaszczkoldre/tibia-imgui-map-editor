@@ -27,18 +27,12 @@ void ThemePanel::Render() {
             ImVec4 color_preview = theme.preview_color;
 
             switch (theme.type) {
-            case ThemeType::ModernDark:
-            case ThemeType::MidnightPurple:
-            case ThemeType::ForestGreen:
+            case ThemeType::DocumentDark:
+            case ThemeType::DocumentMidnight:
                 theme_icon = ICON_FA_MOON;
                 break;
-            case ThemeType::ClassicLight:
-            case ThemeType::SunsetOrange:
-            case ThemeType::TibiaRPG:
+            case ThemeType::DocumentLight:
                 theme_icon = ICON_FA_SUN;
-                break;
-            case ThemeType::OtclientTheme:
-                theme_icon = ICON_FA_GAMEPAD;
                 break;
             }
 

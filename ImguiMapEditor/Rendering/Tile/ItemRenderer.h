@@ -195,29 +195,23 @@ void ItemRenderer::queueAll(
 
   // ============================================================
   // MULTI-PASS RENDERING (OTClient Painter Algorithm)
-  // ============================================================
-  // Pass 1: OnBottom items (walls, pillars) - FORWARD order
-  // Pass 2: Common items (furniture, decorations) - REVERSE order
-  // NOTE: OnTop items (P3) are rendered immediately per-tile in
-  //       TileRenderer::queueTile() AFTER creatures for correct depth.
+  // Pass 1: OnBottom (walls, pillars) — forward
+  // Pass 2: Common items — forward (bottom-to-top, painter's algorithm)
+  // OnTop items rendered after creatures in TileRenderer
   // ============================================================
 
-  // PASS 1: OnBottom items (priority 2) - FORWARD
+  // PASS 1: OnBottom items — forward
   for (const auto &entry : items) {
     if (entry.type && entry.type->is_on_bottom) {
       renderItem(entry);
     }
   }
 
-  // PASS 2: Common items (priority 5) - FORWARD (like RME)
-  // Items at the end of the vector (topmost) must be drawn LAST to appear on top
+  // PASS 2: Common items — forward (painter's algorithm: draw bottom first)
   for (const auto &entry : items) {
-    if (entry.type && !entry.type->is_on_bottom && !entry.type->is_on_top) {
-      renderItem(entry);
-    } else if (!entry.type) {
-      // Items without type info are treated as common items
-      renderItem(entry);
-    }
+    if (entry.type && entry.type->is_on_bottom) continue;
+    if (entry.type && entry.type->is_on_top) continue;
+    renderItem(entry);
   }
 
   // NOTE: OnTop items rendered per-tile in TileRenderer::queueTile()

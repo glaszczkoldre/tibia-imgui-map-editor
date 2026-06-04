@@ -26,6 +26,7 @@ MenuBar::MenuBar(Services::ViewSettings &view_settings,
 void MenuBar::render() {
   renderFileMenu();
   renderEditMenu();
+  renderSearchMenu();
   renderViewMenu();
   renderMapMenu();
   renderThemeMenu();
@@ -128,7 +129,7 @@ void MenuBar::renderRecentFilesSubmenu() {
       ImGui::PushID(i++);
       if (ImGui::MenuItem(filename.c_str())) {
         if (on_open_recent_)
-          on_open_recent_(entry.path);
+          on_open_recent_(entry.path, entry.client_index);
       }
       if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip("%s", full_path.c_str());
@@ -217,6 +218,53 @@ void MenuBar::renderEditMenu() {
   }
 }
 
+void MenuBar::renderSearchMenu() {
+  using namespace Input::Hotkeys;
+
+  if (ImGui::BeginMenu("Search")) {
+    bool has_session = tab_manager_ && tab_manager_->getActiveSession();
+
+    if (ImGui::MenuItem(ICON_FA_MAGNIFYING_GLASS_PLUS " Find Items...", formatShortcut(QUICK_SEARCH).c_str())) {
+      if (on_find_items_)
+        on_find_items_();
+    }
+    if (ImGui::IsItemHovered())
+      ImGui::SetTooltip("Search for items and creatures with filters");
+
+    ImGui::Separator();
+
+    if (ImGui::MenuItem(ICON_FA_FINGERPRINT " Find Unique", nullptr, false, has_session)) {
+      if (on_find_unique_)
+        on_find_unique_();
+    }
+    if (ImGui::IsItemHovered())
+      ImGui::SetTooltip("Find all items with unique ID assigned");
+
+    if (ImGui::MenuItem(ICON_FA_BOLT " Find Action", nullptr, false, has_session)) {
+      if (on_find_action_)
+        on_find_action_();
+    }
+    if (ImGui::IsItemHovered())
+      ImGui::SetTooltip("Find all items with action ID assigned");
+
+    if (ImGui::MenuItem(ICON_FA_BOX " Find Container", nullptr, false, has_session)) {
+      if (on_find_container_)
+        on_find_container_();
+    }
+    if (ImGui::IsItemHovered())
+      ImGui::SetTooltip("Find all containers and items with contents");
+
+    if (ImGui::MenuItem(ICON_FA_PEN_TO_SQUARE " Find Writeable", nullptr, false, has_session)) {
+      if (on_find_writeable_)
+        on_find_writeable_();
+    }
+    if (ImGui::IsItemHovered())
+      ImGui::SetTooltip("Find all items with text (signs, books, letters)");
+
+    ImGui::EndMenu();
+  }
+}
+
 void MenuBar::renderViewMenu() {
   using namespace Input::Hotkeys;
 
@@ -265,10 +313,11 @@ void MenuBar::renderViewMenu() {
 
     ImGui::MenuItem("Show Ingame Box", formatShortcut(SHOW_INGAME_BOX).c_str(),
                     &view_settings_.show_ingame_box);
-    ImGui::MenuItem("Show As Minimap", nullptr,
+    ImGui::MenuItem("Show Minimap", formatShortcut(SHOW_MINIMAP).c_str(),
                     &view_settings_.show_minimap_window);
-    ImGui::MenuItem("Browse Tile", nullptr, &view_settings_.show_browse_tile);
-    ImGui::MenuItem(ICON_FA_PAINTBRUSH " Tool Options", nullptr,
+    ImGui::MenuItem("Show Browse Tile", formatShortcut(SHOW_BROWSE_TILE).c_str(),
+                    &view_settings_.show_browse_tile);
+    ImGui::MenuItem(ICON_FA_PAINTBRUSH " Brush Settings", nullptr,
                     &view_settings_.show_brush_settings);
     ImGui::MenuItem(ICON_FA_MAGNIFYING_GLASS " Search Results", "Ctrl+Shift+F",
                     &view_settings_.show_search_results);
@@ -351,7 +400,7 @@ void MenuBar::renderMapMenu() {
 
   if (ImGui::BeginMenu("Map")) {
     // Edit Towns
-    if (ImGui::MenuItem(ICON_FA_CITY " Edit Towns...", nullptr, false,
+    if (ImGui::MenuItem(ICON_FA_BUILDING " Edit Towns...", nullptr, false,
                         has_session)) {
       if (on_edit_towns_)
         on_edit_towns_();

@@ -61,6 +61,16 @@ public:
                std::vector<uint32_t>& missing_sprites);
 
 private:
+    static int selectMountFrame(const IO::ClientItem *mount_data,
+                                int animation_frame, int64_t global_ms);
+
+    void drawMount(const Domain::Outfit &outfit, int dir, int animation_frame,
+                   float screen_x, float screen_y, float size,
+                   const TileColor &color, float alpha,
+                   const AnimationTicks &anim_ticks,
+                   std::vector<uint32_t> &missing_sprites);
+    void emitPlaceholder(float screen_x, float screen_y, float size, float alpha);
+
     SpriteEmitter& emitter_;
     Services::SpriteManager& sprite_manager_;
     const Services::ClientDataService* client_data_;

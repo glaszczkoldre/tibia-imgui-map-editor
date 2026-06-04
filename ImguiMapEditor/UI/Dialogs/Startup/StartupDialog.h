@@ -12,7 +12,6 @@ class ConfigService;
 } // namespace MapEditor::Services
 #include "UI/Dialogs/ClientConfiguration/ClientConfigurationDialog.h"
 #include "UI/Dialogs/NewMapDialog.h"
-#include "UI/Dialogs/OpenSecDialog.h"
 #include "UI/DTOs/ClientInfo.h"
 #include "UI/DTOs/RecentMapEntry.h"
 #include "UI/DTOs/SelectedMapInfo.h"
@@ -47,7 +46,6 @@ public:
     BrowseSecMap,
     NewMap,           // Open new map modal
     NewMapConfirmed,  // New map modal confirmed - create map
-    OpenSecMapConfirmed,  // SEC map modal confirmed - load SEC map
     ClientConfiguration,
     Preferences,
     LoadMap,
@@ -57,13 +55,10 @@ public:
   struct Result {
     Action action = Action::None;
     std::filesystem::path selected_path;
-    uint32_t selected_version = 0;
+    uint32_t selected_client_index = 0;
     int selected_index = -1;
     // For NewMapConfirmed action
     NewMapPanel::State new_map_config;
-    // For OpenSecMapConfirmed action
-    std::filesystem::path sec_map_folder;
-    uint32_t sec_map_version = 0;
   };
 
   StartupDialog() = default;
@@ -75,7 +70,7 @@ public:
 
   // === Main render (called each frame) ===
   void render(const std::vector<RecentMapEntry> &recent_maps,
-              const std::vector<uint32_t> &recent_clients);
+              uint32_t matched_client_index);
 
   // === State setters (from controller) ===
   void setSelectedMapInfo(const SelectedMapInfo &info);
@@ -97,7 +92,6 @@ public:
 
   // === Modal control ===
   void showNewMapModal() { show_new_map_modal_ = true; }
-  void showSecMapModal() { show_sec_map_modal_ = true; }
 
   // === State queries ===
   bool isIgnoreSignatures() const { return ignore_signatures_; }
@@ -116,7 +110,7 @@ private:
   void renderRecentMapsPanel(const std::vector<RecentMapEntry> &entries);
   void renderSelectedMapPanel();
   void renderClientInfoPanel();
-  void renderRecentClientsPanel(const std::vector<uint32_t> &clients);
+  void renderRecentClientsPanel(uint32_t selected_client_index);
 
   // === Dependencies ===
   Services::ClientVersionRegistry *registry_ = nullptr;
@@ -134,13 +128,11 @@ private:
 
   // Modal trigger flags (dialogs manage their own state)
   bool show_new_map_modal_ = false;
-  bool show_sec_map_modal_ = false;
 
   Result pending_result_;
 
   // === Sub-components (using standalone dialogs for DRY) ===
   NewMapDialog new_map_dialog_;
-  OpenSecDialog open_sec_dialog_;
   ClientConfigurationDialog client_config_dialog_;
 
   // === Extracted Panel Components ===

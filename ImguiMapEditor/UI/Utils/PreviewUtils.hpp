@@ -16,6 +16,8 @@ namespace MapEditor::Rendering {
 class Texture;
 } // namespace MapEditor::Rendering
 
+struct ImVec2;
+
 namespace MapEditor::UI::Utils {
 
 // Retrieves a preview texture for an item. Returns nullptr if not available.
@@ -39,5 +41,11 @@ CreaturePreviewResult GetCreaturePreview(Services::ClientDataService& clientData
 CreaturePreviewResult GetCreaturePreview(Services::ClientDataService& clientData,
                                          Services::SpriteManager& spriteManager,
                                          const Domain::Outfit& outfit);
+
+// Renders a preview texture inside a rounded card with optional selection/hover state.
+// Advances the cursor by `size` pixels. Returns true if clicked.
+bool RenderPreviewCard(Rendering::Texture* texture, float size,
+                       bool is_selected, float rounding = 4.0f,
+                       float padding = 2.0f);
 
 } // namespace MapEditor::UI::Utils

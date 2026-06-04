@@ -18,8 +18,32 @@ uint32_t SpriteUtils::getSpriteIndex(const IO::ClientItem *item, int w, int h,
   const int pattern_z_count = std::max<int>(1, item->pattern_z);
   const int frame_count = std::max<int>(1, item->frames);
 
-  // RME sprite index formula (no modulo on pattern inputs - they are already in
-  // range)
+  uint32_t index = 0;
+  index = (frame % frame_count);
+  index = index * pattern_z_count + pattern_z;
+  index = index * pattern_y_count + pattern_y;
+  index = index * pattern_x_count + pattern_x;
+  index = index * layers + layer;
+  index = index * height + h;
+  index = index * width + w;
+
+  return index;
+}
+
+uint32_t SpriteUtils::getSpriteIndex(const Domain::ItemType *item, int w,
+                                     int h, int layer, int pattern_x,
+                                     int pattern_y, int pattern_z, int frame) {
+  if (!item)
+    return 0;
+
+  const int width = std::max<int>(1, item->width);
+  const int height = std::max<int>(1, item->height);
+  const int layers = std::max<int>(1, item->layers);
+  const int pattern_x_count = std::max<int>(1, item->pattern_x);
+  const int pattern_y_count = std::max<int>(1, item->pattern_y);
+  const int pattern_z_count = std::max<int>(1, item->pattern_z);
+  const int frame_count = std::max<int>(1, item->frames);
+
   uint32_t index = 0;
   index = (frame % frame_count);
   index = index * pattern_z_count + pattern_z;

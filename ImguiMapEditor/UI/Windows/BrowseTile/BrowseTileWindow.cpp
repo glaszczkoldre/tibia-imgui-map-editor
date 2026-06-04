@@ -1,4 +1,5 @@
 #include "BrowseTileWindow.h"
+#include "UI/Core/Theme.h"
 #include "Application/EditorSession.h"
 #include "Domain/ChunkedMap.h"
 #include "Domain/Creature.h"
@@ -19,6 +20,8 @@
 #include <imgui.h>
 #include <map>
 #include <spdlog/spdlog.h>
+
+namespace SC = SemanticColors;
 
 namespace MapEditor::UI {
 
@@ -150,13 +153,19 @@ Domain::Item *BrowseTileWindow::getSelectedItem() {
 }
 
 void BrowseTileWindow::render(bool *p_visible) {
-  ImGuiWindowFlags flags = ImGuiWindowFlags_None;
+  if (p_visible) visible_ = *p_visible;
 
-  // Always call Begin/End for ImGui layout persistence (imgui.ini)
-  if (!ImGui::Begin("Browse Tile", p_visible, flags)) {
+  bool* vis_ptr = p_visible ? p_visible : &visible_;
+
+  if (p_visible && !*p_visible) return;
+
+  ImGuiWindowFlags flags = ImGuiWindowFlags_None;
+  if (!ImGui::Begin("Browse Tile", vis_ptr, flags)) {
     ImGui::End();
     return;
   }
+
+  visible_ = *vis_ptr;
 
   // Refresh tile from selection each frame
   refreshFromSelection();
@@ -167,6 +176,7 @@ void BrowseTileWindow::render(bool *p_visible) {
     ImGui::SetCursorPosX((content_size.x - text_width) * 0.5f);
     ImGui::SetCursorPosY(content_size.y * 0.5f);
     ImGui::TextDisabled("Select a single tile to browse");
+    visible_ = *vis_ptr;
     ImGui::End();
     return;
   }
@@ -315,6 +325,7 @@ void BrowseTileWindow::render(bool *p_visible) {
                 current_pos_.x, current_pos_.y, current_pos_.z);
   }
 
+  visible_ = *vis_ptr;
   ImGui::End();
 }
 
@@ -326,8 +337,8 @@ void BrowseTileWindow::renderTileProperties() {
   bool no_logout = Domain::hasFlag(flags, Domain::TileFlag::NoLogout);
   bool pvp_zone = Domain::hasFlag(flags, Domain::TileFlag::PvpZone);
 
-  ImVec4 green(0.2f, 0.8f, 0.2f, 1.0f);
-  ImVec4 red(0.5f, 0.3f, 0.3f, 1.0f);
+  ImVec4 green = SC::SAVED;
+  ImVec4 red = SC::DANGER;
 
   ImGui::Spacing();
 

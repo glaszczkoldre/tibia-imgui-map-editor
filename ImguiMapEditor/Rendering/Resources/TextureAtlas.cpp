@@ -65,14 +65,20 @@ bool TextureAtlas::initialize(int initial_layers) {
   glBindTexture(GL_TEXTURE_2D_ARRAY, texture_id_);
 
   // Set texture parameters
-  glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-  glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
   glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
   glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
   // Allocate texture array storage
   glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_RGBA8, ATLAS_SIZE, ATLAS_SIZE,
                initial_layers, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+
+  GLubyte clear_val[4] = {0, 0, 0, 0};
+  if (glClearTexSubImage) {
+    glClearTexSubImage(texture_id_, 0, 0, 0, 0, ATLAS_SIZE, ATLAS_SIZE,
+                       initial_layers, GL_RGBA, GL_UNSIGNED_BYTE, clear_val);
+  }
 
   glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
 
@@ -111,8 +117,8 @@ bool TextureAtlas::addLayer() {
     glGenTextures(1, &new_texture);
     glBindTexture(GL_TEXTURE_2D_ARRAY, new_texture);
 
-    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
@@ -183,6 +189,15 @@ bool TextureAtlas::addLayer() {
     }
 
     glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
+
+    // Clear newly allocated layers to transparent black
+    GLubyte clear_val[4] = {0, 0, 0, 0};
+    if (glClearTexSubImage) {
+      glClearTexSubImage(new_texture, 0, 0, 0, allocated_layers_,
+                         ATLAS_SIZE, ATLAS_SIZE,
+                         new_allocated - allocated_layers_,
+                         GL_RGBA, GL_UNSIGNED_BYTE, clear_val);
+    }
 
     // Synchronize GPU before deleting old texture
     glFinish();

@@ -4,6 +4,8 @@
 #include "Brushes/BrushController.h"
 #include "Services/BrushSettingsService.h"
 #include "Brushes/Types/WaypointBrush.h"
+#include "UI/Core/Theme.h"
+#include "UI/Utils/UIUtils.hpp"
 #include "ext/fontawesome6/IconsFontAwesome6.h"
 #include <algorithm>
 #include <array>
@@ -18,8 +20,9 @@ namespace MapEditor {
 namespace UI {
 namespace Panels {
 
-// Green highlight color for active toggles
-static const ImVec4 ACTIVE_TOGGLE_COLOR = ImVec4(0.2f, 0.7f, 0.3f, 1.0f);
+namespace SC = SemanticColors;
+
+static const ImVec4 ACTIVE_TOGGLE_COLOR = SC::SAVED;
 
 namespace {
 

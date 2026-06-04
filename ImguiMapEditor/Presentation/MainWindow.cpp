@@ -1,11 +1,15 @@
 #include "MainWindow.h"
 #include "Rendering/Frame/RenderingManager.h"
 #include "Services/ClipboardService.h"
+#include "UI/Core/Theme.h"
+#include <cmath>
 #include <imgui.h>
 #include <spdlog/spdlog.h>
 
 namespace MapEditor {
 namespace Presentation {
+
+namespace SC = SemanticColors;
 
 MainWindow::MainWindow(Services::ViewSettings &view_settings,
                        Services::ClientVersionRegistry &version_registry,
@@ -14,11 +18,7 @@ MainWindow::MainWindow(Services::ViewSettings &view_settings,
                        MenuBar &menu_bar, AppLogic::MapTabManager *tab_manager)
     : view_settings_(view_settings), version_registry_(version_registry),
       map_panel_(map_panel), ingame_box_window_(ingame_box_window),
-      menu_bar_(menu_bar), tab_manager_(tab_manager) {
-  // Initialize modal dialogs with registry reference
-  new_map_dialog_.initialize(&version_registry_);
-  open_sec_dialog_.initialize(&version_registry_);
-}
+      menu_bar_(menu_bar), tab_manager_(tab_manager) {}
 
 void MainWindow::openPropertiesDialog(Domain::Item *item) {
   if (!item)
@@ -100,8 +100,8 @@ void MainWindow::renderEditor(Domain::ChunkedMap *current_map,
               if (is_active) {
                   // Pulsate between Green and Yellow for Active + Modified
                   float t = (sinf((float)ImGui::GetTime() * 5.0f) * 0.5f) + 0.5f;
-                  ImVec4 color_green = ImVec4(0.0f, 0.5f, 0.0f, 0.7f);
-                  ImVec4 color_yellow = ImVec4(1.0f, 0.8f, 0.0f, 0.7f);
+                  ImVec4 color_green = ImVec4(SC::SAVED.x, SC::SAVED.y, SC::SAVED.z, 0.7f);
+                  ImVec4 color_yellow = ImVec4(SC::MODIFIED.x, SC::MODIFIED.y, SC::MODIFIED.z, 0.7f);
 
                   tab_color.x = color_green.x + (color_yellow.x - color_green.x) * t;
                   tab_color.y = color_green.y + (color_yellow.y - color_green.y) * t;
@@ -109,11 +109,11 @@ void MainWindow::renderEditor(Domain::ChunkedMap *current_map,
                   tab_color.w = 0.7f;
               } else {
                   // Static yellow/gold for Modified
-                  tab_color = ImVec4(0.8f, 0.65f, 0.0f, 0.7f);
+                  tab_color = ImVec4(SC::GOLD.x, SC::GOLD.y, SC::GOLD.z, 0.7f);
               }
           } else {
               // Static green for Active
-              tab_color = ImVec4(0.0f, 0.5f, 0.0f, 0.7f);
+              tab_color = ImVec4(SC::SAVED.x, SC::SAVED.y, SC::SAVED.z, 0.7f);
           }
 
           ImGui::PushStyleColor(ImGuiCol_Tab, tab_color);
@@ -149,7 +149,7 @@ void MainWindow::renderEditor(Domain::ChunkedMap *current_map,
             } else {
               spdlog::error("Error: RenderState not found for session {}",
                             static_cast<int>(session->getID()));
-              ImGui::TextColored(ImVec4(1, 0, 0, 1),
+              ImGui::TextColored(SC::DANGER,
                                  "Error: RenderState not found for session %d",
                                  static_cast<int>(session->getID()));
             }
@@ -230,28 +230,6 @@ void MainWindow::renderEditor(Domain::ChunkedMap *current_map,
     ingame_box_window_.render(current_map, map_renderer, view_settings_,
                               cursor_pos, &view_settings_.show_ingame_box);
   }
-
-  // Render Editor-state modal dialogs
-  new_map_dialog_.render();
-  open_sec_dialog_.render();
-}
-
-void MainWindow::showNewMapDialog() {
-  new_map_dialog_.setOnConfirm([this](const UI::NewMapPanel::State& config) {
-    if (new_map_callback_) {
-      new_map_callback_(config);
-    }
-  });
-  new_map_dialog_.show();
-}
-
-void MainWindow::showOpenSecDialog() {
-  open_sec_dialog_.setOnConfirm([this](const std::filesystem::path& folder, uint32_t version) {
-    if (open_sec_callback_) {
-      open_sec_callback_(folder, version);
-    }
-  });
-  open_sec_dialog_.show();
 }
 
 } // namespace Presentation
