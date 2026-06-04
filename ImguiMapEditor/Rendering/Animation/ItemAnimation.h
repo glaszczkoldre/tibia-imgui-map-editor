@@ -16,6 +16,7 @@ struct ItemAnimation {
 
 private:
     static int getPhaseDuration(const Domain::ItemType &item, int phase);
+    static int getPingPongPhase(int raw_phase, int frames);
 };
 
 } // namespace Rendering

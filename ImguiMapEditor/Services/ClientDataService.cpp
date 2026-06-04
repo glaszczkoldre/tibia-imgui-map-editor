@@ -401,6 +401,9 @@ void ClientDataService::mergeOtbWithDat(
         merged.total_duration += (d.first + d.second) / 2;
       }
 
+      // Lying object (multi-tile corpses)
+      merged.is_lying_object = dat->is_lying_object;
+
       // Frame groups (10.57+ creatures)
       merged.idle_sprite_ids = dat->idle_sprite_ids;
       merged.walk_sprite_ids = dat->walk_sprite_ids;

@@ -251,6 +251,9 @@ public:
   bool is_wall = false;
   bool is_locked = false; // Door key lock status (for highlight_locked_doors)
 
+  // Lying object (multi-tile corpses) — drawn before creatures
+  bool is_lying_object = false;
+
   // Sprite IDs for rendering
   std::vector<uint32_t> sprite_ids;
 

@@ -19,67 +19,36 @@ void CreatureRenderer::queue(const Domain::Creature *creature, float screen_x,
                              const TileColor &ground_color, float alpha,
                              uint8_t direction, int animation_frame,
                              std::vector<uint32_t> &missing_sprites) {
-  if (!creature || !client_data_) {
+  if (!creature || !client_data_)
     return;
-  }
 
-  // Look up creature type to get outfit
   const Domain::CreatureType *creature_type =
       client_data_->getCreatureType(creature->name);
   if (!creature_type || creature_type->outfit.lookType == 0) {
-    // No creature type found - render magenta placeholder
-    const AtlasRegion *white_region =
-        sprite_manager_.getAtlasManager().getWhitePixel();
-    if (white_region) {
-      emitter_.emit(screen_x, screen_y, size, size, *white_region,
-                    Config::Colors::INVALID_CREATURE_R,
-                    Config::Colors::INVALID_CREATURE_G,
-                    Config::Colors::INVALID_CREATURE_B, alpha * 0.7f);
-    }
+    emitPlaceholder(screen_x, screen_y, size, alpha);
     return;
   }
 
   const Domain::Outfit &outfit = creature_type->outfit;
-
-  // Get outfit data from client
   const IO::ClientItem *outfit_data =
       client_data_->getOutfitData(outfit.lookType);
   if (!outfit_data || outfit_data->sprite_ids.empty()) {
-    // No outfit data - render magenta placeholder
-    const AtlasRegion *white_region =
-        sprite_manager_.getAtlasManager().getWhitePixel();
-    if (white_region) {
-      emitter_.emit(screen_x, screen_y, size, size, *white_region,
-                    Config::Colors::INVALID_CREATURE_R,
-                    Config::Colors::INVALID_CREATURE_G,
-                    Config::Colors::INVALID_CREATURE_B, alpha * 0.7f);
-    }
+    emitPlaceholder(screen_x, screen_y, size, alpha);
     return;
   }
 
-  // Calculate color modulation (lighting + selection)
   TileColor creature_color = ground_color;
-
-  // Apply selection dimming
   if (creature->isSelected()) {
     creature_color.r *= 0.5f;
     creature_color.g *= 0.5f;
     creature_color.b *= 0.5f;
   }
 
-  const int width = std::max<int>(1, outfit_data->width);
-  const int height = std::max<int>(1, outfit_data->height);
-  const int layers = std::max<int>(1, outfit_data->layers);
   const int pattern_x = std::max<int>(1, outfit_data->pattern_x);
+  int dir = direction < pattern_x ? direction : 2 % pattern_x;
 
-  // Map direction to pattern_x
-  int dir = 2 % pattern_x; // Default to South
-  if (direction < pattern_x) {
-    dir = direction;
-  }
-
-  // Choose sprite source based on frame groups and walking state
-  const std::vector<uint32_t>* sprites = &outfit_data->sprite_ids;
+  // Select sprite source and animation frame
+  const std::vector<uint32_t> *sprites = &outfit_data->sprite_ids;
   int frame = 0;
   if (outfit_data->has_frame_groups && animation_frame == 0) {
     if (!outfit_data->idle_sprite_ids.empty()) {
@@ -96,90 +65,163 @@ void CreatureRenderer::queue(const Domain::Creature *creature, float screen_x,
     }
   } else if (animation_frame > 0 && !outfit_data->walk_sprite_ids.empty()) {
     sprites = &outfit_data->walk_sprite_ids;
-    int walk_frames = std::max<int>(1, outfit_data->walk_frames);
-    frame = animation_frame % walk_frames;
+    frame = animation_frame % std::max<int>(1, outfit_data->walk_frames);
   } else {
     int f = std::max<int>(1, outfit_data->frames);
     frame = (f > 1) ? (animation_frame % f) : 0;
   }
 
-  // For each tile part of a multi-tile creature
-  // RME formula: draw at (screenx - cx * TileSize, screeny - cy * TileSize)
-  // cx=0,cy=0 is at anchor (screenx, screeny)
-  // cx increases leftward, cy increases upward
-  for (int cy = 0; cy < height; ++cy) {
-    for (int cx = 0; cx < width; ++cx) {
-      // Get the base sprite index
-      // RME uses: getHardwareID(cx, cy, dir, pattern_y, pattern_z, outfit,
-      // frame) Which maps to getSpriteIndex(w, h, layer, pattern_x, pattern_y,
-      // pattern_z, frame)
-      uint32_t base_sprite_idx = Utils::SpriteUtils::getSpriteIndex(
-          outfit_data, cx, cy, // width/height position (NOT reversed!)
-          0,                   // layer 0 = base
-          dir,                 // pattern_x = direction
-          0,                   // pattern_y = addon (0 = base outfit)
-          0,                   // pattern_z = mount (0 = no mount)
-          frame);
+  // Draw mount before rider
+  int z_pattern = 0;
+  if (outfit.lookMount > 0) {
+    z_pattern = 1;
+    drawMount(outfit, dir, animation_frame, screen_x, screen_y, size,
+              creature_color, alpha, anim_ticks, missing_sprites);
+  }
 
-      if (base_sprite_idx >= sprites->size()) {
-        continue;
-      }
+  // Draw outfit + addons (yPattern iteration)
+  const int width = std::max<int>(1, outfit_data->width);
+  const int height = std::max<int>(1, outfit_data->height);
+  const int layers = std::max<int>(1, outfit_data->layers);
+  const int pattern_y_count = std::max<int>(1, outfit_data->pattern_y);
+  uint16_t addons = outfit.lookAddons;
 
-      uint32_t base_sprite_id = (*sprites)[base_sprite_idx];
-      if (base_sprite_id == 0) {
-        continue;
-      }
+  for (int yPattern = 0; yPattern < pattern_y_count; ++yPattern) {
+    if (yPattern > 0 && !(addons & (1 << (yPattern - 1))))
+      continue;
 
-      // Get template sprite for colorization
-      uint32_t template_sprite_id = 0;
-      if (layers >= 2) {
-        uint32_t template_sprite_idx = Utils::SpriteUtils::getSpriteIndex(
-            outfit_data, cx, cy, 1, dir, 0, 0, frame);
-        if (template_sprite_idx < sprites->size()) {
-          template_sprite_id = (*sprites)[template_sprite_idx];
+    for (int cy = 0; cy < height; ++cy) {
+      for (int cx = 0; cx < width; ++cx) {
+        uint32_t base_idx = Utils::SpriteUtils::getSpriteIndex(
+            outfit_data, cx, cy, 0, dir, yPattern, z_pattern, frame);
+        if (base_idx >= sprites->size())
+          continue;
+
+        uint32_t base_id = (*sprites)[base_idx];
+        if (base_id == 0)
+          continue;
+
+        uint32_t template_id = 0;
+        if (layers >= 2) {
+          uint32_t t_idx = Utils::SpriteUtils::getSpriteIndex(
+              outfit_data, cx, cy, 1, dir, yPattern, z_pattern, frame);
+          if (t_idx < sprites->size())
+            template_id = (*sprites)[t_idx];
         }
+
+        const AtlasRegion *region =
+            sprite_manager_.getCreatureSpriteService().getColorizedOutfitRegion(
+                base_id, template_id,
+                static_cast<uint8_t>(outfit.lookHead),
+                static_cast<uint8_t>(outfit.lookBody),
+                static_cast<uint8_t>(outfit.lookLegs),
+                static_cast<uint8_t>(outfit.lookFeet));
+        if (!region) {
+          missing_sprites.push_back(base_id);
+          if (template_id != 0)
+            missing_sprites.push_back(template_id);
+          continue;
+        }
+
+        float scale = size / TILE_SIZE;
+        float dx = screen_x - static_cast<float>(cx) * size -
+                   (outfit_data->has_offset ? outfit_data->offset_x : 0) * scale;
+        float dy = screen_y - static_cast<float>(cy) * size -
+                   (outfit_data->has_offset ? outfit_data->offset_y : 0) * scale;
+
+        emitter_.emit(dx, dy, size, size, *region, creature_color.r,
+                      creature_color.g, creature_color.b, alpha);
+      }
+    }
+  }
+}
+
+void CreatureRenderer::drawMount(const Domain::Outfit &outfit, int dir,
+                                  int animation_frame, float screen_x,
+                                  float screen_y, float size,
+                                  const TileColor &color, float alpha,
+                                  const AnimationTicks &anim_ticks,
+                                  std::vector<uint32_t> &missing_sprites) {
+  const IO::ClientItem *mount_data =
+      client_data_->getOutfitData(outfit.lookMount);
+  if (!mount_data || mount_data->sprite_ids.empty())
+    return;
+
+  const std::vector<uint32_t> *mount_sprites = &mount_data->sprite_ids;
+  int mount_dir = dir % std::max<int>(1, mount_data->pattern_x);
+  int mount_frame = 0;
+
+  if (animation_frame > 0 && !mount_data->walk_sprite_ids.empty()) {
+    mount_sprites = &mount_data->walk_sprite_ids;
+    mount_frame = animation_frame % std::max<int>(1, mount_data->walk_frames);
+  } else if (mount_data->has_frame_groups && !mount_data->idle_sprite_ids.empty()) {
+    mount_sprites = &mount_data->idle_sprite_ids;
+    mount_frame = ItemAnimation::getPhaseFromFrames(
+        static_cast<int>(mount_data->idle_frames), anim_ticks.global_ms,
+        mount_data->has_animation_data ? &mount_data->frame_durations : nullptr,
+        mount_data->total_duration);
+  } else if (mount_data->frames > 1) {
+    mount_frame = ItemAnimation::getPhaseFromFrames(
+        static_cast<int>(mount_data->frames), anim_ticks.global_ms,
+        mount_data->has_animation_data ? &mount_data->frame_durations : nullptr,
+        mount_data->total_duration);
+  }
+
+  int mw = std::max<int>(1, mount_data->width);
+  int mh = std::max<int>(1, mount_data->height);
+  int ml = std::max<int>(1, mount_data->layers);
+  float scale = size / TILE_SIZE;
+
+  for (int cy = 0; cy < mh; ++cy) {
+    for (int cx = 0; cx < mw; ++cx) {
+      uint32_t base_idx = Utils::SpriteUtils::getSpriteIndex(
+          mount_data, cx, cy, 0, mount_dir, 0, 0, mount_frame);
+      if (base_idx >= mount_sprites->size())
+        continue;
+      uint32_t base_id = (*mount_sprites)[base_idx];
+      if (base_id == 0)
+        continue;
+
+      uint32_t template_id = 0;
+      if (ml >= 2) {
+        uint32_t t_idx = Utils::SpriteUtils::getSpriteIndex(
+            mount_data, cx, cy, 1, mount_dir, 0, 0, mount_frame);
+        if (t_idx < mount_sprites->size())
+          template_id = (*mount_sprites)[t_idx];
       }
 
-      // Get the colorized outfit sprite region from the atlas
       const AtlasRegion *region =
           sprite_manager_.getCreatureSpriteService().getColorizedOutfitRegion(
-              base_sprite_id, template_sprite_id,
-              static_cast<uint8_t>(outfit.lookHead),
-              static_cast<uint8_t>(outfit.lookBody),
-              static_cast<uint8_t>(outfit.lookLegs),
-              static_cast<uint8_t>(outfit.lookFeet));
-
+              base_id, template_id,
+              static_cast<uint8_t>(outfit.lookMountHead),
+              static_cast<uint8_t>(outfit.lookMountBody),
+              static_cast<uint8_t>(outfit.lookMountLegs),
+              static_cast<uint8_t>(outfit.lookMountFeet));
       if (!region) {
-        // Queue for async load
-        missing_sprites.push_back(base_sprite_id);
-        if (template_sprite_id != 0) {
-          missing_sprites.push_back(template_sprite_id);
-        }
+        missing_sprites.push_back(base_id);
+        if (template_id != 0)
+          missing_sprites.push_back(template_id);
         continue;
       }
 
-      // Calculate draw position - SIMPLE RME FORMULA + DISPLACEMENT
-      // screenx - cx * TileSize - offsetX, screeny - cy * TileSize - offsetY
-      // The displacement offset centers creatures on the tile (OTClient
-      // parity). This puts cx=0,cy=0 at anchor, and expands left/up for larger
-      // creatures
-      float displacement_x = outfit_data->has_offset
-                                 ? static_cast<float>(outfit_data->offset_x)
-                                 : 0.0f;
-      float displacement_y = outfit_data->has_offset
-                                 ? static_cast<float>(outfit_data->offset_y)
-                                 : 0.0f;
-      // Scale displacement by (size / TILE_SIZE) for zoom
-      float scale = size / TILE_SIZE;
-      float draw_x =
-          screen_x - static_cast<float>(cx) * size - displacement_x * scale;
-      float draw_y =
-          screen_y - static_cast<float>(cy) * size - displacement_y * scale;
+      float dx = screen_x - static_cast<float>(cx) * size -
+                 (mount_data->has_offset ? mount_data->offset_x : 0) * scale;
+      float dy = screen_y - static_cast<float>(cy) * size -
+                 (mount_data->has_offset ? mount_data->offset_y : 0) * scale;
 
-      // Queue to sprite batch
-      emitter_.emit(draw_x, draw_y, size, size, *region, creature_color.r,
-                    creature_color.g, creature_color.b, alpha);
+      emitter_.emit(dx, dy, size, size, *region, color.r, color.g, color.b, alpha);
     }
+  }
+}
+
+void CreatureRenderer::emitPlaceholder(float screen_x, float screen_y,
+                                        float size, float alpha) {
+  const AtlasRegion *white = sprite_manager_.getAtlasManager().getWhitePixel();
+  if (white) {
+    emitter_.emit(screen_x, screen_y, size, size, *white,
+                  Config::Colors::INVALID_CREATURE_R,
+                  Config::Colors::INVALID_CREATURE_G,
+                  Config::Colors::INVALID_CREATURE_B, alpha * 0.7f);
   }
 }
 
