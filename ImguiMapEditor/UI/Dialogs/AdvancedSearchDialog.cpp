@@ -36,10 +36,9 @@ AdvancedSearchDialog::AdvancedSearchDialog() {
 void AdvancedSearchDialog::render() {
     if (!is_open_) return;
 
-    // Execute deferred map search from previous frame (allows "Searching..." to render)
+    // Execute deferred map search from previous frame
     if (pending_map_search_) {
         pending_map_search_ = false;
-        is_searching_ = false;
         executeMapSearch();
     }
 
@@ -49,7 +48,8 @@ void AdvancedSearchDialog::render() {
                      ImGuiWindowFlags_NoCollapse)) {
 
         const float spacing = ImGui::GetStyle().ItemSpacing.x;
-        const float footer_h = ImGui::GetFrameHeightWithSpacing() + ImGui::GetStyle().ItemSpacing.y * 2.0f + 20.0f;
+        const float footer_pad = ImGui::GetStyle().ItemSpacing.y * 5.0f;
+        const float footer_h = ImGui::GetFrameHeightWithSpacing() + footer_pad;
         const float content_h = ImGui::GetContentRegionAvail().y - footer_h;
         const float filters_w = ImGui::GetContentRegionAvail().x * 0.35f;
         const float results_w = ImGui::GetContentRegionAvail().x - filters_w - spacing;
@@ -201,10 +201,7 @@ void AdvancedSearchDialog::renderResultsColumn() {
 
         const char* icon;
         const char* msg;
-        if (is_searching_) {
-            icon = ICON_FA_SPINNER;
-            msg = "Searching...";
-        } else if (!has_query && !has_filters) {
+        if (!has_query && !has_filters) {
             icon = ICON_FA_KEYBOARD;
             msg = "Type to search or select filters";
         } else {
@@ -446,8 +443,7 @@ void AdvancedSearchDialog::onSearchMap() {
         return;
     }
 
-    // Defer search to next frame so "Searching..." renders first
-    is_searching_ = true;
+    // Defer search to next frame
     pending_map_search_ = true;
 
     // Show SearchResultsWidget immediately in searching state
