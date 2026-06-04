@@ -1,5 +1,4 @@
 #pragma once
-#include "Services/ItemPickerService.h"
 #include "Services/Map/MapSearchService.h"
 #include "Services/ViewSettings.h"
 #include <future>
@@ -14,7 +13,6 @@ namespace Search { struct MapSearchResult; }
 }
 
 namespace UI {
-class QuickSearchPopup;
 class AdvancedSearchDialog;
 class SearchResultsWidget;
 }
@@ -88,7 +86,6 @@ public:
     void forgetSessionMap(const Domain::ChunkedMap* map);
 
     // Accessors for UI components (needed for rendering and callbacks)
-    UI::QuickSearchPopup* getQuickSearchPopup() const;
     UI::AdvancedSearchDialog* getAdvancedSearchDialog() const;
     UI::SearchResultsWidget* getSearchResultsWidget() const;
 
@@ -96,12 +93,10 @@ private:
     template<typename F> void launchAsync(F&& searchFn);
 
     // UI Components (unique_ptr to allow forward declarations in header)
-    std::unique_ptr<UI::QuickSearchPopup> quick_search_popup_;
     std::unique_ptr<UI::AdvancedSearchDialog> advanced_search_dialog_;
     std::unique_ptr<UI::SearchResultsWidget> search_results_widget_;
 
     // Services
-    std::unique_ptr<AppLogic::ItemPickerService> item_picker_service_;
     std::unique_ptr<Services::MapSearchService> map_search_service_;
 
     // State tracking

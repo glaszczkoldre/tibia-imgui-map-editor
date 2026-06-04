@@ -243,7 +243,6 @@ set(SERVICES_SOURCES
     Services/Map/MapCleanupService.cpp
     Services/Map/MapSearchService.cpp
     Services/ClipboardService.cpp
-    Services/ItemPickerService.cpp
     Services/MapMergeService.cpp
     Services/SessionWiringService.cpp
     Services/SettingsRegistry.cpp
@@ -296,7 +295,6 @@ set(UI_SOURCES
     UI/Ribbon/RibbonController.cpp
     UI/Widgets/Properties/PropertyPanelRenderer.cpp
     UI/Widgets/Properties/PropertyWidgets.cpp
-    UI/Widgets/QuickSearchPopup.cpp
     UI/Widgets/SearchResultsWidget.cpp
     UI/Widgets/TilesetWidget.cpp
     UI/Widgets/TilesetGridWidget.cpp

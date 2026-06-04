@@ -23,7 +23,6 @@
 #include "UI/Panels/BrushSizePanel.h"
 #include "UI/Ribbon/Panels/FilePanel.h"
 #include "UI/Ribbon/RibbonController.h"
-#include "UI/Widgets/QuickSearchPopup.h"
 #include "UI/Widgets/SearchResultsWidget.h"
 #include "UI/Widgets/TilesetWidget.h"
 #include "UI/Windows/BrowseTile/BrowseTileWindow.h"
@@ -195,12 +194,7 @@ void RenderOrchestrator::renderDialogs(Context &ctx) {
        ctx.rendering_manager, // Pass rendering_manager instead of renderer
        &dialogs.cleanup_confirm});
 
-  // Quick Search popup (Ctrl+F)
-  if (ctx.quick_search_popup) {
-    ctx.quick_search_popup->render();
-  }
-
-  // Advanced Search dialog (Ctrl+Shift+F)
+  // Advanced Search dialog (Ctrl+F)
   if (ctx.advanced_search_dialog) {
     ctx.advanced_search_dialog->render();
   }

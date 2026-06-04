@@ -25,7 +25,6 @@ class MapOperationHandler;
 class HotkeyController;
 class MapInputController;
 class EditorSession;
-class ItemPickerService;
 class MapSearchService;
 class SearchController;
 } // namespace AppLogic
@@ -64,7 +63,6 @@ class PreferencesDialog;
 class EditTownsDialog;
 class MapPropertiesDialog;
 class ConfirmationDialog;
-class QuickSearchPopup;
 class AdvancedSearchDialog;
 class SearchResultsWidget;
 
@@ -134,7 +132,6 @@ public:
     UI::MapPropertiesDialog *map_properties = nullptr;
 
     // Search components
-    UI::QuickSearchPopup *quick_search = nullptr;
     UI::AdvancedSearchDialog *advanced_search = nullptr;
     UI::SearchResultsWidget *search_results = nullptr;
     AppLogic::SearchController *search_controller = nullptr;

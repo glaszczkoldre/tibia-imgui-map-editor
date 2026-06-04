@@ -173,7 +173,6 @@ void Application::wireCallbacks() {
       .edit_towns = &dialogs_.edit_towns,
       .map_properties = &dialogs_.map_properties,
       // Search components
-      .quick_search = ui_.search_controller->getQuickSearchPopup(),
       .advanced_search = ui_.search_controller->getAdvancedSearchDialog(),
       .search_results = ui_.search_controller->getSearchResultsWidget(),
       .search_controller = ui_.search_controller.get(),
@@ -367,7 +366,6 @@ void Application::render() {
       .ribbon = ui_.ribbon_controller.get(),
       .file_panel = ui_.file_panel_ptr,
       .main_window = ui_.main_window.get(),
-      .quick_search_popup = ui_.search_controller->getQuickSearchPopup(),
       .advanced_search_dialog =
           ui_.search_controller->getAdvancedSearchDialog(),
       .search_results_widget = ui_.search_controller->getSearchResultsWidget(),

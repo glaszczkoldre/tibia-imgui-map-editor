@@ -72,7 +72,6 @@ public:
     void setConvertToClientIdCallback(ActionCallback cb) { on_convert_to_client_id_ = std::move(cb); }
 
     // Search menu callbacks
-    void setQuickFindCallback(ActionCallback cb) { on_quick_find_ = std::move(cb); }
     void setFindItemsCallback(ActionCallback cb) { on_find_items_ = std::move(cb); }
     void setFindUniqueCallback(ActionCallback cb) { on_find_unique_ = std::move(cb); }
     void setFindActionCallback(ActionCallback cb) { on_find_action_ = std::move(cb); }
@@ -122,7 +121,6 @@ private:
     ActionCallback on_convert_to_server_id_;
     ActionCallback on_convert_to_client_id_;
 
-    ActionCallback on_quick_find_;
     ActionCallback on_find_items_;
     ActionCallback on_find_unique_;
     ActionCallback on_find_action_;

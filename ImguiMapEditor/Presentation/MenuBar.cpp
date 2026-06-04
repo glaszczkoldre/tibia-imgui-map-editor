@@ -224,19 +224,12 @@ void MenuBar::renderSearchMenu() {
   if (ImGui::BeginMenu("Search")) {
     bool has_session = tab_manager_ && tab_manager_->getActiveSession();
 
-    if (ImGui::MenuItem(ICON_FA_MAGNIFYING_GLASS " Quick Find", formatShortcut(QUICK_SEARCH).c_str())) {
-      if (on_quick_find_)
-        on_quick_find_();
-    }
-    if (ImGui::IsItemHovered())
-      ImGui::SetTooltip("Quick catalog search for items and creatures");
-
-    if (ImGui::MenuItem(ICON_FA_MAGNIFYING_GLASS_PLUS " Find Items...", formatShortcut(ADVANCED_SEARCH).c_str())) {
+    if (ImGui::MenuItem(ICON_FA_MAGNIFYING_GLASS_PLUS " Find Items...", formatShortcut(QUICK_SEARCH).c_str())) {
       if (on_find_items_)
         on_find_items_();
     }
     if (ImGui::IsItemHovered())
-      ImGui::SetTooltip("Advanced search with type and property filters");
+      ImGui::SetTooltip("Search for items and creatures with filters");
 
     ImGui::Separator();
 

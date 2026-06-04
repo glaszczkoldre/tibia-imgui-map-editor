@@ -33,7 +33,6 @@ class MapPanel;
 class MinimapWindow;
 class BrowseTileWindow;
 class TilesetWidget;
-class QuickSearchPopup;
 class AdvancedSearchDialog;
 class SearchResultsWidget;
 class StartupDialog;
@@ -99,7 +98,6 @@ public:
     UI::Ribbon::RibbonController *ribbon = nullptr;
     UI::Ribbon::FilePanel *file_panel = nullptr;
     Presentation::MainWindow *main_window = nullptr;
-    UI::QuickSearchPopup *quick_search_popup = nullptr;
     UI::AdvancedSearchDialog *advanced_search_dialog = nullptr;
     UI::SearchResultsWidget *search_results_widget = nullptr;
     UI::TilesetWidget *tileset_widget = nullptr;

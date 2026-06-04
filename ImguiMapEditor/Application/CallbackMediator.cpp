@@ -31,7 +31,6 @@
 #include "UI/Map/MapPanel.h"
 #include "UI/PreferencesDialog.h"
 #include "UI/Ribbon/Panels/FilePanel.h"
-#include "UI/Widgets/QuickSearchPopup.h"
 #include "UI/Widgets/SearchResultsWidget.h"
 #include "UI/Windows/BrowseTile/BrowseTileWindow.h"
 #include "UI/Windows/IngameBoxWindow.h"
@@ -366,11 +365,8 @@ void CallbackMediator::wireMenuCallbacks(Context &ctx) {
   });
 
   // Search menu callbacks
-  ctx.menu_bar->setQuickFindCallback(
-      [ctx]() { if (ctx.quick_search) ctx.quick_search->open(); });
-
   ctx.menu_bar->setFindItemsCallback(
-      [ctx]() { ctx.view_settings->show_search_results = true; });
+      [ctx]() { if (ctx.advanced_search) ctx.advanced_search->open(); });
 
   ctx.menu_bar->setFindUniqueCallback(
       [ctx]() {
@@ -537,29 +533,16 @@ void CallbackMediator::wireCleanupCallbacks(Context &ctx) {
 }
 
 void CallbackMediator::wireSearchCallbacks(Context &ctx) {
-  // Wire Ctrl+F quick search callback
-  if (ctx.hotkey && ctx.quick_search) {
+  // Wire Ctrl+F to open Advanced Search dialog
+  if (ctx.hotkey && ctx.advanced_search) {
     ctx.hotkey->setQuickSearchCallback(
-        [qs = ctx.quick_search]() { qs->open(); });
+        [as = ctx.advanced_search]() { as->open(); });
   }
 
-  // Wire Ctrl+Shift+F to toggle Search Results Widget (not Advanced Search)
+  // Wire Ctrl+Shift+F to toggle Search Results Widget
   if (ctx.hotkey && ctx.view_settings) {
     ctx.hotkey->setAdvancedSearchCallback(
         [vs = ctx.view_settings]() { vs->show_search_results = true; });
-  }
-
-  // Wire QuickSearch selection callback
-  if (ctx.quick_search) {
-    ctx.quick_search->setSelectCallback(
-        [](uint16_t server_id, bool is_creature) {
-          spdlog::info("QuickSearch selected: {} (ID: {})",
-                       is_creature ? "creature" : "item", server_id);
-          Presentation::showInfo(std::string("Selected ") +
-                                     (is_creature ? "creature" : "item") +
-                                     " ID: " + std::to_string(server_id),
-                                 2000);
-        });
   }
 
   // Wire SearchResultsWidget navigate callback
