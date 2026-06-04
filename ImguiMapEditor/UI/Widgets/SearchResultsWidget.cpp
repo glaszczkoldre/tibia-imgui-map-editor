@@ -19,6 +19,7 @@ SearchResultsWidget::SearchResultsWidget() {
 }
 
 void SearchResultsWidget::setResults(const std::vector<Domain::Search::MapSearchResult>& results) {
+    is_searching_ = false;
     auto view = results | std::views::take(MAX_RESULTS);
     results_.assign(view.begin(), view.end());
     total_results_ = results.size();
@@ -39,6 +40,7 @@ void SearchResultsWidget::clear() {
     search_buffer_[0] = '\0';
     filter_buffer_[0] = '\0';
     filter_dirty_ = true;
+    is_searching_ = false;
     if (active_map_) saveState();
 }
 
@@ -179,8 +181,19 @@ void SearchResultsWidget::renderResultsList(float row_height) {
 
     if (results_.empty()) {
         ImVec2 wsize = ImGui::GetWindowSize();
-        const char* msg = search_buffer_[0] ? "No results found" : "Type to search...";
-        std::string text = std::format("{} {}", search_buffer_[0] ? ICON_FA_CIRCLE_EXCLAMATION : ICON_FA_KEYBOARD, msg);
+        const char* icon;
+        const char* msg;
+        if (is_searching_) {
+            icon = ICON_FA_SPINNER;
+            msg = "Searching...";
+        } else if (search_buffer_[0]) {
+            icon = ICON_FA_CIRCLE_EXCLAMATION;
+            msg = "No results found";
+        } else {
+            icon = ICON_FA_KEYBOARD;
+            msg = "Type to search...";
+        }
+        std::string text = std::format("{} {}", icon, msg);
         ImVec2 tsize = ImGui::CalcTextSize(text.c_str());
         ImGui::SetCursorPos(ImVec2((wsize.x - tsize.x) * 0.5f, (wsize.y - tsize.y) * 0.5f));
         ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyle().Colors[ImGuiCol_TextDisabled]);
@@ -418,6 +431,7 @@ void SearchResultsWidget::doSearch() {
 
     if (std::string_view(search_buffer_).empty()) return;
 
+    is_searching_ = true;
     if (on_search_async_) {
         on_search_async_(search_buffer_, search_items_, search_creatures_);
     }

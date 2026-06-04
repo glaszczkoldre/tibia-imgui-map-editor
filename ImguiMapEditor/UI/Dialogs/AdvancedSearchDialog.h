@@ -77,6 +77,7 @@ private:
     // Actions
     void updatePreviewResults();
     void onSearchMap();
+    void executeMapSearch();
     void onSelectItem();
     
     // Dependencies
@@ -89,7 +90,9 @@ private:
     // Dialog state
     bool is_open_ = false;
     bool focus_input_ = false;
+    bool is_searching_ = false;
     bool filters_changed_ = false;
+    bool pending_map_search_ = false;
     
     char search_buffer_[256] = {};
     

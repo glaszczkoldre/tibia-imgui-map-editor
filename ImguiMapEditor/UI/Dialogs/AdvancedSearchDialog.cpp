@@ -36,6 +36,13 @@ AdvancedSearchDialog::AdvancedSearchDialog() {
 void AdvancedSearchDialog::render() {
     if (!is_open_) return;
 
+    // Execute deferred map search from previous frame (allows "Searching..." to render)
+    if (pending_map_search_) {
+        pending_map_search_ = false;
+        is_searching_ = false;
+        executeMapSearch();
+    }
+
     ImGui::SetNextWindowSize(ImVec2(850, 600), ImGuiCond_Once);
 
     if (ImGui::Begin(ICON_FA_MAGNIFYING_GLASS_PLUS " Advanced Search###AdvancedSearch", &is_open_,
@@ -186,97 +193,134 @@ void AdvancedSearchDialog::renderResultsColumn() {
     auto result_label = std::format("Result ({})", preview_results_.size());
     ImGui::SeparatorText(result_label.c_str());
 
+    // State-based empty messages
     if (preview_results_.empty()) {
-        ImGui::Spacing();
-        ImGui::TextDisabled("No matching items");
-        ImGui::TextDisabled("Enter search term or select filters");
+        ImVec2 wsize = ImGui::GetContentRegionAvail();
+        bool has_query = strlen(search_buffer_) > 0;
+        bool has_filters = type_filter_.hasAnySelected() || property_filter_.hasAnySelected();
+
+        const char* icon;
+        const char* msg;
+        if (is_searching_) {
+            icon = ICON_FA_SPINNER;
+            msg = "Searching...";
+        } else if (!has_query && !has_filters) {
+            icon = ICON_FA_KEYBOARD;
+            msg = "Type to search or select filters";
+        } else {
+            icon = ICON_FA_CIRCLE_EXCLAMATION;
+            msg = "No matching items";
+        }
+
+        std::string text = std::format("{} {}", icon, msg);
+        ImVec2 tsize = ImGui::CalcTextSize(text.c_str());
+        ImGui::SetCursorPos(ImVec2(
+            (ImGui::GetContentRegionAvail().x - tsize.x) * 0.5f,
+            wsize.y * 0.4f));
+        ImGui::TextDisabled("%s", text.c_str());
         return;
     }
 
-    ImGui::TextDisabled("Double-click to search map");
+    ImGui::TextDisabled("Hover for details. Double-click to search map.");
     ImGui::Spacing();
 
-    constexpr float SPRITE_SIZE = 24.0f;
-    constexpr float ROW_HEIGHT = 28.0f;
+    constexpr float CELL_SIZE = 32.0f;
+    constexpr float PREVIEW_SIZE = 64.0f;
+    constexpr float CARD_ROUNDING = 4.0f;
+    constexpr float IMG_ROUNDING = 3.0f;
+    constexpr float IMG_PADDING = 2.0f;
+    const float pad = ImGui::GetStyle().WindowPadding.x;
+    const float avail_w = ImGui::GetContentRegionAvail().x;
+    const int columns = std::max(1, static_cast<int>((avail_w - pad) / CELL_SIZE));
+    const int total_rows = (static_cast<int>(preview_results_.size()) + columns - 1) / columns;
+
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    const ImU32 col_bg = ImGui::GetColorU32(ImGuiCol_FrameBg);
+    const ImU32 col_border = ImGui::GetColorU32(ImGuiCol_Border);
+    const ImU32 col_selected = ImGui::GetColorU32(ImGuiCol_Header);
+    const ImU32 col_hovered = ImGui::GetColorU32(ImGuiCol_HeaderHovered);
 
     ImGuiListClipper clipper;
-    clipper.Begin(static_cast<int>(preview_results_.size()), ROW_HEIGHT);
+    clipper.Begin(total_rows, CELL_SIZE);
     while (clipper.Step()) {
-        for (int i = clipper.DisplayStart; i < clipper.DisplayEnd; ++i) {
-            const auto& result = preview_results_[i];
-            bool is_selected = (i == selected_preview_index_);
+        for (int row = clipper.DisplayStart; row < clipper.DisplayEnd; ++row) {
+            for (int col = 0; col < columns; ++col) {
+                int idx = row * columns + col;
+                if (idx >= static_cast<int>(preview_results_.size())) break;
 
-            ImGui::PushID(i);
+                const auto& result = preview_results_[idx];
+                bool is_selected = (idx == selected_preview_index_);
 
-            if (ImGui::Selectable("##Row", is_selected, ImGuiSelectableFlags_AllowDoubleClick,
-                                  ImVec2(0, ROW_HEIGHT))) {
-                selected_preview_index_ = i;
-                if (ImGui::IsMouseDoubleClicked(0)) {
-                    onSearchMap();
-                }
-            }
+                ImGui::PushID(idx);
 
-            ImGui::SameLine(4);
-
-            bool sprite_rendered = false;
-            if (sprite_manager_ && client_data_) {
-                if (result.is_creature && result.creature) {
-                    auto preview = Utils::GetCreaturePreview(*client_data_, *sprite_manager_, result.creature->outfit);
-                    if (preview && preview.texture) {
-                        ImGui::Image(TexId(preview.texture->id()), ImVec2(SPRITE_SIZE, SPRITE_SIZE));
-                        sprite_rendered = true;
-                    }
-                } else if (result.item) {
-                    if (auto* texture = Utils::GetItemPreview(*sprite_manager_, result.item)) {
-                        ImGui::Image(TexId(texture->id()), ImVec2(SPRITE_SIZE, SPRITE_SIZE));
-                        sprite_rendered = true;
+                // Load sprite texture
+                uint32_t tex_id = 0;
+                bool sprite_rendered = false;
+                if (sprite_manager_ && client_data_) {
+                    if (result.is_creature && result.creature) {
+                        auto preview = Utils::GetCreaturePreview(*client_data_, *sprite_manager_, result.creature->outfit);
+                        if (preview && preview.texture) {
+                            tex_id = preview.texture->id();
+                            sprite_rendered = true;
+                        }
+                    } else if (result.item) {
+                        if (auto* texture = Utils::GetItemPreview(*sprite_manager_, result.item)) {
+                            tex_id = texture->id();
+                            sprite_rendered = true;
+                        }
                     }
                 }
-            }
 
-            if (!sprite_rendered) {
-                ImGui::Dummy(ImVec2(SPRITE_SIZE, SPRITE_SIZE));
-                ImGui::SameLine(4);
-                ImGui::Text("%s", result.is_creature ? ICON_FA_DRAGON : ICON_FA_CUBE);
-            }
+                // Exact 32x32 hitbox
+                ImGui::InvisibleButton("##cell", ImVec2(CELL_SIZE, CELL_SIZE));
+                bool hovered = ImGui::IsItemHovered();
+                bool clicked = ImGui::IsItemClicked();
+                bool double_clicked = hovered && ImGui::IsMouseDoubleClicked(0);
 
-            ImGui::SameLine();
+                if (clicked) selected_preview_index_ = idx;
+                if (double_clicked) onSearchMap();
 
-            if (result.is_creature) {
-                ImGui::Text("%s", result.getDisplayName().c_str());
-            } else {
-                ImGui::Text("[%u] %s", result.getServerId(), result.getDisplayName().c_str());
-            }
+                ImVec2 min = ImGui::GetItemRectMin();
+                ImVec2 max = ImGui::GetItemRectMax();
 
-            if (ImGui::BeginItemTooltip()) {
-                if (result.is_creature && result.creature) {
-                    ImGui::Text("Creature: %s", result.creature->name.c_str());
-                    ImGui::Text("LookType: %u", result.creature->outfit.lookType);
-                } else if (result.item) {
-                    ImGui::Text("Server ID: %u", result.item->server_id);
-                    ImGui::Text("Client ID: %u", result.item->client_id);
-                    if (!result.item->name.empty()) {
-                        ImGui::Text("Name: %s", result.item->name.c_str());
+                // Rounded card background
+                ImU32 bg_col = is_selected ? col_selected : (hovered ? col_hovered : col_bg);
+                dl->AddRectFilled(min, max, bg_col, CARD_ROUNDING);
+                dl->AddRect(min, max, col_border, CARD_ROUNDING);
+
+                // Rounded image inside card
+                if (sprite_rendered) {
+                    ImVec2 img_min(min.x + IMG_PADDING, min.y + IMG_PADDING);
+                    ImVec2 img_max(max.x - IMG_PADDING, max.y - IMG_PADDING);
+                    dl->AddImageRounded(TexId(tex_id), img_min, img_max,
+                        ImVec2(0, 0), ImVec2(1, 1), IM_COL32_WHITE, IMG_ROUNDING);
+                }
+
+                // Tooltip on hover
+                if (hovered) {
+                    ImGui::BeginTooltip();
+                    if (sprite_rendered) {
+                        ImGui::Image(TexId(tex_id), ImVec2(PREVIEW_SIZE, PREVIEW_SIZE));
+                        ImGui::SameLine();
                     }
+                    if (result.is_creature && result.creature) {
+                        ImGui::TextUnformatted(result.creature->name.c_str());
+                        ImGui::TextDisabled("Creature");
+                    } else if (result.item) {
+                        ImGui::TextUnformatted(result.item->name.empty() ? "(unnamed)" : result.item->name.c_str());
+                        ImGui::TextDisabled("SID: %u", result.item->server_id);
+                        ImGui::TextDisabled("CID: %u", result.item->client_id);
+                    }
+                    ImGui::EndTooltip();
                 }
-                ImGui::EndTooltip();
-            }
 
-            ImGui::SameLine();
-            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - 30);
-
-            if (ImGui::Button(ICON_FA_COPY)) {
-                if (result.is_creature && result.creature) {
-                    ImGui::SetClipboardText(result.creature->name.c_str());
-                    Presentation::showSuccess("Creature name copied");
-                } else if (result.item) {
-                    ImGui::SetClipboardText(std::to_string(result.item->server_id).c_str());
-                    Presentation::showSuccess("Item ID copied");
+                // Grid flow
+                if (col < columns - 1 && idx + 1 < static_cast<int>(preview_results_.size())) {
+                    ImGui::SameLine(0.0f, 0.0f);
                 }
-            }
-            ImGui::SetItemTooltip("Copy ID/Name to clipboard");
 
-            ImGui::PopID();
+                ImGui::PopID();
+            }
         }
     }
 }
@@ -386,6 +430,14 @@ void AdvancedSearchDialog::updatePreviewResults() {
             preview_results_.push_back({true, nullptr, creature});
         }
     }
+
+    // Sort by server_id ascending, creatures (id=0) last
+    std::sort(preview_results_.begin(), preview_results_.end(),
+        [](const PreviewResult& a, const PreviewResult& b) {
+            uint16_t a_id = a.is_creature ? UINT16_MAX : (a.item ? a.item->server_id : 0);
+            uint16_t b_id = b.is_creature ? UINT16_MAX : (b.item ? b.item->server_id : 0);
+            return a_id < b_id;
+        });
 }
 
 void AdvancedSearchDialog::onSearchMap() {
@@ -394,17 +446,35 @@ void AdvancedSearchDialog::onSearchMap() {
         return;
     }
 
+    // Defer search to next frame so "Searching..." renders first
+    is_searching_ = true;
+    pending_map_search_ = true;
+
+    // Show SearchResultsWidget immediately in searching state
+    if (results_widget_) results_widget_->setSearching(true);
+    if (view_settings_) *view_settings_ = true;
+}
+
+void AdvancedSearchDialog::executeMapSearch() {
+    if (selected_preview_index_ < 0 ||
+        selected_preview_index_ >= static_cast<int>(preview_results_.size())) {
+        return;
+    }
+
     const auto& selected = preview_results_[selected_preview_index_];
     std::vector<Domain::Search::MapSearchResult> results;
 
     if (selected.is_creature && selected.creature) {
+        // Set widget search buffer so empty state shows "No results found"
+        if (results_widget_) results_widget_->setSearchBuffer(selected.creature->name.c_str());
         results = search_service_->search(selected.creature->name, Services::MapSearchMode::ByName, false, true, 1000);
     } else if (selected.item) {
-        results = search_service_->search(std::to_string(selected.item->server_id), Services::MapSearchMode::ByServerId, true, false, 1000);
+        auto id_str = std::to_string(selected.item->server_id);
+        if (results_widget_) results_widget_->setSearchBuffer(id_str.c_str());
+        results = search_service_->search(id_str, Services::MapSearchMode::ByServerId, true, false, 1000);
     }
 
     if (results_widget_) results_widget_->setResults(results);
-    if (view_settings_) *view_settings_ = true;
 }
 
 void AdvancedSearchDialog::onSelectItem() {

@@ -48,6 +48,8 @@ public:
     void forgetMap(const Domain::ChunkedMap* map);
     
     void setResults(const std::vector<Domain::Search::MapSearchResult>& results);
+    void setSearching(bool searching) { is_searching_ = searching; }
+    void setSearchBuffer(const char* query) { strncpy(search_buffer_, query, sizeof(search_buffer_) - 1); search_buffer_[sizeof(search_buffer_) - 1] = '\0'; }
     void clear();
     void invalidateFilter();
     size_t getResultCount() const { return total_results_; }
@@ -84,6 +86,7 @@ private:
     std::vector<size_t> filtered_indices_;
     size_t filtered_count_ = 0;
     bool filter_dirty_ = true;
+    bool is_searching_ = false;
 
     const Domain::ChunkedMap* active_map_ = nullptr;
 
