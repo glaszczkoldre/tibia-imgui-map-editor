@@ -1,4 +1,5 @@
 #include "EditTownsDialog.h"
+#include "../../Utils/StringCopy.h"
 #include "Application/MapTabManager.h"
 #include "Application/EditorSession.h"
 #include "Domain/MapInstance.h"

@@ -15,7 +15,7 @@ namespace Services {
 
 MapLoadingService::MapLoadingService(ClientVersionRegistry &version_registry,
                                      ViewSettings &view_settings,
-                                     Brushes::BrushRegistry &brush_registry,
+                                     ::MapEditor::Brushes::BrushRegistry &brush_registry,
                                      TilesetService &tileset_service,
                                      const OtbmSettings &otbm_settings)
     : version_registry_(version_registry), view_settings_(view_settings),

@@ -121,27 +121,6 @@ MapPropertiesDialog::Result MapPropertiesDialog::render() {
   return result;
 }
 
-void MapPropertiesDialog::loadFromMap() {
-  if (!map_)
-    return;
-
-  // Description
-  ::MapEditor::Utils::copyTruncate(description_buffer_, map_->getDescription());
-
-  // Dimensions
-  width_ = map_->getWidth();
-  height_ = map_->getHeight();
-
-  // Version info
-  const auto &version = map_->getVersion();
-  otbm_version_ = version.otbm_version;
-  client_version_ = version.client_version;
-
-  // External files
-  ::MapEditor::Utils::copyTruncate(house_filename_, map_->getHouseFile());
-
-  ::MapEditor::Utils::copyTruncate(spawn_filename_, map_->getSpawnFile());
-}
 
 void MapPropertiesDialog::applyToMap() {
   if (!map_)

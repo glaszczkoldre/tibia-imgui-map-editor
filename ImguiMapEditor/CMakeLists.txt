@@ -437,7 +437,6 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/ext/stb
     ${Stb_INCLUDE_DIR}
 )
-)
 
 add_executable(BrushSmoke
     ${BRUSH_SMOKE_SOURCES}

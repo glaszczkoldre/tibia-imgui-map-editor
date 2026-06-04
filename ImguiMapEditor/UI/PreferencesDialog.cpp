@@ -1,6 +1,7 @@
 // Prevent GLFW from including OpenGL headers (glad provides them)
 #define GLFW_INCLUDE_NONE
 #include "PreferencesDialog.h"
+#include "../Utils/StringCopy.h"
 #include "UI/Core/Theme.h"
 #include "../ext/imhotkey/imHotKey.h"
 #include "IO/HotkeyJsonReader.h"
