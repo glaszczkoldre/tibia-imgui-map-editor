@@ -437,7 +437,6 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/ext/stb
     ${Stb_INCLUDE_DIR}
 )
-)
 
 add_executable(BrushSmoke
     ${BRUSH_SMOKE_SOURCES}
@@ -537,10 +536,6 @@ add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${CMAKE_CURRENT_SOURCE_DIR}/clients_templates.json"
         "$<TARGET_FILE_DIR:${PROJECT_NAME}>/data/clients_templates.json"
-    # Copy entire sample_data directory tree (includes tilesets/, creatures/, items/, etc.)
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-        "${CMAKE_CURRENT_SOURCE_DIR}/sample_data"
-        "$<TARGET_FILE_DIR:${PROJECT_NAME}>/data"
     # Copy shaders
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         "${CMAKE_CURRENT_SOURCE_DIR}/shaders"
@@ -551,6 +546,19 @@ add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
         "$<TARGET_FILE_DIR:${PROJECT_NAME}>/data/fonts/fa-solid-900.ttf"
     COMMENT "Copying data files..."
 )
+
+# Copy version-specific data directory (guarded — only if it exists)
+set(TME_DATA_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/../data")
+if(EXISTS "${TME_DATA_SOURCE}")
+    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${TME_DATA_SOURCE}"
+            "$<TARGET_FILE_DIR:${PROJECT_NAME}>/data"
+        COMMENT "Copying version data folders..."
+    )
+else()
+    message(WARNING "Data directory not found at ${TME_DATA_SOURCE} — version-specific data will not be copied to build output")
+endif()
 
 # Installation
 install(TARGETS ${PROJECT_NAME}

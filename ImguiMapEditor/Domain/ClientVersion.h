@@ -112,8 +112,45 @@ public:
   void setDefault(bool is_default) { is_default_ = is_default; }
 
   // Data directory and description
+  // setDataDirectory normalizes paths like "data/1098" or absolute paths ending
+  // in "/data/<version>" to just the final segment (e.g., "1098").
+  // autoDetectDataDirectory() and MapLoadingService both depend on
+  // std::filesystem::current_path() to resolve data/[version]/ at runtime.
   const std::string &getDataDirectory() const { return data_directory_; }
-  void setDataDirectory(const std::string &dir) { data_directory_ = dir; }
+  void setDataDirectory(const std::string &dir) {
+    // Normalize: reduce .../data/<version> to just <version>
+    std::filesystem::path p(dir);
+    if (p.has_parent_path() && p.parent_path().filename() == "data") {
+      data_directory_ = p.filename().string();
+    } else {
+      data_directory_ = dir;
+    }
+  }
+
+  // Resolve the version-specific data directory to an absolute path.
+  // Returns empty path if data_directory_ is not set or doesn't exist.
+  // Handles both "1098" and "data/1098" formats.
+  std::filesystem::path resolveDataPath() const {
+    if (data_directory_.empty()) return {};
+    auto candidate = std::filesystem::current_path() / "data" / data_directory_;
+    if (std::filesystem::exists(candidate)) return candidate;
+    // Try stripping "data/" prefix if present
+    std::filesystem::path dir_path(data_directory_);
+    if (dir_path.has_parent_path() && dir_path.parent_path().filename() == "data") {
+      auto stripped = std::filesystem::current_path() / "data" / dir_path.filename();
+      if (std::filesystem::exists(stripped)) return stripped;
+    }
+    return {};
+  }
+
+  // Auto-detect data directory: checks if data/[version]/ exists
+  void autoDetectDataDirectory() {
+    auto candidate = std::filesystem::current_path() / "data" / std::to_string(version_);
+    if (std::filesystem::exists(candidate)) {
+      data_directory_ = std::to_string(version_);
+    }
+  }
+
   const std::string &getDescription() const { return description_; }
   void setDescription(const std::string &desc) { description_ = desc; }
 

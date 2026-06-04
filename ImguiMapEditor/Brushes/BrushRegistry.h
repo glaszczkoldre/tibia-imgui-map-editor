@@ -82,6 +82,7 @@ public:
   void registerBorderTemplate(uint32_t id, BorderBlock border);
   const BorderBlock *getBorderTemplate(uint32_t id) const;
   const BorderItemMetadata *getBorderItemMetadata(uint16_t itemId) const;
+  size_t getBorderTemplateCount() const { return border_templates_.size(); }
 
   /**
    * Clear all brushes from the registry.

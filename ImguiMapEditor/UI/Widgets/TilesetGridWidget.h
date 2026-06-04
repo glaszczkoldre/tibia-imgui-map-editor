@@ -201,6 +201,14 @@ private:
 
   [[nodiscard]] Utils::ResolvedBrushPreview
   getBrushPreview(const Brushes::IBrush *brush) const;
+
+  void renderBrushCard(ImVec2 cursorPos, ImVec2 size,
+                       const Utils::ResolvedBrushPreview &preview,
+                       bool isSelected, bool isHovered,
+                       bool isPulsing = false, float pulseElapsed = 0.0f);
+
+  // Returns {isPulsing, pulseElapsed}. Clears stale pulse state when duration expires.
+  std::pair<bool, float> computePulseState(const Brushes::IBrush *brush);
   // Services (non-owning)
   Services::ClientDataService *clientData_ = nullptr;
   Services::SpriteManager *spriteManager_ = nullptr;

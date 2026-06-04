@@ -160,9 +160,11 @@ private:
                                   Services::ClientDataService &client_data);
 
   bool tryLoadCreatures(const std::filesystem::path &map_dir,
-                        const std::filesystem::path &client_path);
+                        const std::filesystem::path &client_path,
+                        const std::filesystem::path &version_data_path);
   bool tryLoadItems(const std::filesystem::path &map_dir,
-                    const std::filesystem::path &client_path);
+                    const std::filesystem::path &client_path,
+                    const std::filesystem::path &version_data_path);
 
   void loadWaypoints(const std::filesystem::path &otbm_path,
                      Domain::ChunkedMap &map);

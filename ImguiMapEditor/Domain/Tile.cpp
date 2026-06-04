@@ -54,7 +54,6 @@ Tile::~Tile() = default;
 void Tile::setOpaqueData(std::unique_ptr<IO::InvalidZoneState> data) {
     opaque_data_ = std::move(data);
 }
-}
 
 void Tile::setGround(std::unique_ptr<Item> item) {
   ground_ = std::move(item);
