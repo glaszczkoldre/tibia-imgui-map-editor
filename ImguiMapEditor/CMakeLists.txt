@@ -536,9 +536,9 @@ add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${CMAKE_CURRENT_SOURCE_DIR}/clients_templates.json"
         "$<TARGET_FILE_DIR:${PROJECT_NAME}>/data/clients_templates.json"
-    # Copy entire sample_data directory tree (includes tilesets/, creatures/, items/, etc.)
+    # Copy entire data directory tree (includes version folders, tilesets/, creatures/, items/, etc.)
     COMMAND ${CMAKE_COMMAND} -E copy_directory
-        "${CMAKE_CURRENT_SOURCE_DIR}/sample_data"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../data"
         "$<TARGET_FILE_DIR:${PROJECT_NAME}>/data"
     # Copy shaders
     COMMAND ${CMAKE_COMMAND} -E copy_directory

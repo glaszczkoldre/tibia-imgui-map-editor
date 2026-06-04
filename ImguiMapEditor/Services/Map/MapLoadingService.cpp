@@ -567,11 +567,21 @@ bool MapLoadingService::loadClientData(
                            ? pending_path
                            : pending_path.parent_path();
 
-  if (!tryLoadCreatures(map_dir, client_path)) {
+  // Compute version data path for creatures.xml and items.xml lookup
+  std::string data_dir_for_resources = version_info->getDataDirectory();
+  std::filesystem::path version_data_path;
+  if (!data_dir_for_resources.empty()) {
+    auto candidate = std::filesystem::current_path() / "data" / data_dir_for_resources;
+    if (std::filesystem::exists(candidate)) {
+      version_data_path = candidate;
+    }
+  }
+
+  if (!tryLoadCreatures(map_dir, client_path, version_data_path)) {
     spdlog::warn("No creature data loaded. Spawns may look incorrect.");
   }
 
-  if (!tryLoadItems(map_dir, client_path)) {
+  if (!tryLoadItems(map_dir, client_path, version_data_path)) {
     spdlog::warn("No items.xml loaded. Item names may be missing.");
   }
 
@@ -595,21 +605,46 @@ bool MapLoadingService::loadClientData(
     }
   }
 
-  // Use injected TilesetService instead of creating locally
-  // Always use the application's data folder for tilesets and palettes,
-  // NOT the map directory - these are app resources, not per-map resources
-  std::filesystem::path app_data_path =
-      std::filesystem::current_path() / "data";
+  // Use version-specific data directory for tilesets, palettes, brushes, etc.
+  // dataDirectory should be just the folder name (e.g., "1098"), not a path.
+  // Handle both "1098" and "data/1098" gracefully.
+  std::string data_dir = version_info->getDataDirectory();
+  std::filesystem::path app_data_path;
 
-  bool tilesets_loaded = tileset_service_.loadMaterials(app_data_path);
-  if (!tilesets_loaded) {
-    spdlog::warn("materials.xml could not be loaded. Falling back to direct tileset/palette loading.");
-    tilesets_loaded = tileset_service_.loadTilesets(app_data_path);
-    if (!tilesets_loaded) {
-      spdlog::warn("No tilesets found. The palette will be empty.");
+  if (!data_dir.empty()) {
+    auto candidate = std::filesystem::current_path() / "data" / data_dir;
+    if (std::filesystem::exists(candidate)) {
+      app_data_path = candidate;
+    } else {
+      // Maybe data_dir already contains "data/" prefix — try stripping it
+      std::filesystem::path dir_path(data_dir);
+      if (dir_path.has_parent_path() && dir_path.parent_path().filename() == "data") {
+        auto stripped = std::filesystem::current_path() / "data" / dir_path.filename();
+        if (std::filesystem::exists(stripped)) {
+          app_data_path = stripped;
+          spdlog::warn("Data directory '{}' had 'data/' prefix, stripped to '{}'",
+                       data_dir, dir_path.filename().string());
+        }
+      }
     }
-    if (!tileset_service_.loadPalettes(app_data_path)) {
-      spdlog::warn("No palettes loaded. Ribbon palette buttons will be empty.");
+  }
+
+  if (app_data_path.empty() || !std::filesystem::exists(app_data_path)) {
+    spdlog::warn("Data directory '{}' not found. Skipping materials/tilesets/palettes loading.",
+                 data_dir);
+  } else {
+    spdlog::info("Loading materials from: {}", app_data_path.string());
+    bool tilesets_loaded = tileset_service_.loadMaterials(app_data_path);
+    if (!tilesets_loaded) {
+      spdlog::warn("materials.xml not found in '{}'. Falling back to direct loading.",
+                   app_data_path.string());
+      tilesets_loaded = tileset_service_.loadTilesets(app_data_path);
+      if (!tilesets_loaded) {
+        spdlog::warn("No tilesets found in '{}'.", app_data_path.string());
+      }
+      if (!tileset_service_.loadPalettes(app_data_path)) {
+        spdlog::warn("No palettes found in '{}'.", app_data_path.string());
+      }
     }
   }
 
@@ -676,7 +711,8 @@ Domain::Position MapLoadingService::findCameraCenter() const {
 
 bool MapLoadingService::tryLoadCreatures(
     const std::filesystem::path &map_dir,
-    const std::filesystem::path &client_path) {
+    const std::filesystem::path &client_path,
+    const std::filesystem::path &version_data_path) {
   const auto load = [this](const std::filesystem::path &path) {
     return client_data_service_->loadCreatureData(path);
   };
@@ -684,12 +720,24 @@ bool MapLoadingService::tryLoadCreatures(
   if (tryLoadResource("creatures.xml", map_dir, client_path, load)) {
     return true;
   }
-  return tryLoadResource(std::filesystem::path("creatures") / "creatures.xml",
-                         map_dir, client_path, load);
+  if (tryLoadResource(std::filesystem::path("creatures") / "creatures.xml",
+                         map_dir, client_path, load)) {
+    return true;
+  }
+  // Try version-specific data folder
+  if (!version_data_path.empty()) {
+    auto version_file = version_data_path / "creatures" / "creatures.xml";
+    if (std::filesystem::exists(version_file) && load(version_file)) {
+      spdlog::info("Loaded creatures.xml from version data folder");
+      return true;
+    }
+  }
+  return false;
 }
 
 bool MapLoadingService::tryLoadItems(const std::filesystem::path &map_dir,
-                                     const std::filesystem::path &client_path) {
+                                     const std::filesystem::path &client_path,
+                                     const std::filesystem::path &version_data_path) {
   const auto load = [this](const std::filesystem::path &path) {
     return client_data_service_->loadItemData(path);
   };
@@ -697,8 +745,19 @@ bool MapLoadingService::tryLoadItems(const std::filesystem::path &map_dir,
   if (tryLoadResource("items.xml", map_dir, client_path, load)) {
     return true;
   }
-  return tryLoadResource(std::filesystem::path("items") / "items.xml", map_dir,
-                         client_path, load);
+  if (tryLoadResource(std::filesystem::path("items") / "items.xml", map_dir,
+                         client_path, load)) {
+    return true;
+  }
+  // Try version-specific data folder
+  if (!version_data_path.empty()) {
+    auto version_file = version_data_path / "items" / "items.xml";
+    if (std::filesystem::exists(version_file) && load(version_file)) {
+      spdlog::info("Loaded items.xml from version data folder");
+      return true;
+    }
+  }
+  return false;
 }
 
 void MapLoadingService::loadWaypoints(const std::filesystem::path &otbm_path,

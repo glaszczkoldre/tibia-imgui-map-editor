@@ -35,6 +35,18 @@ bool ClientVersionRegistry::loadDefaults(const ConfigService &config) {
           setNextIndex(versions_.rbegin()->first);
       }
       spdlog::info("Loaded {} saved clients from: {}", versions_.size(), path.string());
+
+      // Auto-detect data directories for versions without one set
+      for (auto &[index, cv] : versions_) {
+        if (cv.getDataDirectory().empty()) {
+          cv.autoDetectDataDirectory();
+          if (!cv.getDataDirectory().empty()) {
+            spdlog::info("Auto-detected data directory for '{}': {}",
+                         cv.getName(), cv.getDataDirectory());
+          }
+        }
+      }
+
       return true;
     }
   }

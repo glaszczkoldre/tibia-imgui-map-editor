@@ -113,7 +113,24 @@ public:
 
   // Data directory and description
   const std::string &getDataDirectory() const { return data_directory_; }
-  void setDataDirectory(const std::string &dir) { data_directory_ = dir; }
+  void setDataDirectory(const std::string &dir) {
+    // Normalize: strip "data/" or "data\\" prefix if user typed it
+    std::filesystem::path p(dir);
+    if (p.has_parent_path() && p.parent_path().filename() == "data") {
+      data_directory_ = p.filename().string();
+    } else {
+      data_directory_ = dir;
+    }
+  }
+
+  // Auto-detect data directory: checks if data/[version]/ exists
+  void autoDetectDataDirectory() {
+    auto candidate = std::filesystem::current_path() / "data" / std::to_string(version_);
+    if (std::filesystem::exists(candidate)) {
+      data_directory_ = std::to_string(version_);
+    }
+  }
+
   const std::string &getDescription() const { return description_; }
   void setDescription(const std::string &desc) { description_ = desc; }
 
