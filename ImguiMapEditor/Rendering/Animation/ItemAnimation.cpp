@@ -1,6 +1,5 @@
 #include "ItemAnimation.h"
 #include <algorithm>
-#include <vector>
 
 namespace MapEditor {
 namespace Rendering {
@@ -60,23 +59,26 @@ int ItemAnimation::getPhase(const Domain::ItemType &item, int64_t global_ms,
         const int num_phases = static_cast<int>(item.frame_durations.size());
         if (num_phases == 0) return start_phase;
 
-        // Forward timeline: [0, 1, 2, ..., N-1]
-        // Ping-pong timeline: [0, 1, ..., N-1, N-2, ..., 1] (omit duplicate endpoints)
-        std::vector<int> timeline;
-        timeline.reserve(num_phases * 2);
-        for (int i = 0; i < num_phases; ++i)
-            timeline.push_back(i);
-        for (int i = num_phases - 2; i >= 1; --i)
-            timeline.push_back(i);
-
-        // Sum per-phase durations for the cycle
-        std::vector<int> phase_durs(num_phases);
+        // Per-phase durations (stack allocation — max 32 phases is more than enough)
+        constexpr int MAX_PHASES = 32;
+        int phase_durs[MAX_PHASES];
         int cycle_length = 0;
-        for (int i = 0; i < num_phases; ++i) {
+        for (int i = 0; i < num_phases && i < MAX_PHASES; ++i) {
             phase_durs[i] = getPhaseDuration(item, i);
             cycle_length += phase_durs[i];
         }
-        // Ping-pong cycle = forward + backward (endpoints shared)
+
+        // Ping-pong timeline: [0, 1, ..., N-1, N-2, ..., 1] (omit duplicate endpoints)
+        // Timeline size is at most 2*N-2
+        constexpr int MAX_TIMELINE = MAX_PHASES * 2 - 2;
+        int timeline[MAX_TIMELINE];
+        int timeline_len = 0;
+        for (int i = 0; i < num_phases && i < MAX_PHASES; ++i)
+            timeline[timeline_len++] = i;
+        for (int i = num_phases - 2; i >= 1; --i)
+            timeline[timeline_len++] = i;
+
+        // Backward portion cycle length
         int backward_length = 0;
         for (int i = num_phases - 2; i >= 1; --i)
             backward_length += phase_durs[i];
@@ -93,7 +95,7 @@ int ItemAnimation::getPhase(const Domain::ItemType &item, int64_t global_ms,
             (global_ms + static_cast<int64_t>(tile_offset) * 500 + start_offset) % cycle_length);
 
         // Walk the timeline to find the active phase
-        for (int i = 0; i < static_cast<int>(timeline.size()); ++i) {
+        for (int i = 0; i < timeline_len; ++i) {
             int dur = phase_durs[timeline[i]];
             if (elapsed < dur)
                 return timeline[i] % frames;

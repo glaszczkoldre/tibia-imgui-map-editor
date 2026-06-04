@@ -45,7 +45,7 @@ void CreatureRenderer::queue(const Domain::Creature *creature, float screen_x,
   }
 
   const int pattern_x = std::max<int>(1, outfit_data->pattern_x);
-  int dir = direction < pattern_x ? direction : 2 % pattern_x;
+  int dir = direction % pattern_x;
 
   // Select sprite source and animation frame
   const std::vector<uint32_t> *sprites = &outfit_data->sprite_ids;
