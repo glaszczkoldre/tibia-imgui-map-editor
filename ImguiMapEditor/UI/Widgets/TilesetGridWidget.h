@@ -16,6 +16,10 @@ struct AppSettings;
 
 namespace MapEditor {
 
+namespace Rendering {
+class Texture;
+}
+
 namespace Services {
 class ClientDataService;
 class SpriteManager;
@@ -173,10 +177,10 @@ private:
   void applyFilter();
 
   /**
-   * Get OpenGL texture ID for a brush (RawBrush or CreatureBrush).
+   * Get preview texture for a brush (RawBrush or CreatureBrush).
    * Uses PreviewUtils for consistent texture retrieval.
    */
-  void *getBrushTextureId(const Brushes::IBrush *brush) const;
+  Rendering::Texture *getBrushTexture(const Brushes::IBrush *brush) const;
 
   // Services (non-owning)
   Services::ClientDataService *clientData_ = nullptr;

@@ -7,6 +7,7 @@
 #include "Domain/ChunkedMap.h"
 #include "Services/SpriteManager.h"
 #include "Rendering/Core/Texture.h"
+#include "UI/Utils/PreviewUtils.hpp"
 #include "../../ext/fontawesome6/IconsFontAwesome6.h"
 #include <imgui.h>
 #include <cstring>
@@ -319,8 +320,9 @@ void PropertyPanelRenderer::renderContainerSection() {
         if (slot_item && sprite_manager_) {
             const Domain::ItemType* slot_type = slot_item->getType();
             if (slot_type) {
-                if (auto* tex = sprite_manager_->getItemCompositor().getCompositedItemTexture(slot_type)) {
-                    ImGui::Image((void*)(intptr_t)tex->id(), ImVec2(SLOT_SIZE, SLOT_SIZE));
+                if (auto* tex = Utils::GetItemPreview(*sprite_manager_, slot_type)) {
+                    ImGui::SetCursorScreenPos(pos);
+                    Utils::RenderPreviewCard(tex, SLOT_SIZE, false);
                     
                     // Tooltip on hover
                     if (ImGui::IsItemHovered()) {

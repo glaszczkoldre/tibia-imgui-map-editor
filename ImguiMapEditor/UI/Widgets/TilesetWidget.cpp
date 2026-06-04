@@ -266,8 +266,7 @@ void TilesetWidget::renderItemGrid() {
           if (spriteManager_) {
             if (auto *texture =
                     Utils::GetItemPreview(*spriteManager_, itemType)) {
-              clicked = Utils::RenderGridItem((void *)(intptr_t)texture->id(),
-                                              iconSize_, isSelected);
+              clicked = Utils::RenderPreviewCard(texture, iconSize_, isSelected);
               rendered = true;
             }
           }
