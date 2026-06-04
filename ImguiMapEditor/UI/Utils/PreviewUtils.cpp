@@ -47,8 +47,12 @@ CreaturePreviewResult GetCreaturePreview(Services::ClientDataService& clientData
 
 bool RenderPreviewCard(Rendering::Texture* texture, float size,
                        bool is_selected, float rounding, float padding) {
-    ImDrawList* dl = ImGui::GetWindowDrawList();
     ImVec2 min = ImGui::GetCursorScreenPos();
+    ImGui::Dummy(ImVec2(size, size));
+    bool is_hovered = ImGui::IsItemHovered();
+    bool is_clicked = ImGui::IsItemClicked();
+
+    ImDrawList* dl = ImGui::GetWindowDrawList();
     ImVec2 max(min.x + size, min.y + size);
 
     ImU32 bg_col = ImGui::GetColorU32(ImGuiCol_FrameBg);
@@ -56,8 +60,8 @@ bool RenderPreviewCard(Rendering::Texture* texture, float size,
 
     if (is_selected) {
         bg_col = ImGui::GetColorU32(ImGuiCol_Header);
-        border_col = IM_COL32(255, 200, 0, 255); // Gold
-    } else if (ImGui::IsMouseHoveringRect(min, max)) {
+        border_col = IM_COL32(255, 200, 0, 255);
+    } else if (is_hovered) {
         bg_col = ImGui::GetColorU32(ImGuiCol_HeaderHovered);
     }
 
@@ -72,8 +76,7 @@ bool RenderPreviewCard(Rendering::Texture* texture, float size,
             ImVec2(0, 0), ImVec2(1, 1), IM_COL32_WHITE, rounding);
     }
 
-    ImGui::Dummy(ImVec2(size, size));
-    return ImGui::IsItemClicked();
+    return is_clicked;
 }
 
 } // namespace MapEditor::UI::Utils

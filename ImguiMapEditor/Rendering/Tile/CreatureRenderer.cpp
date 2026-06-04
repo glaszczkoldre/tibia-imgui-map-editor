@@ -149,23 +149,14 @@ void CreatureRenderer::drawMount(const Domain::Outfit &outfit, int dir,
 
   const std::vector<uint32_t> *mount_sprites = &mount_data->sprite_ids;
   int mount_dir = dir % std::max<int>(1, mount_data->pattern_x);
-  int mount_frame = 0;
 
+  // Select walk sprites if rider is walking
   if (animation_frame > 0 && !mount_data->walk_sprite_ids.empty()) {
     mount_sprites = &mount_data->walk_sprite_ids;
-    mount_frame = animation_frame % std::max<int>(1, mount_data->walk_frames);
-  } else if (mount_data->has_frame_groups && !mount_data->idle_sprite_ids.empty()) {
-    mount_sprites = &mount_data->idle_sprite_ids;
-    mount_frame = ItemAnimation::getPhaseFromFrames(
-        static_cast<int>(mount_data->idle_frames), anim_ticks.global_ms,
-        mount_data->has_animation_data ? &mount_data->frame_durations : nullptr,
-        mount_data->total_duration);
-  } else if (mount_data->frames > 1) {
-    mount_frame = ItemAnimation::getPhaseFromFrames(
-        static_cast<int>(mount_data->frames), anim_ticks.global_ms,
-        mount_data->has_animation_data ? &mount_data->frame_durations : nullptr,
-        mount_data->total_duration);
   }
+
+  int mount_frame = selectMountFrame(mount_data, animation_frame,
+                                      anim_ticks.global_ms);
 
   int mw = std::max<int>(1, mount_data->width);
   int mh = std::max<int>(1, mount_data->height);
@@ -212,6 +203,26 @@ void CreatureRenderer::drawMount(const Domain::Outfit &outfit, int dir,
       emitter_.emit(dx, dy, size, size, *region, color.r, color.g, color.b, alpha);
     }
   }
+}
+
+int CreatureRenderer::selectMountFrame(const IO::ClientItem *mount_data,
+                                        int animation_frame, int64_t global_ms) {
+  if (animation_frame > 0 && !mount_data->walk_sprite_ids.empty()) {
+    return animation_frame % std::max<int>(1, mount_data->walk_frames);
+  }
+  if (mount_data->has_frame_groups && !mount_data->idle_sprite_ids.empty()) {
+    return ItemAnimation::getPhaseFromFrames(
+        static_cast<int>(mount_data->idle_frames), global_ms,
+        mount_data->has_animation_data ? &mount_data->frame_durations : nullptr,
+        mount_data->total_duration);
+  }
+  if (mount_data->frames > 1) {
+    return ItemAnimation::getPhaseFromFrames(
+        static_cast<int>(mount_data->frames), global_ms,
+        mount_data->has_animation_data ? &mount_data->frame_durations : nullptr,
+        mount_data->total_duration);
+  }
+  return 0;
 }
 
 void CreatureRenderer::emitPlaceholder(float screen_x, float screen_y,

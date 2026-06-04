@@ -51,8 +51,8 @@ ItemCompositor::getCompositedItemTexture(const Domain::ItemType *type) {
   for (int layer = 0; layer < layers; ++layer) {
     for (int cy = 0; cy < h; ++cy) {
       for (int cx = 0; cx < w; ++cx) {
-        size_t sprite_index =
-            (static_cast<size_t>(layer) * h + cy) * w + cx;
+        size_t sprite_index = Utils::SpriteUtils::getSpriteIndex(
+            type, cx, cy, layer, 0, 0, 0, 0);
         if (sprite_index >= type->sprite_ids.size())
           continue;
 

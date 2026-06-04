@@ -28,7 +28,6 @@ int ItemAnimation::getPhaseFromFrames(int frames, int64_t global_ms,
 int ItemAnimation::getPingPongPhase(int raw_phase, int frames) {
     if (frames <= 1) return 0;
     int cycle = frames * 2 - 2;
-    if (cycle <= 0) return 0;
     int mod = raw_phase % cycle;
     return mod >= frames ? cycle - mod : mod;
 }
@@ -39,11 +38,9 @@ int ItemAnimation::getPhase(const Domain::ItemType &item, int64_t global_ms,
     if (frames <= 1)
         return 0;
 
-    // animation_mode: 0=async (per-tile offset), 1=sync (global clock)
     bool is_async = !item.frame_durations.empty() && item.animation_mode == 0;
     int tile_offset = is_async ? (tile_x * 17 + tile_y * 31 + tile_z * 7) : 0;
 
-    // start_frame: 255=random per instance (async only), >0=fixed phase
     int start_phase = 0;
     if (item.start_frame == 255 && is_async) {
         start_phase = (tile_x * 17 + tile_y * 31 + tile_z * 7) % frames;
@@ -51,8 +48,8 @@ int ItemAnimation::getPhase(const Domain::ItemType &item, int64_t global_ms,
         start_phase = item.start_frame % frames;
     }
 
-    // Ping-pong (loop_count == -1)
     if (item.loop_count == -1) {
+        // Ping-pong: apply start_phase to raw phase BEFORE reflection
         if (item.frame_durations.empty()) {
             int tick = static_cast<int>(global_ms / 500);
             return getPingPongPhase(tick + tile_offset + start_phase, frames);
@@ -60,19 +57,22 @@ int ItemAnimation::getPhase(const Domain::ItemType &item, int64_t global_ms,
         int total = static_cast<int>(item.total_duration);
         if (total <= 0) return start_phase;
         int cycle_total = total * 2;
-        int elapsed = static_cast<int>((global_ms + static_cast<int64_t>(tile_offset) * 500) % cycle_total);
+        int raw_elapsed = static_cast<int>((global_ms + static_cast<int64_t>(tile_offset) * 500) % cycle_total);
+        // Apply start_phase offset before reflection
+        int elapsed = (raw_elapsed + start_phase * (total / std::max(1, frames))) % cycle_total;
+        // Reflect: map [total, cycle_total) back to [0, total)
         if (elapsed >= total)
-            elapsed = cycle_total - elapsed;
+            elapsed = cycle_total - 1 - elapsed;
         for (int phase = 0; phase < static_cast<int>(item.frame_durations.size()); ++phase) {
             int dur = getPhaseDuration(item, phase);
             if (elapsed < dur)
-                return (phase + start_phase) % frames;
+                return phase % frames;
             elapsed -= dur;
         }
-        return start_phase;
+        return 0;
     }
 
-    // Forward loop (loop_count == 0 or > 0)
+    // Forward loop
     if (item.frame_durations.empty()) {
         int tick = static_cast<int>(global_ms / 500);
         return (tick + tile_offset + start_phase) % frames;

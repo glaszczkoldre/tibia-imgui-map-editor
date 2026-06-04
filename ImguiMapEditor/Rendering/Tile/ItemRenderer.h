@@ -196,7 +196,7 @@ void ItemRenderer::queueAll(
   // ============================================================
   // MULTI-PASS RENDERING (OTClient Painter Algorithm)
   // Pass 1: OnBottom (walls, pillars) — forward
-  // Pass 2: Common items — reverse (OTClient rbegin→rend)
+  // Pass 2: Common items — forward (bottom-to-top, painter's algorithm)
   // OnTop items rendered after creatures in TileRenderer
   // ============================================================
 
@@ -207,15 +207,10 @@ void ItemRenderer::queueAll(
     }
   }
 
-  // PASS 2: Common items — reverse (OTClient parity)
-  // Multi-tile lying corpses excluded (drawn pre-creature in TileRenderer)
-  for (auto it = items.rbegin(); it != items.rend(); ++it) {
-    const auto &entry = *it;
+  // PASS 2: Common items — forward (painter's algorithm: draw bottom first)
+  for (const auto &entry : items) {
     if (entry.type && entry.type->is_on_bottom) continue;
     if (entry.type && entry.type->is_on_top) continue;
-    if (entry.type && entry.type->is_lying_object &&
-        (entry.type->width > 1 || entry.type->height > 1))
-      continue;
     renderItem(entry);
   }
 

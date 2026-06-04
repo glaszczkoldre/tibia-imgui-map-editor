@@ -177,6 +177,14 @@ private:
   void applyFilter();
 
   /**
+   * Render a rounded card with sprite and optional selection/pulse border.
+   * Used by both cross-tileset and single-tileset rendering paths.
+   */
+  void renderBrushCard(ImVec2 cursorPos, ImVec2 size, Rendering::Texture *tex,
+                       bool isSelected, bool isHovered,
+                       bool isPulsing = false, float pulseElapsed = 0.0f);
+
+  /**
    * Get preview texture for a brush (RawBrush or CreatureBrush).
    * Uses PreviewUtils for consistent texture retrieval.
    */

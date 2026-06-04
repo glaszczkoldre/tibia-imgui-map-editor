@@ -196,17 +196,6 @@ void TileRenderer::queueTile(const Domain::Tile &tile, int tile_x, int tile_y,
                           &accumulated_elevation, tile_has_hook_south,
                           tile_has_hook_east, check_tooltips, &tile_needs_tooltip);
 
-  // Corpse correction: draw multi-tile lying corpses before creatures
-  for (const auto &[item, type] : render_cache_) {
-    if (type && type->is_lying_object && (type->width > 1 || type->height > 1)) {
-      item_renderer_.queueWithColor(
-          type, screen_x, screen_y, size, tile_x, tile_y, tile_z, anim_ticks,
-          missing_sprites, ground_color.r, ground_color.g, ground_color.b,
-          item_alpha, &accumulated_elevation, item, 0,
-          tile_has_hook_south, tile_has_hook_east);
-    }
-  }
-
   // Creature rendering (per-tile for correct isometric depth)
   // With diagonal tile iteration, creatures must be rendered PER-TILE to
   // maintain correct isometric depth. NW tiles (drawn first) should have
