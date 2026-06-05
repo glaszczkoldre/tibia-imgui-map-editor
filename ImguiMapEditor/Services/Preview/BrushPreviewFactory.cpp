@@ -1,4 +1,5 @@
 #include "BrushPreviewFactory.h"
+#include "AutoborderBrushPreviewProvider.h"
 #include "MultiItemBrushPreviewProvider.h"
 #include "PreviewTypes.h"
 #include "WallBrushPreviewProvider.h"
@@ -74,19 +75,27 @@ BrushPreviewFactory::createProvider(const Brushes::IBrush *brush,
   };
 
   if (auto *groundBrush = dynamic_cast<const Brushes::GroundBrush *>(brush)) {
-    return makeSingleItemPreview(groundBrush->getPreviewItemId());
+    (void)groundBrush;
+    return std::make_unique<AutoborderBrushPreviewProvider>(brush, settings,
+                                                            map);
   }
 
   if (auto *wallBrush = dynamic_cast<const Brushes::WallBrush *>(brush)) {
-    return std::make_unique<WallBrushPreviewProvider>(wallBrush, settings, map);
+    (void)wallBrush;
+    return std::make_unique<AutoborderBrushPreviewProvider>(brush, settings,
+                                                            map);
   }
 
   if (auto *carpetBrush = dynamic_cast<const Brushes::CarpetBrush *>(brush)) {
-    return makeSingleItemPreview(carpetBrush->getPreviewItemId());
+    (void)carpetBrush;
+    return std::make_unique<AutoborderBrushPreviewProvider>(brush, settings,
+                                                            map);
   }
 
   if (auto *tableBrush = dynamic_cast<const Brushes::TableBrush *>(brush)) {
-    return makeSingleItemPreview(tableBrush->getPreviewItemId());
+    (void)tableBrush;
+    return std::make_unique<AutoborderBrushPreviewProvider>(brush, settings,
+                                                            map);
   }
 
   if (auto *doorBrush = dynamic_cast<const Brushes::DoorBrush *>(brush)) {

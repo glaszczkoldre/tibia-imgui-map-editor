@@ -6,6 +6,17 @@ namespace MapEditor::Brushes {
 thread_local std::mt19937 WeightedSelection::rng_;
 thread_local bool WeightedSelection::initialized_ = false;
 
+WeightedSelection::ScopedSeed::ScopedSeed(uint32_t seed)
+    : previous_rng_(rng_), previous_initialized_(initialized_) {
+    rng_.seed(seed);
+    initialized_ = true;
+}
+
+WeightedSelection::ScopedSeed::~ScopedSeed() {
+    rng_ = previous_rng_;
+    initialized_ = previous_initialized_;
+}
+
 void WeightedSelection::ensureInitialized() {
     if (!initialized_) {
         std::random_device rd;

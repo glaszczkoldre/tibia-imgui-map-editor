@@ -2,6 +2,7 @@
 #include "../../Brushes/BrushRegistry.h"
 #include "../../Domain/Tileset/Tileset.h"
 #include "../../Domain/Tileset/TilesetRegistry.h"
+#include <imgui.h>
 #include <cstdint>
 #include <functional>
 #include <set>
@@ -205,7 +206,8 @@ private:
   void renderBrushCard(ImVec2 cursorPos, ImVec2 size,
                        const Utils::ResolvedBrushPreview &preview,
                        bool isSelected, bool isHovered,
-                       bool isPulsing = false, float pulseElapsed = 0.0f);
+                       bool isPulsing = false, float pulseElapsed = 0.0f,
+                       Brushes::BrushType brushType = Brushes::BrushType::Raw);
 
   // Returns {isPulsing, pulseElapsed}. Clears stale pulse state when duration expires.
   std::pair<bool, float> computePulseState(const Brushes::IBrush *brush);

@@ -224,6 +224,8 @@ set(SERVICES_SOURCES
     Services/CreatureSpriteService.cpp
     Services/RecentLocationsService.cpp
     Services/ViewSettings.cpp
+    Services/Autoborder/AutoborderEngine.cpp
+    Services/Autoborder/TileDiff.cpp
     Services/ClientVersionValidator.cpp
     Services/SecondaryClientData.cpp
     Services/CreatureSimulator.cpp
@@ -235,6 +237,7 @@ set(SERVICES_SOURCES
     Services/Preview/PastePreviewProvider.cpp
     Services/Preview/DragPreviewProvider.cpp
     Services/Preview/BrushPreviewFactory.cpp
+    Services/Preview/AutoborderBrushPreviewProvider.cpp
     Services/Preview/CreaturePreviewProvider.cpp
     Services/Preview/DoodadBrushPreviewProvider.cpp
     Services/Preview/SpawnPreviewProvider.cpp
@@ -444,6 +447,23 @@ add_executable(BrushSmoke
     ${BRUSH_SMOKE_SOURCES}
 )
 
+add_executable(AutoborderSmoke
+    ${DOMAIN_SOURCES}
+    ${RENDERING_SOURCES}
+    ${IO_SOURCES}
+    ${SERVICES_SOURCES}
+    ${UI_SOURCES}
+    ${PLATFORM_SOURCES}
+    ${APPLICATION_SOURCES}
+    ${CONTROLLER_SOURCES}
+    ${PRESENTATION_SOURCES}
+    ${RIBBON_SOURCES}
+    ${BRUSHES_SOURCES}
+    Application.cpp
+    Tests/AutoborderSmoke.cpp
+    ${IMGUI_SOURCES}
+)
+
 function(configure_tme_target target_name)
     target_include_directories(${target_name} PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
@@ -489,8 +509,12 @@ endfunction()
 
 configure_tme_target(${PROJECT_NAME})
 configure_tme_target(BrushSmoke)
+configure_tme_target(AutoborderSmoke)
 target_compile_definitions(BrushSmoke PRIVATE
     BRUSH_SMOKE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+)
+target_compile_definitions(AutoborderSmoke PRIVATE
+    AUTOBORDER_SMOKE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
 )
 
 if(TME_ENABLE_PCH)

@@ -2,6 +2,8 @@
 #include "BrushRegistry.h"
 #include "Domain/Item.h"
 #include "Services/BrushSettingsService.h"
+#include "Services/Autoborder/AutoborderEngine.h"
+#include "Services/Autoborder/TileDiff.h"
 #include "Services/ClientDataService.h"
 #include "Services/Preview/BrushPreviewFactory.h"
 #include "Services/Preview/PreviewService.h"
@@ -1196,25 +1198,10 @@ bool BrushController::applyBrush(const Domain::Position &pos,
 
   strokeModifiers_ = modifiers;
 
-  // If in stroke mode, use optimized direct painting
+  // If another input path reaches applyBrush while a stroke is active, keep it
+  // on the same planned stroke lifecycle used by drag movement.
   if (strokeActive_) {
-    auto key = std::make_tuple(pos.x, pos.y, pos.z);
-    if (paintedPositions_.count(key) > 0) {
-      return true; // Already painted
-    }
-    paintedPositions_.insert(key);
-
-    // Capture BEFORE state for undo
-    const Domain::Tile *tile = map_->getTile(pos);
-    historyManager_->recordTileBefore(pos, tile);
-
-    if (strokeEraseMode_) {
-      if (auto *mutableTile = map_->getTile(pos)) {
-        currentBrush_->undraw(*map_, mutableTile);
-      }
-    } else {
-      paintTileDirect(pos, modifiers);
-    }
+    continueStroke(pos);
     return true;
   }
 
@@ -1269,19 +1256,25 @@ bool BrushController::eraseBrush(const Domain::Position &pos,
     return false;
   }
 
-  // Use HistoryManager for undo support
-  // Note: Selection service is nullptr since brushes don't affect selection
   historyManager_->beginOperation("Erase: " + currentBrushName_,
                                   Domain::History::ActionType::Delete, nullptr);
-  historyManager_->recordTileBefore(pos, tile);
   strokeModifiers_ = modifiers;
+  paintedPositions_.clear();
+  lastStrokePos_.reset();
 
-  // Use IBrush::undraw() for unified erasing
-  currentBrush_->undraw(*map_, tile);
+  eraseRecordedPosition(pos);
 
-  historyManager_->endOperation(map_, nullptr);
+  const bool changed = !paintedPositions_.empty();
+  if (changed) {
+    historyManager_->endOperation(map_, nullptr);
+  } else {
+    historyManager_->cancelOperation();
+  }
 
-  return true;
+  paintedPositions_.clear();
+  lastStrokePos_.reset();
+
+  return changed;
 }
 
 void BrushController::beginStroke() {
@@ -1318,6 +1311,22 @@ void BrushController::beginStroke(uint32_t modifiers, bool eraseMode) {
                 eraseMode ? "erase" : "draw");
 }
 
+DrawContext BrushController::createDrawContext(uint32_t modifiers,
+                                               bool specialAction) const {
+  DrawContext ctx;
+  ctx.variation = variation_;
+  ctx.modifiers = modifiers;
+  ctx.isDragging = strokeActive_;
+  ctx.specialAction = specialAction;
+  ctx.forcePlace = (modifiers & GLFW_MOD_ALT) != 0;
+  ctx.brushSettings = brushSettingsService_;
+  ctx.clientData = clientData_;
+  ctx.brushRegistry = registry_;
+  ctx.ownerBrushId =
+      registry_ ? registry_->getBrushId(currentBrush_) : InvalidBrushId;
+  return ctx;
+}
+
 // Paint tile using IBrush::draw()
 void BrushController::paintTileDirect(const Domain::Position &pos,
                                       uint32_t modifiers,
@@ -1333,20 +1342,8 @@ void BrushController::paintTileDirect(const Domain::Position &pos,
   if (!tile)
     return;
 
-  // Create draw context with brush settings
-  DrawContext ctx;
-  ctx.variation = variation_;
-  ctx.modifiers = modifiers;
-  ctx.isDragging = strokeActive_;
-  ctx.specialAction = specialAction;
-  ctx.forcePlace = (modifiers & GLFW_MOD_ALT) != 0;
-  ctx.brushSettings = brushSettingsService_;
-  ctx.clientData = clientData_;
-  ctx.brushRegistry = registry_;
-  ctx.ownerBrushId =
-      registry_ ? registry_->getBrushId(currentBrush_) : InvalidBrushId;
-
   // Use unified IBrush::draw()
+  const auto ctx = createDrawContext(modifiers, specialAction);
   currentBrush_->draw(*map_, tile, ctx);
 }
 
@@ -1499,6 +1496,24 @@ bool BrushController::paintRecordedPosition(const Domain::Position &pos,
     return false;
   }
 
+  Services::Autoborder::AutoborderEngine autoborderEngine;
+  Services::Autoborder::PlacementIntent intent;
+  intent.brush = currentBrush_;
+  intent.context = createDrawContext(modifiers, specialAction);
+  intent.mode = Services::Autoborder::PlacementMode::Draw;
+  intent.positions = {pos};
+  if (autoborderEngine.canPlan(intent)) {
+    auto diffs = autoborderEngine.plan(*map_, intent);
+    if (diffs.empty()) {
+      return false;
+    }
+
+    paintedPositions_.insert(key);
+    Services::Autoborder::applyTileDiffsWithHistory(*map_, *historyManager_,
+                                                    diffs);
+    return true;
+  }
+
   paintedPositions_.insert(key);
   historyManager_->recordTileBefore(pos, map_->getTile(pos));
   paintTileDirect(pos, modifiers, specialAction);
@@ -1512,6 +1527,24 @@ void BrushController::eraseRecordedPosition(const Domain::Position &pos) {
 
   auto key = std::make_tuple(pos.x, pos.y, pos.z);
   if (paintedPositions_.contains(key)) {
+    return;
+  }
+
+  Services::Autoborder::AutoborderEngine autoborderEngine;
+  Services::Autoborder::PlacementIntent intent;
+  intent.brush = currentBrush_;
+  intent.context = createDrawContext(strokeModifiers_);
+  intent.mode = Services::Autoborder::PlacementMode::Erase;
+  intent.positions = {pos};
+  if (autoborderEngine.canPlan(intent)) {
+    auto diffs = autoborderEngine.plan(*map_, intent);
+    if (diffs.empty()) {
+      return;
+    }
+
+    paintedPositions_.insert(key);
+    Services::Autoborder::applyTileDiffsWithHistory(*map_, *historyManager_,
+                                                    diffs);
     return;
   }
 
@@ -1653,12 +1686,9 @@ void BrushController::continueWallLikeStroke(const Domain::Position &pos) {
       currentBrush_->getType() == BrushType::Wall &&
       getBrushPositionsForCenter(pos).size() == 1;
 
-  std::vector<Domain::Position> newlyPainted;
   const auto paintWallPosition = [&](const Domain::Position &paintPos,
                                      bool specialAction = false) {
-    if (paintRecordedPosition(paintPos, strokeModifiers_, specialAction)) {
-      newlyPainted.push_back(paintPos);
-    }
+    paintRecordedPosition(paintPos, strokeModifiers_, specialAction);
   };
   const auto paintWallCenter = [&](const Domain::Position &center) {
     for (const auto &paintPos : getBrushPositionsForCenter(center)) {
@@ -1682,9 +1712,6 @@ void BrushController::continueWallLikeStroke(const Domain::Position &pos) {
     }
   }
 
-  if (!newlyPainted.empty() && !strokeEraseMode_) {
-    rebuildWallPositions(newlyPainted);
-  }
   lastStrokePos_ = pos;
 }
 
@@ -1734,41 +1761,6 @@ void BrushController::continueDoodadLikeStroke(const Domain::Position &pos) {
 
 void BrushController::continuePointLikeStroke(const Domain::Position &pos) {
   continueDoorLikeStroke(pos);
-}
-
-void BrushController::rebuildWallPositions(
-    const std::vector<Domain::Position> &centers) {
-  if (!map_ || !historyManager_ || centers.empty()) {
-    return;
-  }
-
-  auto *wallBrush = dynamic_cast<WallBrush *>(currentBrush_);
-  if (!wallBrush) {
-    return;
-  }
-
-  std::unordered_set<Domain::Position> rebuildPositions;
-  rebuildPositions.reserve(centers.size() * 9);
-  for (const auto &center : centers) {
-    for (int dy = -1; dy <= 1; ++dy) {
-      for (int dx = -1; dx <= 1; ++dx) {
-        rebuildPositions.emplace(center.x + dx, center.y + dy, center.z);
-      }
-    }
-  }
-
-  for (const auto &pos : rebuildPositions) {
-    if (const auto *tile = map_->getTile(pos)) {
-      historyManager_->recordTileBefore(pos, tile);
-    }
-  }
-
-  std::vector<Domain::Position> orderedPositions;
-  orderedPositions.reserve(rebuildPositions.size());
-  for (const auto &pos : rebuildPositions) {
-    orderedPositions.push_back(pos);
-  }
-  wallBrush->rebuildTiles(*map_, orderedPositions);
 }
 
 void BrushController::endStroke() {

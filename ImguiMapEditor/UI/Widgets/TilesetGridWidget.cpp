@@ -14,6 +14,7 @@
 #include <spdlog/spdlog.h>
 
 #include "../../Brushes/BrushController.h"
+#include "../../Brushes/Core/IBrush.h"
 #include "../../Brushes/Types/RawBrush.h"
 #include "../../Rendering/Core/Texture.h"
 #include "../../Services/AppSettings.h"
@@ -28,6 +29,53 @@
 namespace MapEditor::UI {
 
 using namespace Domain::Tileset;
+using Brushes::BrushType;
+
+namespace {
+
+ImU32 brushTypeColor(BrushType type) {
+  switch (type) {
+  case BrushType::Ground:
+    return IM_COL32(80, 220, 80, 255);
+  case BrushType::Wall:
+    return IM_COL32(180, 180, 220, 255);
+  case BrushType::WallDecoration:
+    return IM_COL32(100, 160, 255, 255);
+  case BrushType::Door:
+    return IM_COL32(255, 180, 60, 255);
+  case BrushType::Doodad:
+    return IM_COL32(255, 230, 50, 255);
+  case BrushType::Table:
+    return IM_COL32(200, 130, 60, 255);
+  case BrushType::Carpet:
+    return IM_COL32(200, 80, 220, 255);
+  default:
+    return 0;
+  }
+}
+
+const char *brushTypeLabel(BrushType type) {
+  switch (type) {
+  case BrushType::Ground:
+    return "Ground";
+  case BrushType::Wall:
+    return "Wall";
+  case BrushType::WallDecoration:
+    return "Wall Deco";
+  case BrushType::Door:
+    return "Door";
+  case BrushType::Doodad:
+    return "Doodad";
+  case BrushType::Table:
+    return "Table";
+  case BrushType::Carpet:
+    return "Carpet";
+  default:
+    return nullptr;
+  }
+}
+
+} // namespace
 
 TilesetGridWidget::TilesetGridWidget() = default;
 
@@ -119,7 +167,8 @@ void TilesetGridWidget::syncActiveBrushSelection() {
 void TilesetGridWidget::renderBrushCard(ImVec2 cursorPos, ImVec2 size,
                                          const Utils::ResolvedBrushPreview &preview,
                                          bool isSelected, bool isHovered,
-                                         bool isPulsing, float pulseElapsed) {
+                                         bool isPulsing, float pulseElapsed,
+                                         BrushType brushType) {
   ImDrawList *dl = ImGui::GetWindowDrawList();
   constexpr float CARD_ROUNDING = 4.0f;
   constexpr float IMG_ROUNDING = 3.0f;
@@ -128,13 +177,16 @@ void TilesetGridWidget::renderBrushCard(ImVec2 cursorPos, ImVec2 size,
 
   // Rounded card background using ImGui theme colors
   ImU32 bgCol = ImGui::GetColorU32(ImGuiCol_FrameBg);
+  ImU32 borderCol = ImGui::GetColorU32(ImGuiCol_Border);
   if (isSelected) {
     bgCol = ImGui::GetColorU32(ImGuiCol_Header);
   } else if (isHovered) {
     bgCol = ImGui::GetColorU32(ImGuiCol_HeaderHovered);
+  } else if (ImU32 typeCol = brushTypeColor(brushType); typeCol != 0) {
+    borderCol = typeCol;
   }
   dl->AddRectFilled(cursorPos, rectMax, bgCol, CARD_ROUNDING);
-  dl->AddRect(cursorPos, rectMax, ImGui::GetColorU32(ImGuiCol_Border), CARD_ROUNDING);
+  dl->AddRect(cursorPos, rectMax, borderCol, CARD_ROUNDING);
 
   // Rounded image inside card with padding
   if (preview.texture && preview.texture->isValid()) {
@@ -409,12 +461,16 @@ void TilesetGridWidget::renderBrushGrid() {
       auto [isPulsing, pulseElapsed] = computePulseState(brush);
 
       renderBrushCard(cursorPos, tileSize, preview, isSelected, isHovered,
-                      isPulsing, pulseElapsed);
+                      isPulsing, pulseElapsed, brush->getType());
 
       // Tooltip
       if (isHovered) {
         ImGui::BeginTooltip();
-        ImGui::Text("%s", brush->getName().c_str());
+        const char *label = brushTypeLabel(brush->getType());
+        if (label)
+          ImGui::Text("%s: %s", label, brush->getName().c_str());
+        else
+          ImGui::Text("%s", brush->getName().c_str());
         ImGui::TextDisabled("From: %s", bws.sourceTileset.c_str());
         ImGui::TextDisabled("Double-click to jump");
         ImGui::EndTooltip();
@@ -559,12 +615,16 @@ void TilesetGridWidget::renderBrushGrid() {
       // Render card with pulse animation support
       auto [isPulsing, pulseElapsed] = computePulseState(brush);
       renderBrushCard(cursorPos, tileSize, preview, isSelected, isHovered,
-                      isPulsing, pulseElapsed);
+                      isPulsing, pulseElapsed, brush->getType());
 
       // Tooltip
       if (isHovered) {
         ImGui::BeginTooltip();
-        ImGui::Text("%s", brush->getName().c_str());
+        const char *label = brushTypeLabel(brush->getType());
+        if (label)
+          ImGui::Text("%s: %s", label, brush->getName().c_str());
+        else
+          ImGui::Text("%s", brush->getName().c_str());
         ImGui::EndTooltip();
       }
 

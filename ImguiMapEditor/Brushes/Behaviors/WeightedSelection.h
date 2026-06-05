@@ -15,6 +15,19 @@ namespace MapEditor::Brushes {
  */
 class WeightedSelection {
 public:
+    class ScopedSeed {
+    public:
+        explicit ScopedSeed(uint32_t seed);
+        ~ScopedSeed();
+
+        ScopedSeed(const ScopedSeed&) = delete;
+        ScopedSeed& operator=(const ScopedSeed&) = delete;
+
+    private:
+        std::mt19937 previous_rng_;
+        bool previous_initialized_ = false;
+    };
+
     /**
      * Select an index from items with weights.
      * 
