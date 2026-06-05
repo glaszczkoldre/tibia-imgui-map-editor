@@ -115,7 +115,8 @@ WallAlign parseWallType(std::string_view name) {
       {"northwest diagonal", WallAlign::NorthwestDiagonal},
       {"northeast diagonal", WallAlign::NortheastDiagonal},
       {"southwest diagonal", WallAlign::SouthwestDiagonal},
-      {"southeast diagonal", WallAlign::SoutheastDiagonal}};
+      {"southeast diagonal", WallAlign::SoutheastDiagonal},
+      {"untouchable", WallAlign::Untouchable}};
   auto it = map.find(name);
   return it != map.end() ? it->second : WallAlign::Pole;
 }

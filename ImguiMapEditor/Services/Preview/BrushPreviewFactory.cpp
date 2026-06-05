@@ -1,6 +1,7 @@
 #include "BrushPreviewFactory.h"
 #include "MultiItemBrushPreviewProvider.h"
 #include "PreviewTypes.h"
+#include "WallBrushPreviewProvider.h"
 #include "Brushes/Types/CarpetBrush.h"
 #include "Brushes/Types/CreatureBrush.h"
 #include "Brushes/Types/DoodadBrush.h"
@@ -76,7 +77,7 @@ BrushPreviewFactory::createProvider(const Brushes::IBrush *brush,
   }
 
   if (auto *wallBrush = dynamic_cast<const Brushes::WallBrush *>(brush)) {
-    return makeSingleItemPreview(wallBrush->getPreviewItemId());
+    return std::make_unique<WallBrushPreviewProvider>(wallBrush, settings);
   }
 
   if (auto *carpetBrush = dynamic_cast<const Brushes::CarpetBrush *>(brush)) {

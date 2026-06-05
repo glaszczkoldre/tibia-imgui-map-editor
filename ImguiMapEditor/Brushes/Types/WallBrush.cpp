@@ -32,21 +32,6 @@ constexpr std::array<std::tuple<int, int, WallNeighbor>, 4> kWallNeighbors{{
     {0, 1, WallNeighbor::South},
 }};
 
-template <typename Predicate>
-WallAlign computeWallAlignment(const Domain::ChunkedMap &map,
-                               const Domain::Position &pos,
-                               Predicate &&hasWallGroup) {
-  WallNeighbor neighbors = WallNeighbor::None;
-  for (const auto &[dx, dy, bit] : kWallNeighbors) {
-    const auto *neighborTile = map.getTile(pos.x + dx, pos.y + dy, pos.z);
-    if (std::invoke(hasWallGroup, neighborTile)) {
-      neighbors |= bit;
-    }
-  }
-
-  return Services::Brushes::WallLookupService{}.getFullType(neighbors);
-}
-
 template <typename Fn>
 bool visitWallRedirectChain(const WallBrush &root, Fn &&fn) {
   std::vector<const WallBrush *> pending{&root};
@@ -227,7 +212,7 @@ bool WallBrush::ownsItem(const Domain::Item *item) const {
 }
 
 void WallBrush::addWallItem(WallAlign align, uint16_t itemId, uint32_t chance) {
-  wallNodes_[static_cast<size_t>(align)].addItem(itemId, chance == 0 ? 1u : chance);
+  wallNodes_[static_cast<size_t>(align)].addItem(itemId, chance);
   ownedItemIds_.insert(itemId);
   registry_.registerItemBinding(itemId, this);
   if (lookId_ == 0) {
@@ -248,9 +233,15 @@ void WallBrush::addDoorItem(WallAlign align, DoorNode door) {
 }
 
 void WallBrush::addRedirectName(const std::string &name) {
-  if (!name.empty()) {
-    redirectNames_.insert(normalizeName(name));
-  }
+  redirectNames_.insert(normalizeName(name));
+}
+
+void WallBrush::addFriendName(const std::string &name) {
+  friendNames_.insert(normalizeName(name));
+}
+
+void WallBrush::addWallHateMeItem(uint16_t itemId) {
+  wallHateMeItems_.insert(itemId);
 }
 
 uint16_t WallBrush::getPreviewItemId() const {
@@ -680,14 +671,24 @@ void WallBrush::rebuildTile(Domain::ChunkedMap &map,
     return;
   }
 
-  const auto align =
-      computeWallAlignment(map, pos, [this](const Domain::Tile *neighborTile) {
-        return tileHasWallGroup(neighborTile);
-      });
+  // Compute neighbor bitmask (same encoding as RME: N=1, W=2, E=4, S=8)
+  WallNeighbor neighbors = WallNeighbor::None;
+  for (const auto &[dx, dy, bit] : kWallNeighbors) {
+    const auto *neighborTile = map.getTile(pos.x + dx, pos.y + dy, pos.z);
+    if (tileHasWallGroup(neighborTile)) {
+      neighbors |= bit;
+    }
+  }
 
-  auto resolvedAlignment = align;
+  // Two-pass alignment: try full table first, then half table (RME parity)
+  Services::Brushes::WallLookupService lookupService;
+  const auto fullAlign = lookupService.getFullType(neighbors);
+  const auto halfAlign = lookupService.getHalfType(neighbors);
+
+  auto resolvedAlignment = fullAlign;
   uint16_t replacementId = 0;
 
+  // If the tile has a door, try to find a matching door item
   if (currentDoorType != DoorType::Undefined) {
     if (currentAlignment) {
       if (const auto door =
@@ -699,19 +700,34 @@ void WallBrush::rebuildTile(Domain::ChunkedMap &map,
 
     if (replacementId == 0) {
       if (const auto door =
-              selectDoorItem(align, currentDoorType, isOpen, isLocked)) {
+              selectDoorItem(fullAlign, currentDoorType, isOpen, isLocked)) {
         replacementId = static_cast<uint16_t>(door->getItem());
-        resolvedAlignment = align;
+        resolvedAlignment = fullAlign;
+      }
+    }
+
+    // Half table fallback for doors
+    if (replacementId == 0 && halfAlign != fullAlign) {
+      if (const auto door =
+              selectDoorItem(halfAlign, currentDoorType, isOpen, isLocked)) {
+        replacementId = static_cast<uint16_t>(door->getItem());
+        resolvedAlignment = halfAlign;
       }
     }
   }
 
+  // Wall item selection with two-pass fallback
   if (replacementId == 0) {
-    replacementId = selectWallItem(align);
-    if (replacementId == 0) {
-      replacementId = selectWallItem(WallAlign::Horizontal);
-      resolvedAlignment = WallAlign::Horizontal;
-    }
+    replacementId = selectWallItem(fullAlign);
+    resolvedAlignment = fullAlign;
+  }
+  if (replacementId == 0 && halfAlign != fullAlign) {
+    replacementId = selectWallItem(halfAlign);
+    resolvedAlignment = halfAlign;
+  }
+  if (replacementId == 0) {
+    replacementId = selectWallItem(WallAlign::Horizontal);
+    resolvedAlignment = WallAlign::Horizontal;
   }
 
   if (replacementId == 0) {
@@ -761,8 +777,18 @@ bool WallBrush::connectsTo(const IBrush *brush) const {
   }
 
   const auto otherName = normalizeName(wallBrush->getName());
-  return redirectNames_.contains(otherName) ||
-         wallBrush->redirectNames_.contains(normalizeName(getName()));
+  const auto myName = normalizeName(getName());
+  // Redirect friends (bidirectional)
+  if (redirectNames_.contains(otherName) ||
+      wallBrush->redirectNames_.contains(myName)) {
+    return true;
+  }
+  // Non-redirect friends (bidirectional)
+  if (friendNames_.contains(otherName) ||
+      wallBrush->friendNames_.contains(myName)) {
+    return true;
+  }
+  return false;
 }
 
 bool WallBrush::tileHasWallGroup(const Domain::Tile *tile) const {
@@ -772,6 +798,10 @@ bool WallBrush::tileHasWallGroup(const Domain::Tile *tile) const {
 
   for (const auto &item : tile->getItems()) {
     if (!item) {
+      continue;
+    }
+    // WallHateMe items break wall connections
+    if (wallHateMeItems_.contains(item->getServerId())) {
       continue;
     }
     if (isWallGroupItem(item->getServerId())) {

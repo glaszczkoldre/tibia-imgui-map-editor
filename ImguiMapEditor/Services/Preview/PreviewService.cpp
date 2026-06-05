@@ -54,6 +54,12 @@ void PreviewService::updateCursor(const Domain::Position& cursor) {
     }
 }
 
+void PreviewService::updateFractional(float fracX, float fracY) {
+    if (provider_) {
+        provider_->updateFractionalPosition(fracX, fracY);
+    }
+}
+
 void PreviewService::regenerate() {
     if (provider_ && provider_->needsRegeneration()) {
         provider_->regenerate();

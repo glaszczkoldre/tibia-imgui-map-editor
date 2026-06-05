@@ -258,19 +258,57 @@ void parseWallLikeBrush(const pugi::xml_node &node, const std::string &name,
         continue;
       }
 
-      DoorNode entry;
-      entry.type = parseDoorType(doorNode.attribute("type").as_string());
-      entry.alignment = align;
-      entry.items.push_back(itemId);
-      entry.isOpen = doorNode.attribute("open").as_bool(false);
-      entry.isLocked = doorNode.attribute("locked").as_bool(false);
-      brush->addDoorItem(align, std::move(entry));
+      const auto typeStr = std::string_view(doorNode.attribute("type").as_string());
+      const bool isOpen = doorNode.attribute("open").as_bool(false);
+      const bool isLocked = doorNode.attribute("locked").as_bool(false);
+      const bool hate = doorNode.attribute("hate").as_bool(false);
+
+      if (hate) {
+        brush->addWallHateMeItem(itemId);
+      }
+
+      // Expand shortcut types into individual door entries
+      auto addDoor = [&](DoorType type) {
+        DoorNode entry;
+        entry.type = type;
+        entry.alignment = align;
+        entry.items.push_back(itemId);
+        entry.isOpen = isOpen;
+        entry.isLocked = isLocked;
+        brush->addDoorItem(align, std::move(entry));
+      };
+
+      if (typeStr == "any door") {
+        addDoor(DoorType::Normal);
+        addDoor(DoorType::NormalAlt);
+        addDoor(DoorType::Locked);
+        addDoor(DoorType::Quest);
+        addDoor(DoorType::Magic);
+        addDoor(DoorType::Archway);
+      } else if (typeStr == "any window") {
+        addDoor(DoorType::Window);
+        addDoor(DoorType::HatchWindow);
+      } else if (typeStr == "any") {
+        addDoor(DoorType::Normal);
+        addDoor(DoorType::NormalAlt);
+        addDoor(DoorType::Locked);
+        addDoor(DoorType::Quest);
+        addDoor(DoorType::Magic);
+        addDoor(DoorType::Archway);
+        addDoor(DoorType::Window);
+        addDoor(DoorType::HatchWindow);
+      } else {
+        addDoor(parseDoorType(typeStr));
+      }
     }
   }
 
   for (const auto friendNode : node.children("friend")) {
+    const auto name = std::string(friendNode.attribute("name").as_string());
     if (friendNode.attribute("redirect").as_bool(false)) {
-      brush->addRedirectName(friendNode.attribute("name").as_string());
+      brush->addRedirectName(name);
+    } else {
+      brush->addFriendName(name);
     }
   }
 

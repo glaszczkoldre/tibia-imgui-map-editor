@@ -240,6 +240,7 @@ set(SERVICES_SOURCES
     Services/Preview/SpawnPreviewProvider.cpp
     Services/Preview/ZoneBrushPreviewProvider.cpp
     Services/Preview/MultiItemBrushPreviewProvider.cpp
+    Services/Preview/WallBrushPreviewProvider.cpp
     Services/Map/MapLoadingService.cpp
     Services/Map/MapSavingService.cpp
     Services/Map/MapCleanupService.cpp
@@ -425,6 +426,7 @@ set(BRUSH_SMOKE_SOURCES
 )
 
 set_target_properties(${PROJECT_NAME} PROPERTIES UNITY_BUILD ${TME_UNITY_BUILD})
+set_target_properties(${PROJECT_NAME} PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "$<TARGET_FILE_DIR:${PROJECT_NAME}>")
 
 # Include directories
 target_include_directories(${PROJECT_NAME} PRIVATE

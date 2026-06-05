@@ -86,6 +86,13 @@ public:
      * @param cursor World position of cursor
      */
     void updateCursor(const Domain::Position& cursor);
+
+    /**
+     * Update fractional position within tile for sub-tile precision.
+     * @param fracX Horizontal fraction (0..1)
+     * @param fracY Vertical fraction (0..1)
+     */
+    void updateFractional(float fracX, float fracY);
     
     /**
      * Trigger regeneration on active provider.

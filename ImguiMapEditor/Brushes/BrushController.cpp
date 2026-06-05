@@ -1434,8 +1434,41 @@ BrushController::getBrushPositionsForCenter(const Domain::Position &center) cons
   case BrushActionFamily::PointLike:
   case BrushActionFamily::DoodadLike:
     return {center};
+  case BrushActionFamily::WallLike: {
+    // Wall brushes use perimeter-only positions for larger sizes
+    // (RME parity: only the outline of the brush square gets walls)
+    auto allPositions = brushSettingsService_->getBrushPositions(center);
+    if (allPositions.size() <= 1) {
+      return allPositions;
+    }
+
+    auto allOffsets = brushSettingsService_->getBrushOffsets();
+
+    auto hasOffset = [&](int dx, int dy) {
+      for (const auto &[ox, oy] : allOffsets) {
+        if (ox == dx && oy == dy)
+          return true;
+      }
+      return false;
+    };
+
+    auto isPerimeter = [&](int dx, int dy) {
+      return !hasOffset(dx - 1, dy) || !hasOffset(dx + 1, dy) ||
+             !hasOffset(dx, dy - 1) || !hasOffset(dx, dy + 1);
+    };
+
+    std::vector<Domain::Position> perimeterPositions;
+    for (const auto &[dx, dy] : allOffsets) {
+      if (isPerimeter(dx, dy)) {
+        perimeterPositions.emplace_back(center.x + dx, center.y + dy,
+                                        center.z);
+      }
+    }
+    return perimeterPositions.empty()
+               ? std::vector<Domain::Position>{center}
+               : perimeterPositions;
+  }
   case BrushActionFamily::GroundLike:
-  case BrushActionFamily::WallLike:
     break;
   }
 

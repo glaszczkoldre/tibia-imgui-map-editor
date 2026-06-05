@@ -15,14 +15,6 @@ class IPreviewProvider;
 
 /**
  * Factory that creates preview providers based on brush type.
- *
- * Centralizes preview creation logic in one service.
- * Uses dynamic_cast to detect brush types and create appropriate providers.
- *
- * Supported brushes:
- * - RawBrush -> RawBrushPreviewProvider
- * - CreatureBrush -> (future) CreaturePreviewProvider
- * - Other types -> nullptr (no preview)
  */
 class BrushPreviewFactory {
 public:

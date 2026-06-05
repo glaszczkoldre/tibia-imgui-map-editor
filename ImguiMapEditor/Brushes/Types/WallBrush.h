@@ -29,6 +29,8 @@ public:
   void addWallItem(WallAlign align, uint16_t itemId, uint32_t chance);
   void addDoorItem(WallAlign align, DoorNode door);
   void addRedirectName(const std::string &name);
+  void addFriendName(const std::string &name);
+  void addWallHateMeItem(uint16_t itemId);
 
   uint16_t getPreviewItemId() const;
   void rebuildAround(Domain::ChunkedMap &map, const Domain::Position &center) const;
@@ -52,6 +54,10 @@ public:
   std::optional<DoorNode> findDoorForItem(uint16_t itemId) const;
   std::vector<const WallBrush *> getRedirectBrushes() const;
   BrushRegistry &getBrushRegistry() const { return registry_; }
+  bool connectsTo(const IBrush *brush) const;
+  const std::unordered_set<uint16_t> &getWallHateMeItems() const {
+    return wallHateMeItems_;
+  }
 
 protected:
   BrushRegistry &brushRegistry() const { return registry_; }
@@ -66,7 +72,6 @@ private:
   void rebuildTile(Domain::ChunkedMap &map, const Domain::Position &pos) const;
   void rebuildNeighbors(Domain::ChunkedMap &map,
                         const Domain::Position &center) const;
-  bool connectsTo(const IBrush *brush) const;
   bool tileHasWallGroup(const Domain::Tile *tile) const;
 
   BrushRegistry &registry_;
@@ -74,6 +79,8 @@ private:
   std::array<std::vector<DoorNode>, 17> doorNodes_{};
   std::unordered_set<uint16_t> ownedItemIds_;
   std::unordered_set<std::string> redirectNames_;
+  std::unordered_set<std::string> friendNames_;   // non-redirect friends
+  std::unordered_set<uint16_t> wallHateMeItems_;  // items that break wall connections
 };
 
 } // namespace MapEditor::Brushes

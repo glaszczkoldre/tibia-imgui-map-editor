@@ -50,7 +50,16 @@ public:
      * @param cursor New world position of cursor
      */
     virtual void updateCursorPosition(const Domain::Position& cursor) = 0;
-    
+
+    /**
+     * Update the fractional position within the tile (0..1 range).
+     * Used by wall brush preview for sub-tile alignment detection.
+     * Default is no-op. Override to use.
+     * @param fracX Horizontal fraction (0=left edge, 1=right edge)
+     * @param fracY Vertical fraction (0=top edge, 1=bottom edge)
+     */
+    virtual void updateFractionalPosition(float fracX, float fracY) {}
+
     /**
      * Get the preview style for rendering.
      * Default is Ghost (semi-transparent blue tint).
