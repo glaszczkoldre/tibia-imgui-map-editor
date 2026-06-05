@@ -316,6 +316,10 @@ void MapInputController::onDoubleClick(const Domain::Position &pos,
   if (!session)
     return;
 
+  if (brush_controller_ && brush_controller_->hasBrush()) {
+    return;
+  }
+
   auto *map = session->getMap();
   if (!map)
     return;

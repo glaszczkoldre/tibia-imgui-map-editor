@@ -522,6 +522,16 @@ int main() {
       contextBrushController.setBrush(groundBrush);
       inputController.setBrushController(&contextBrushController);
 
+      bool itemPropertiesOpenedWithBrush = false;
+      inputController.setOpenItemPropertiesCallback(
+          [&itemPropertiesOpenedWithBrush](MapEditor::Domain::Item *) {
+            itemPropertiesOpenedWithBrush = true;
+          });
+      inputController.onDoubleClick(contextPos, {0.0f, 0.0f},
+                                    &contextSession);
+      require(!itemPropertiesOpenedWithBrush,
+              "double click should not open item properties while brush mode is active");
+
       inputController.onRightClick(contextPos, 0, {0.0f, 0.0f}, &contextSession);
       require(!contextBrushController.hasBrush(),
               "right click should toggle out of brush mode before opening context");

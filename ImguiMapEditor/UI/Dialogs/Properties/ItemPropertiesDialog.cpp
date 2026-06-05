@@ -54,10 +54,7 @@ void ItemPropertiesDialog::renderContent() {
   // Validate type pointer — it may be null or garbage if the item
   // was created without a proper ItemType lookup
   const Domain::ItemType *item_type = current_item_->getType();
-  const bool is_container =
-      item_type &&
-      reinterpret_cast<uintptr_t>(item_type) > 0x10000 &&
-      item_type->volume > 0;
+  const bool is_container = item_type && item_type->volume > 0;
 
   if (ImGui::BeginTabBar("##ItemPropsTabs")) {
     // Properties tab
