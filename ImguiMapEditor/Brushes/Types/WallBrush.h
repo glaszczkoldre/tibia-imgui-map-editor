@@ -6,7 +6,9 @@
 #include <array>
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <string>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -34,6 +36,8 @@ public:
 
   uint16_t getPreviewItemId() const;
   void rebuildAround(Domain::ChunkedMap &map, const Domain::Position &center) const;
+  void rebuildTiles(Domain::ChunkedMap &map,
+                    std::span<const Domain::Position> positions) const;
 
   bool canApplyDoor(const Domain::Tile &tile, DoorType type, bool open,
                     bool preferLocked) const;
@@ -52,7 +56,7 @@ public:
                                               bool open,
                                               bool preferLocked) const;
   std::optional<DoorNode> findDoorForItem(uint16_t itemId) const;
-  std::vector<const WallBrush *> getRedirectBrushes() const;
+  const std::vector<const WallBrush *> &getRedirectBrushes() const;
   BrushRegistry &getBrushRegistry() const { return registry_; }
   bool connectsTo(const IBrush *brush) const;
   const std::unordered_set<uint16_t> &getWallHateMeItems() const {
@@ -77,10 +81,15 @@ private:
   BrushRegistry &registry_;
   std::array<WallNode, 17> wallNodes_{};
   std::array<std::vector<DoorNode>, 17> doorNodes_{};
+  std::unordered_map<uint16_t, WallAlign> itemAlignments_;
+  std::unordered_map<uint16_t, DoorNode> doorNodesByItemId_;
   std::unordered_set<uint16_t> ownedItemIds_;
   std::unordered_set<std::string> redirectNames_;
   std::unordered_set<std::string> friendNames_;   // non-redirect friends
   std::unordered_set<uint16_t> wallHateMeItems_;  // items that break wall connections
+  std::string normalizedName_;
+  mutable std::vector<const WallBrush *> redirectBrushesCache_;
+  mutable bool redirectBrushesCacheDirty_ = true;
 };
 
 } // namespace MapEditor::Brushes

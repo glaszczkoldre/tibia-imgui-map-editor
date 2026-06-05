@@ -1475,21 +1475,22 @@ BrushController::getBrushPositionsForCenter(const Domain::Position &center) cons
   return brushSettingsService_->getBrushPositions(center);
 }
 
-void BrushController::paintRecordedPosition(const Domain::Position &pos,
+bool BrushController::paintRecordedPosition(const Domain::Position &pos,
                                             uint32_t modifiers,
                                             bool specialAction) {
   if (!map_ || !historyManager_) {
-    return;
+    return false;
   }
 
   auto key = std::make_tuple(pos.x, pos.y, pos.z);
   if (paintedPositions_.contains(key)) {
-    return;
+    return false;
   }
 
   paintedPositions_.insert(key);
   historyManager_->recordTileBefore(pos, map_->getTile(pos));
   paintTileDirect(pos, modifiers, specialAction);
+  return true;
 }
 
 void BrushController::eraseRecordedPosition(const Domain::Position &pos) {
@@ -1640,30 +1641,38 @@ void BrushController::continueWallLikeStroke(const Domain::Position &pos) {
       currentBrush_->getType() == BrushType::Wall &&
       getBrushPositionsForCenter(pos).size() == 1;
 
-  if (!lastStrokePos_.has_value()) {
+  std::vector<Domain::Position> newlyPainted;
+  const auto paintWallPosition = [&](const Domain::Position &paintPos,
+                                     bool specialAction = false) {
+    if (paintRecordedPosition(paintPos, strokeModifiers_, specialAction)) {
+      newlyPainted.push_back(paintPos);
+    }
+  };
+  const auto paintWallCenter = [&](const Domain::Position &center) {
+    for (const auto &paintPos : getBrushPositionsForCenter(center)) {
+      paintWallPosition(paintPos);
+    }
+  };
+
+  auto linePositions = !lastStrokePos_.has_value()
+                           ? std::vector<Domain::Position>{pos}
+                           : getLinePositions(lastStrokePos_.value(), pos);
+
+  for (const auto &linePos : linePositions) {
     if (wallVariantShift) {
-      paintRecordedPosition(pos, strokeModifiers_, true);
+      paintWallPosition(linePos, true);
     } else if (strokeEraseMode_) {
-      eraseExpandedCenter(pos);
-    } else if (altPressed && !strokeEraseMode_) {
-      paintRecordedPosition(pos, strokeModifiers_);
-    } else {
-      paintExpandedCenter(pos, strokeModifiers_);
-    }
-    lastStrokePos_ = pos;
-    return;
-  }
-
-  for (const auto &linePos : getLinePositions(lastStrokePos_.value(), pos)) {
-    if (strokeEraseMode_) {
       eraseExpandedCenter(linePos);
-    } else if (altPressed) {
-      paintRecordedPosition(linePos, strokeModifiers_);
+    } else if (altPressed && !strokeEraseMode_) {
+      paintWallPosition(linePos);
     } else {
-      paintExpandedCenter(linePos, strokeModifiers_);
+      paintWallCenter(linePos);
     }
   }
 
+  if (!newlyPainted.empty() && !strokeEraseMode_) {
+    rebuildWallPositions(newlyPainted);
+  }
   lastStrokePos_ = pos;
 }
 
@@ -1715,6 +1724,41 @@ void BrushController::continuePointLikeStroke(const Domain::Position &pos) {
   continueDoorLikeStroke(pos);
 }
 
+void BrushController::rebuildWallPositions(
+    const std::vector<Domain::Position> &centers) {
+  if (!map_ || !historyManager_ || centers.empty()) {
+    return;
+  }
+
+  auto *wallBrush = dynamic_cast<WallBrush *>(currentBrush_);
+  if (!wallBrush) {
+    return;
+  }
+
+  std::unordered_set<Domain::Position> rebuildPositions;
+  rebuildPositions.reserve(centers.size() * 9);
+  for (const auto &center : centers) {
+    for (int dy = -1; dy <= 1; ++dy) {
+      for (int dx = -1; dx <= 1; ++dx) {
+        rebuildPositions.emplace(center.x + dx, center.y + dy, center.z);
+      }
+    }
+  }
+
+  for (const auto &pos : rebuildPositions) {
+    if (const auto *tile = map_->getTile(pos)) {
+      historyManager_->recordTileBefore(pos, tile);
+    }
+  }
+
+  std::vector<Domain::Position> orderedPositions;
+  orderedPositions.reserve(rebuildPositions.size());
+  for (const auto &pos : rebuildPositions) {
+    orderedPositions.push_back(pos);
+  }
+  wallBrush->rebuildTiles(*map_, orderedPositions);
+}
+
 void BrushController::endStroke() {
   if (!strokeActive_ || !historyManager_) {
     if (currentBrush_ && currentBrush_->getType() == BrushType::Ground) {
@@ -1731,17 +1775,6 @@ void BrushController::endStroke() {
   if (!paintedPositions_.empty()) {
     spdlog::debug("[BrushController] Ended stroke with {} tiles",
                   paintedPositions_.size());
-
-    const bool wallAltStroke = !strokeEraseMode_ && currentBrush_ &&
-                               currentBrush_->getType() == BrushType::Wall &&
-                               (strokeModifiers_ & GLFW_MOD_ALT) != 0;
-    if (wallAltStroke) {
-      if (auto *wallBrush = dynamic_cast<WallBrush *>(currentBrush_)) {
-        for (const auto &[x, y, z] : paintedPositions_) {
-          wallBrush->rebuildAround(*map_, Domain::Position(x, y, z));
-        }
-      }
-    }
 
     // End the history operation - captures AFTER states and pushes to history
     historyManager_->endOperation(map_, nullptr);

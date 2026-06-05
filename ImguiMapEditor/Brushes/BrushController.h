@@ -422,7 +422,7 @@ private:
   [[nodiscard]] BrushActionFamily getActionFamily() const;
   [[nodiscard]] std::vector<Domain::Position>
   getBrushPositionsForCenter(const Domain::Position &center) const;
-  void paintRecordedPosition(const Domain::Position &pos, uint32_t modifiers,
+  bool paintRecordedPosition(const Domain::Position &pos, uint32_t modifiers,
                              bool specialAction = false);
   void eraseRecordedPosition(const Domain::Position &pos);
   void paintExpandedCenter(const Domain::Position &center, uint32_t modifiers);
@@ -432,6 +432,7 @@ private:
   void continueDoorLikeStroke(const Domain::Position &pos);
   void continueDoodadLikeStroke(const Domain::Position &pos);
   void continuePointLikeStroke(const Domain::Position &pos);
+  void rebuildWallPositions(const std::vector<Domain::Position> &centers);
   void paintDoodadRecordedPosition(const Domain::Position &pos,
                                    uint32_t modifiers);
   void eraseDoodadRecordedPosition(const Domain::Position &pos,

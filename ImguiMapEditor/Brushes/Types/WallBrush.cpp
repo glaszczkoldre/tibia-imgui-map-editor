@@ -155,7 +155,8 @@ void updateConsecutiveDecorations(Domain::Tile &tile, Domain::Item *baseItem,
 } // namespace
 
 WallBrush::WallBrush(std::string name, uint32_t lookId, BrushRegistry &registry)
-    : BrushBase(std::move(name), lookId, true), registry_(registry) {}
+    : BrushBase(std::move(name), lookId, true), registry_(registry),
+      normalizedName_(normalizeName(getName())) {}
 
 void WallBrush::draw(Domain::ChunkedMap &map, Domain::Tile *tile,
                      const DrawContext &ctx) {
@@ -193,7 +194,7 @@ void WallBrush::draw(Domain::ChunkedMap &map, Domain::Tile *tile,
     tile->addItem(Types::createTypedItem(ctx, itemId));
   }
   const bool deferNeighborRebuild =
-      ctx.forcePlace && ctx.isDragging && !ctx.specialAction;
+      ctx.isDragging && !ctx.specialAction;
   if (!deferNeighborRebuild) {
     rebuildAround(map, tile->getPosition());
   }
@@ -213,6 +214,7 @@ bool WallBrush::ownsItem(const Domain::Item *item) const {
 
 void WallBrush::addWallItem(WallAlign align, uint16_t itemId, uint32_t chance) {
   wallNodes_[static_cast<size_t>(align)].addItem(itemId, chance);
+  itemAlignments_[itemId] = align;
   ownedItemIds_.insert(itemId);
   registry_.registerItemBinding(itemId, this);
   if (lookId_ == 0) {
@@ -221,19 +223,22 @@ void WallBrush::addWallItem(WallAlign align, uint16_t itemId, uint32_t chance) {
 }
 
 void WallBrush::addDoorItem(WallAlign align, DoorNode door) {
+  door.alignment = align;
   for (const auto itemId : door.items) {
+    doorNodesByItemId_.try_emplace(itemId, door);
+    itemAlignments_[itemId] = align;
     ownedItemIds_.insert(itemId);
     registry_.registerItemBinding(itemId, this);
     if (lookId_ == 0) {
       lookId_ = itemId;
     }
   }
-  door.alignment = align;
   doorNodes_[static_cast<size_t>(align)].push_back(std::move(door));
 }
 
 void WallBrush::addRedirectName(const std::string &name) {
   redirectNames_.insert(normalizeName(name));
+  redirectBrushesCacheDirty_ = true;
 }
 
 void WallBrush::addFriendName(const std::string &name) {
@@ -271,6 +276,13 @@ void WallBrush::rebuildAround(Domain::ChunkedMap &map,
     for (int dx = -1; dx <= 1; ++dx) {
       rebuildTile(map, {center.x + dx, center.y + dy, center.z});
     }
+  }
+}
+
+void WallBrush::rebuildTiles(
+    Domain::ChunkedMap &map, std::span<const Domain::Position> positions) const {
+  for (const auto &pos : positions) {
+    rebuildTile(map, pos);
   }
 }
 
@@ -462,24 +474,25 @@ bool WallBrush::switchDoor(Domain::ChunkedMap &map, Domain::Tile &tile,
 std::optional<DoorNode> WallBrush::findDoorForItem(uint16_t itemId) const {
   std::optional<DoorNode> foundDoor;
   visitWallRedirectChain(*this, [&](const WallBrush &brush) {
-    for (const auto &doors : brush.doorNodes_) {
-      for (const auto &door : doors) {
-        if (std::find(door.items.begin(), door.items.end(), itemId) !=
-            door.items.end()) {
-          foundDoor = door;
-          return true;
-        }
-      }
+    if (const auto it = brush.doorNodesByItemId_.find(itemId);
+        it != brush.doorNodesByItemId_.end()) {
+      foundDoor = it->second;
+      return true;
     }
     return false;
   });
   return foundDoor;
 }
 
-std::vector<const WallBrush *> WallBrush::getRedirectBrushes() const {
-  std::vector<const WallBrush *> result;
+const std::vector<const WallBrush *> &WallBrush::getRedirectBrushes() const {
+  if (!redirectBrushesCacheDirty_) {
+    return redirectBrushesCache_;
+  }
+
+  redirectBrushesCache_.clear();
+  redirectBrushesCacheDirty_ = false;
   if (redirectNames_.empty()) {
-    return result;
+    return redirectBrushesCache_;
   }
 
   for (auto *brush : registry_.getAllBrushes()) {
@@ -489,10 +502,10 @@ std::vector<const WallBrush *> WallBrush::getRedirectBrushes() const {
     }
 
     if (redirectNames_.contains(normalizeName(wallBrush->getName()))) {
-      result.push_back(wallBrush);
+      redirectBrushesCache_.push_back(wallBrush);
     }
   }
-  return result;
+  return redirectBrushesCache_;
 }
 
 bool WallBrush::isWallGroupItem(uint16_t itemId) const {
@@ -509,22 +522,10 @@ bool WallBrush::isWallGroupItem(uint16_t itemId) const {
 std::optional<WallAlign> WallBrush::findAlignmentForItem(uint16_t itemId) const {
   std::optional<WallAlign> alignment;
   visitWallRedirectChain(*this, [&](const WallBrush &brush) {
-    for (size_t index = 0; index < brush.wallNodes_.size(); ++index) {
-      const auto align = static_cast<WallAlign>(index);
-      for (const auto &[candidateId, _] : brush.wallNodes_[index].getItems()) {
-        if (candidateId == itemId) {
-          alignment = align;
-          return true;
-        }
-      }
-
-      for (const auto &door : brush.doorNodes_[index]) {
-        if (std::find(door.items.begin(), door.items.end(), itemId) !=
-            door.items.end()) {
-          alignment = align;
-          return true;
-        }
-      }
+    if (const auto it = brush.itemAlignments_.find(itemId);
+        it != brush.itemAlignments_.end()) {
+      alignment = it->second;
+      return true;
     }
     return false;
   });
@@ -681,7 +682,7 @@ void WallBrush::rebuildTile(Domain::ChunkedMap &map,
   }
 
   // Two-pass alignment: try full table first, then half table (RME parity)
-  Services::Brushes::WallLookupService lookupService;
+  static const Services::Brushes::WallLookupService lookupService;
   const auto fullAlign = lookupService.getFullType(neighbors);
   const auto halfAlign = lookupService.getHalfType(neighbors);
 
@@ -776,16 +777,14 @@ bool WallBrush::connectsTo(const IBrush *brush) const {
     return false;
   }
 
-  const auto otherName = normalizeName(wallBrush->getName());
-  const auto myName = normalizeName(getName());
   // Redirect friends (bidirectional)
-  if (redirectNames_.contains(otherName) ||
-      wallBrush->redirectNames_.contains(myName)) {
+  if (redirectNames_.contains(wallBrush->normalizedName_) ||
+      wallBrush->redirectNames_.contains(normalizedName_)) {
     return true;
   }
   // Non-redirect friends (bidirectional)
-  if (friendNames_.contains(otherName) ||
-      wallBrush->friendNames_.contains(myName)) {
+  if (friendNames_.contains(wallBrush->normalizedName_) ||
+      wallBrush->friendNames_.contains(normalizedName_)) {
     return true;
   }
   return false;
