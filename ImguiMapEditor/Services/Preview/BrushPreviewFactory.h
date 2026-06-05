@@ -5,6 +5,10 @@ namespace MapEditor::Brushes {
 class IBrush;
 }
 
+namespace MapEditor::Domain {
+class ChunkedMap;
+}
+
 namespace MapEditor::Services {
 class BrushSettingsService;
 }
@@ -26,7 +30,8 @@ public:
    */
   std::unique_ptr<IPreviewProvider>
   createProvider(const ::MapEditor::Brushes::IBrush *brush,
-                 BrushSettingsService *settings);
+                 BrushSettingsService *settings,
+                 const ::MapEditor::Domain::ChunkedMap *map = nullptr);
 };
 
 } // namespace MapEditor::Services::Preview

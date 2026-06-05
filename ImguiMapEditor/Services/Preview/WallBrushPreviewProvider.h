@@ -5,6 +5,9 @@ namespace MapEditor {
 namespace Brushes {
 class WallBrush;
 }
+namespace Domain {
+class ChunkedMap;
+}
 namespace Services {
 class BrushSettingsService;
 }
@@ -20,7 +23,8 @@ namespace MapEditor::Services::Preview {
 class WallBrushPreviewProvider : public IPreviewProvider {
 public:
   WallBrushPreviewProvider(const Brushes::WallBrush *wallBrush,
-                           BrushSettingsService *brushSettings);
+                           BrushSettingsService *brushSettings,
+                           const Domain::ChunkedMap *map = nullptr);
 
   bool isActive() const override { return wallBrush_ != nullptr; }
   Domain::Position getAnchorPosition() const override { return anchor_; }
@@ -38,6 +42,7 @@ private:
 
   const Brushes::WallBrush *wallBrush_ = nullptr;
   BrushSettingsService *brushSettings_ = nullptr;
+  const Domain::ChunkedMap *map_ = nullptr;
 
   Domain::Position anchor_{0, 0, 0};
   mutable std::vector<PreviewTileData> tiles_;

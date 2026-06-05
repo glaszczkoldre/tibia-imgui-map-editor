@@ -29,7 +29,8 @@ namespace MapEditor::Services::Preview {
 
 std::unique_ptr<IPreviewProvider>
 BrushPreviewFactory::createProvider(const Brushes::IBrush *brush,
-                                    BrushSettingsService *settings) {
+                                    BrushSettingsService *settings,
+                                    const Domain::ChunkedMap *map) {
   if (!brush) {
     return nullptr;
   }
@@ -77,7 +78,7 @@ BrushPreviewFactory::createProvider(const Brushes::IBrush *brush,
   }
 
   if (auto *wallBrush = dynamic_cast<const Brushes::WallBrush *>(brush)) {
-    return std::make_unique<WallBrushPreviewProvider>(wallBrush, settings);
+    return std::make_unique<WallBrushPreviewProvider>(wallBrush, settings, map);
   }
 
   if (auto *carpetBrush = dynamic_cast<const Brushes::CarpetBrush *>(brush)) {

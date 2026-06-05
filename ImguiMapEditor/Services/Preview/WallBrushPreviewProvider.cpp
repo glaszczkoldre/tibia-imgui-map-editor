@@ -1,6 +1,7 @@
 #include "WallBrushPreviewProvider.h"
 
 #include "Brushes/Types/WallBrush.h"
+#include "Domain/ChunkedMap.h"
 #include "Services/BrushSettingsService.h"
 
 namespace MapEditor::Services::Preview {
@@ -23,8 +24,9 @@ bool isPerimeterOffset(std::span<const std::pair<int, int>> offsets, int x,
 } // namespace
 
 WallBrushPreviewProvider::WallBrushPreviewProvider(
-    const Brushes::WallBrush *wallBrush, BrushSettingsService *brushSettings)
-    : wallBrush_(wallBrush), brushSettings_(brushSettings) {
+    const Brushes::WallBrush *wallBrush, BrushSettingsService *brushSettings,
+    const Domain::ChunkedMap *map)
+    : wallBrush_(wallBrush), brushSettings_(brushSettings), map_(map) {
   buildPreview();
 }
 
@@ -83,6 +85,14 @@ void WallBrushPreviewProvider::buildPreview() const {
 
   auto offsets = getPerimeterOffsets();
   cachedOffsets_ = offsets;
+
+  if (wallBrush_ && map_) {
+    tiles_ = wallBrush_->buildPreviewTiles(*map_, anchor_, offsets);
+    for (const auto &tile : tiles_) {
+      bounds_.expand(tile.relativePosition);
+    }
+    return;
+  }
 
   uint16_t itemId = wallBrush_ ? wallBrush_->getPreviewItemId() : 0;
 

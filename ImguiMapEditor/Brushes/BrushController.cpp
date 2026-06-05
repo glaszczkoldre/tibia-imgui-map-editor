@@ -297,26 +297,38 @@ void BrushController::setBrush(IBrush *brush) {
   currentBrush_->setVariation(static_cast<size_t>(variation_));
   lastBrushSelection_ = captureCurrentSelection();
 
-  // Use factory to create preview provider
-  if (previewService_ && previewFactory_) {
-    auto provider =
-        previewFactory_->createProvider(brush, brushSettingsService_);
-    if (provider) {
-      previewService_->setProvider(std::move(provider));
-    } else {
-      previewService_->clearPreview();
-    }
-  } else if (previewService_) {
-    // No factory available - clear preview
-    previewService_->clearPreview();
-    spdlog::warn("[BrushController] No preview factory available");
-  }
+  refreshPreviewProvider();
 
   if (onBrushActivated_) {
     onBrushActivated_();
   }
 
   spdlog::info("[BrushController] Set brush: {}", brush->getName());
+}
+
+void BrushController::refreshPreviewProvider() {
+  if (!previewService_) {
+    return;
+  }
+
+  if (!currentBrush_) {
+    previewService_->clearPreview();
+    return;
+  }
+
+  if (!previewFactory_) {
+    previewService_->clearPreview();
+    spdlog::warn("[BrushController] No preview factory available");
+    return;
+  }
+
+  auto provider =
+      previewFactory_->createProvider(currentBrush_, brushSettingsService_, map_);
+  if (provider) {
+    previewService_->setProvider(std::move(provider));
+  } else {
+    previewService_->clearPreview();
+  }
 }
 
 void BrushController::clearBrush() {

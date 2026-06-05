@@ -155,6 +155,12 @@ public:
   }
 
   /**
+   * Rebuild the active preview provider after session-scoped dependencies
+   * change, without reactivating the current brush.
+   */
+  void refreshPreviewProvider();
+
+  /**
    * Check if a brush is currently selected.
    */
   bool hasBrush() const { return currentBrush_ != nullptr; }

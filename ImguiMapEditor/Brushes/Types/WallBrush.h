@@ -3,6 +3,7 @@
 #include "Brushes/Core/BrushBase.h"
 #include "Brushes/Data/WallNode.h"
 #include "Brushes/Enums/BrushEnums.h"
+#include "Services/Preview/PreviewTypes.h"
 #include <array>
 #include <cstdint>
 #include <optional>
@@ -38,6 +39,10 @@ public:
   void rebuildAround(Domain::ChunkedMap &map, const Domain::Position &center) const;
   void rebuildTiles(Domain::ChunkedMap &map,
                     std::span<const Domain::Position> positions) const;
+  std::vector<Services::Preview::PreviewTileData>
+  buildPreviewTiles(const Domain::ChunkedMap &map,
+                    const Domain::Position &anchor,
+                    std::span<const std::pair<int, int>> offsets) const;
 
   bool canApplyDoor(const Domain::Tile &tile, DoorType type, bool open,
                     bool preferLocked) const;
