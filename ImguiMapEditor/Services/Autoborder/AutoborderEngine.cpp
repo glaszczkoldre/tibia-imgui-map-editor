@@ -112,36 +112,6 @@ void cloneTiles(Domain::ChunkedMap &scratchMap,
   }
 }
 
-void applyDirectIntent(Domain::ChunkedMap &scratchMap,
-                       const Domain::ChunkedMap &sourceMap,
-                       const PlacementIntent &intent) {
-  auto *brush = const_cast<MapEditor::Brushes::IBrush *>(intent.brush);
-  if (!brush) {
-    return;
-  }
-
-  for (const auto &pos : intent.positions) {
-    if (intent.mode == PlacementMode::Draw) {
-      if (!brush->canDraw(sourceMap, pos)) {
-        continue;
-      }
-
-      auto *tile = scratchMap.getOrCreateTile(pos);
-      if (!tile) {
-        continue;
-      }
-
-      brush->draw(scratchMap, tile, intent.context);
-      continue;
-    }
-
-    auto *tile = getOrCloneTile(scratchMap, sourceMap, pos);
-    if (tile) {
-      brush->undraw(scratchMap, tile);
-    }
-  }
-}
-
 class RadiusOneResolver : public AutoborderResolver {
 public:
   [[nodiscard]] std::vector<Domain::Position>
@@ -157,11 +127,51 @@ public:
            nullptr;
   }
 
+  void applyIntent(Domain::ChunkedMap &scratchMap,
+                   const Domain::ChunkedMap &sourceMap,
+                   const PlacementIntent &intent) const override {
+    const auto *wallBrush =
+        dynamic_cast<const MapEditor::Brushes::WallBrush *>(intent.brush);
+    if (!wallBrush) {
+      return;
+    }
+
+    if (intent.mode == PlacementMode::ResolveOnly) {
+      return;
+    }
+
+    for (const auto &pos : intent.positions) {
+      if (intent.mode == PlacementMode::Draw) {
+        if (!wallBrush->canDraw(sourceMap, pos)) {
+          continue;
+        }
+
+        if (auto *tile = scratchMap.getOrCreateTile(pos)) {
+          wallBrush->placeWallTile(*tile, intent.context);
+        }
+        continue;
+      }
+
+      if (auto *tile = getOrCloneTile(scratchMap, sourceMap, pos)) {
+        wallBrush->eraseFromTile(*tile);
+      }
+    }
+  }
+
   void resolve(Domain::ChunkedMap &scratchMap, const PlacementIntent &intent,
                const std::vector<Domain::Position> &affected) const override {
     const auto *wallBrush =
         dynamic_cast<const MapEditor::Brushes::WallBrush *>(intent.brush);
     if (!wallBrush) {
+      return;
+    }
+    const bool skipsLiveWallResolve =
+        intent.context.isDragging &&
+        intent.brush->getType() == MapEditor::Brushes::BrushType::Wall;
+    const bool skipsVariantResolve =
+        intent.mode == PlacementMode::Draw && intent.context.specialAction;
+    if (intent.mode != PlacementMode::ResolveOnly &&
+        (skipsVariantResolve || skipsLiveWallResolve)) {
       return;
     }
     wallBrush->rebuildTiles(scratchMap, affected);
@@ -173,6 +183,37 @@ public:
   [[nodiscard]] bool canResolve(const PlacementIntent &intent) const override {
     return dynamic_cast<const MapEditor::Brushes::GroundBrush *>(intent.brush) !=
            nullptr;
+  }
+
+  void applyIntent(Domain::ChunkedMap &scratchMap,
+                   const Domain::ChunkedMap &sourceMap,
+                   const PlacementIntent &intent) const override {
+    const auto *groundBrush =
+        dynamic_cast<const MapEditor::Brushes::GroundBrush *>(intent.brush);
+    if (!groundBrush) {
+      return;
+    }
+
+    if (intent.mode == PlacementMode::ResolveOnly) {
+      return;
+    }
+
+    for (const auto &pos : intent.positions) {
+      if (intent.mode == PlacementMode::Draw) {
+        if (!groundBrush->canDraw(sourceMap, pos)) {
+          continue;
+        }
+
+        if (auto *tile = scratchMap.getOrCreateTile(pos)) {
+          groundBrush->placeGroundTile(*tile, intent.context);
+        }
+        continue;
+      }
+
+      if (auto *tile = getOrCloneTile(scratchMap, sourceMap, pos)) {
+        groundBrush->eraseFromTile(*tile);
+      }
+    }
   }
 
   void resolve(Domain::ChunkedMap &scratchMap, const PlacementIntent &intent,
@@ -195,6 +236,37 @@ public:
            nullptr;
   }
 
+  void applyIntent(Domain::ChunkedMap &scratchMap,
+                   const Domain::ChunkedMap &sourceMap,
+                   const PlacementIntent &intent) const override {
+    const auto *carpetBrush =
+        dynamic_cast<const MapEditor::Brushes::CarpetBrush *>(intent.brush);
+    if (!carpetBrush) {
+      return;
+    }
+
+    if (intent.mode == PlacementMode::ResolveOnly) {
+      return;
+    }
+
+    for (const auto &pos : intent.positions) {
+      if (intent.mode == PlacementMode::Draw) {
+        if (!carpetBrush->canDraw(sourceMap, pos)) {
+          continue;
+        }
+
+        if (auto *tile = scratchMap.getOrCreateTile(pos)) {
+          carpetBrush->placeCenterTile(*tile, intent.context);
+        }
+        continue;
+      }
+
+      if (auto *tile = getOrCloneTile(scratchMap, sourceMap, pos)) {
+        carpetBrush->eraseFromTile(*tile);
+      }
+    }
+  }
+
   void resolve(Domain::ChunkedMap &scratchMap, const PlacementIntent &intent,
                const std::vector<Domain::Position> &) const override {
     const auto *carpetBrush =
@@ -213,6 +285,37 @@ public:
   [[nodiscard]] bool canResolve(const PlacementIntent &intent) const override {
     return dynamic_cast<const MapEditor::Brushes::TableBrush *>(intent.brush) !=
            nullptr;
+  }
+
+  void applyIntent(Domain::ChunkedMap &scratchMap,
+                   const Domain::ChunkedMap &sourceMap,
+                   const PlacementIntent &intent) const override {
+    const auto *tableBrush =
+        dynamic_cast<const MapEditor::Brushes::TableBrush *>(intent.brush);
+    if (!tableBrush) {
+      return;
+    }
+
+    if (intent.mode == PlacementMode::ResolveOnly) {
+      return;
+    }
+
+    for (const auto &pos : intent.positions) {
+      if (intent.mode == PlacementMode::Draw) {
+        if (!tableBrush->canDraw(sourceMap, pos)) {
+          continue;
+        }
+
+        if (auto *tile = scratchMap.getOrCreateTile(pos)) {
+          tableBrush->placeAloneTile(*tile, intent.context);
+        }
+        continue;
+      }
+
+      if (auto *tile = getOrCloneTile(scratchMap, sourceMap, pos)) {
+        tableBrush->eraseFromTile(*tile);
+      }
+    }
   }
 
   void resolve(Domain::ChunkedMap &scratchMap, const PlacementIntent &intent,
@@ -267,7 +370,7 @@ TileDiffList AutoborderEngine::plan(const Domain::ChunkedMap &map,
   cloneTiles(scratchMap, map, readPositions);
   MapEditor::Brushes::WeightedSelection::ScopedSeed scopedSeed(
       deterministicSeed(intent));
-  applyDirectIntent(scratchMap, map, intent);
+  resolver->applyIntent(scratchMap, map, intent);
   resolver->resolve(scratchMap, intent, affected);
 
   TileDiffList diffs;

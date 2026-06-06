@@ -94,7 +94,7 @@ void AutoborderBrushPreviewProvider::buildPreview() const {
   Autoborder::PlacementIntent intent;
   intent.brush = brush_;
   intent.mode = Autoborder::PlacementMode::Draw;
-  intent.context.isDragging = true;
+  intent.context.isDragging = false;
   intent.context.forcePlace = false;
   intent.positions = getPlacementPositions();
 

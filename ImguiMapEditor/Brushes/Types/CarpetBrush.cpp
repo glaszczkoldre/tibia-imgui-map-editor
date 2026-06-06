@@ -50,11 +50,7 @@ void CarpetBrush::draw(Domain::ChunkedMap &map, Domain::Tile *tile,
     return;
   }
 
-  tile->removeItemsIf([this](const Domain::Item *item) { return ownsItem(item); });
-  const auto centerId = selectItem(EdgeType::Center);
-  if (centerId != 0) {
-    tile->addItem(Types::createTypedItem(ctx, centerId));
-  }
+  placeCenterTile(*tile, ctx);
   rebuildAround(map, tile->getPosition());
 }
 
@@ -62,7 +58,7 @@ void CarpetBrush::undraw(Domain::ChunkedMap &map, Domain::Tile *tile) {
   if (!tile) {
     return;
   }
-  tile->removeItemsIf([this](const Domain::Item *item) { return ownsItem(item); });
+  eraseFromTile(*tile);
   rebuildAround(map, tile->getPosition());
 }
 
@@ -84,6 +80,19 @@ void CarpetBrush::addAlignedItem(EdgeType align, uint16_t itemId,
 uint16_t CarpetBrush::getPreviewItemId() const {
   const auto center = selectItem(EdgeType::Center);
   return center != 0 ? center : lookId_;
+}
+
+void CarpetBrush::placeCenterTile(Domain::Tile &tile,
+                                  const DrawContext &ctx) const {
+  eraseFromTile(tile);
+  const auto centerId = selectItem(EdgeType::Center);
+  if (centerId != 0) {
+    tile.addItem(Types::createTypedItem(ctx, centerId));
+  }
+}
+
+void CarpetBrush::eraseFromTile(Domain::Tile &tile) const {
+  tile.removeItemsIf([this](const Domain::Item *item) { return ownsItem(item); });
 }
 
 void CarpetBrush::rebuildAround(Domain::ChunkedMap &map,

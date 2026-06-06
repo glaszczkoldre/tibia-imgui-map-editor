@@ -393,6 +393,7 @@ private:
   // Simple flag for stroke tracking (HistoryManager handles actual undo)
   bool strokeActive_ = false;
   bool strokeEraseMode_ = false;
+  bool strokeNeedsAutoborderFinalize_ = false;
   int variation_ = 0;
   uint32_t strokeModifiers_ = 0;
 
@@ -428,9 +429,11 @@ private:
   [[nodiscard]] BrushActionFamily getActionFamily() const;
   [[nodiscard]] std::vector<Domain::Position>
   getBrushPositionsForCenter(const Domain::Position &center) const;
+  [[nodiscard]] std::vector<Domain::Position> getPaintedStrokePositions() const;
   bool paintRecordedPosition(const Domain::Position &pos, uint32_t modifiers,
                              bool specialAction = false);
   void eraseRecordedPosition(const Domain::Position &pos);
+  void finalizeAutoborderStroke();
   void paintExpandedCenter(const Domain::Position &center, uint32_t modifiers);
   void eraseExpandedCenter(const Domain::Position &center);
   void continueGroundLikeStroke(const Domain::Position &pos);

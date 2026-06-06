@@ -225,6 +225,7 @@ set(SERVICES_SOURCES
     Services/RecentLocationsService.cpp
     Services/ViewSettings.cpp
     Services/Autoborder/AutoborderEngine.cpp
+    Services/Autoborder/PlannedMutation.cpp
     Services/Autoborder/TileDiff.cpp
     Services/ClientVersionValidator.cpp
     Services/SecondaryClientData.cpp

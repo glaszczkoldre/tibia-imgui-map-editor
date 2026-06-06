@@ -49,12 +49,8 @@ void TableBrush::draw(Domain::ChunkedMap &map, Domain::Tile *tile,
   if (!tile) {
     return;
   }
-  tile->removeItemsIf([this](const Domain::Item *item) { return ownsItem(item); });
 
-  const auto itemId = selectItem(TableAlign::Alone);
-  if (itemId != 0) {
-    tile->addItem(Types::createTypedItem(ctx, itemId));
-  }
+  placeAloneTile(*tile, ctx);
   rebuildAround(map, tile->getPosition());
 }
 
@@ -62,7 +58,7 @@ void TableBrush::undraw(Domain::ChunkedMap &map, Domain::Tile *tile) {
   if (!tile) {
     return;
   }
-  tile->removeItemsIf([this](const Domain::Item *item) { return ownsItem(item); });
+  eraseFromTile(*tile);
   rebuildAround(map, tile->getPosition());
 }
 
@@ -84,6 +80,20 @@ void TableBrush::addAlignedItem(TableAlign align, uint16_t itemId,
 uint16_t TableBrush::getPreviewItemId() const {
   const auto horizontal = selectItem(TableAlign::Horizontal);
   return horizontal != 0 ? horizontal : lookId_;
+}
+
+void TableBrush::placeAloneTile(Domain::Tile &tile,
+                                const DrawContext &ctx) const {
+  eraseFromTile(tile);
+
+  const auto itemId = selectItem(TableAlign::Alone);
+  if (itemId != 0) {
+    tile.addItem(Types::createTypedItem(ctx, itemId));
+  }
+}
+
+void TableBrush::eraseFromTile(Domain::Tile &tile) const {
+  tile.removeItemsIf([this](const Domain::Item *item) { return ownsItem(item); });
 }
 
 void TableBrush::rebuildAround(Domain::ChunkedMap &map,

@@ -55,6 +55,8 @@ public:
   uint16_t getPreviewItemId() const;
   void rebuildAround(Domain::ChunkedMap &map, const Domain::Position &center) const;
   void rebuildTile(Domain::ChunkedMap &map, const Domain::Position &pos) const;
+  bool placeGroundTile(Domain::Tile &tile, const DrawContext &ctx) const;
+  void eraseFromTile(Domain::Tile &tile) const;
   static void resetAltReplaceState();
 
 private:

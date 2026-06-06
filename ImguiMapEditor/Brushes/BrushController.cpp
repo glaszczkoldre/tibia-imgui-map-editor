@@ -3,7 +3,7 @@
 #include "Domain/Item.h"
 #include "Services/BrushSettingsService.h"
 #include "Services/Autoborder/AutoborderEngine.h"
-#include "Services/Autoborder/TileDiff.h"
+#include "Services/Autoborder/PlannedMutation.h"
 #include "Services/ClientDataService.h"
 #include "Services/Preview/BrushPreviewFactory.h"
 #include "Services/Preview/PreviewService.h"
@@ -1304,6 +1304,7 @@ void BrushController::beginStroke(uint32_t modifiers, bool eraseMode) {
   // Set stroke active flag (HistoryManager handles actual undo)
   strokeActive_ = true;
   strokeEraseMode_ = eraseMode;
+  strokeNeedsAutoborderFinalize_ = false;
   strokeModifiers_ = modifiers;
   paintedPositions_.clear();
   lastStrokePos_.reset();
@@ -1484,6 +1485,17 @@ BrushController::getBrushPositionsForCenter(const Domain::Position &center) cons
   return brushSettingsService_->getBrushPositions(center);
 }
 
+std::vector<Domain::Position> BrushController::getPaintedStrokePositions() const {
+  std::vector<Domain::Position> positions;
+  positions.reserve(paintedPositions_.size());
+  for (const auto &key : paintedPositions_) {
+    positions.emplace_back(std::get<0>(key), std::get<1>(key),
+                           static_cast<int16_t>(std::get<2>(key)));
+  }
+  std::sort(positions.begin(), positions.end());
+  return positions;
+}
+
 bool BrushController::paintRecordedPosition(const Domain::Position &pos,
                                             uint32_t modifiers,
                                             bool specialAction) {
@@ -1502,15 +1514,17 @@ bool BrushController::paintRecordedPosition(const Domain::Position &pos,
   intent.context = createDrawContext(modifiers, specialAction);
   intent.mode = Services::Autoborder::PlacementMode::Draw;
   intent.positions = {pos};
-  if (autoborderEngine.canPlan(intent)) {
-    auto diffs = autoborderEngine.plan(*map_, intent);
-    if (diffs.empty()) {
+  const auto plannedResult = Services::Autoborder::applyPlannedIntentWithHistory(
+      autoborderEngine, *map_, *historyManager_, intent);
+  if (plannedResult != Services::Autoborder::PlannedMutationResult::Unsupported) {
+    if (plannedResult != Services::Autoborder::PlannedMutationResult::Applied) {
       return false;
     }
-
     paintedPositions_.insert(key);
-    Services::Autoborder::applyTileDiffsWithHistory(*map_, *historyManager_,
-                                                    diffs);
+    if (strokeActive_ && currentBrush_ &&
+        currentBrush_->getType() == BrushType::Wall && !specialAction) {
+      strokeNeedsAutoborderFinalize_ = true;
+    }
     return true;
   }
 
@@ -1536,15 +1550,17 @@ void BrushController::eraseRecordedPosition(const Domain::Position &pos) {
   intent.context = createDrawContext(strokeModifiers_);
   intent.mode = Services::Autoborder::PlacementMode::Erase;
   intent.positions = {pos};
-  if (autoborderEngine.canPlan(intent)) {
-    auto diffs = autoborderEngine.plan(*map_, intent);
-    if (diffs.empty()) {
+  const auto plannedResult = Services::Autoborder::applyPlannedIntentWithHistory(
+      autoborderEngine, *map_, *historyManager_, intent);
+  if (plannedResult != Services::Autoborder::PlannedMutationResult::Unsupported) {
+    if (plannedResult != Services::Autoborder::PlannedMutationResult::Applied) {
       return;
     }
-
     paintedPositions_.insert(key);
-    Services::Autoborder::applyTileDiffsWithHistory(*map_, *historyManager_,
-                                                    diffs);
+    if (strokeActive_ && currentBrush_ &&
+        currentBrush_->getType() == BrushType::Wall) {
+      strokeNeedsAutoborderFinalize_ = true;
+    }
     return;
   }
 
@@ -1556,6 +1572,27 @@ void BrushController::eraseRecordedPosition(const Domain::Position &pos) {
   paintedPositions_.insert(key);
   historyManager_->recordTileBefore(pos, tile);
   currentBrush_->undraw(*map_, tile);
+}
+
+void BrushController::finalizeAutoborderStroke() {
+  if (!strokeNeedsAutoborderFinalize_ || !map_ || !historyManager_ ||
+      !currentBrush_) {
+    return;
+  }
+
+  auto positions = getPaintedStrokePositions();
+  if (positions.empty()) {
+    return;
+  }
+
+  Services::Autoborder::AutoborderEngine autoborderEngine;
+  Services::Autoborder::PlacementIntent intent;
+  intent.brush = currentBrush_;
+  intent.context = createDrawContext(strokeModifiers_);
+  intent.mode = Services::Autoborder::PlacementMode::ResolveOnly;
+  intent.positions = std::move(positions);
+  Services::Autoborder::applyPlannedIntentWithHistory(
+      autoborderEngine, *map_, *historyManager_, intent);
 }
 
 void BrushController::paintDoodadRecordedPosition(const Domain::Position &pos,
@@ -1770,6 +1807,7 @@ void BrushController::endStroke() {
     }
     strokeActive_ = false;
     strokeEraseMode_ = false;
+    strokeNeedsAutoborderFinalize_ = false;
     paintedPositions_.clear();
     lastStrokePos_.reset();
     strokeModifiers_ = 0;
@@ -1777,6 +1815,7 @@ void BrushController::endStroke() {
   }
 
   if (!paintedPositions_.empty()) {
+    finalizeAutoborderStroke();
     spdlog::debug("[BrushController] Ended stroke with {} tiles",
                   paintedPositions_.size());
 
@@ -1793,6 +1832,7 @@ void BrushController::endStroke() {
 
   strokeActive_ = false;
   strokeEraseMode_ = false;
+  strokeNeedsAutoborderFinalize_ = false;
   paintedPositions_.clear();
   lastStrokePos_.reset();
   strokeModifiers_ = 0;

@@ -26,6 +26,8 @@ public:
   void addAlignedItem(EdgeType align, uint16_t itemId, uint32_t chance);
   uint16_t getPreviewItemId() const;
   void rebuildAround(Domain::ChunkedMap &map, const Domain::Position &center) const;
+  void placeCenterTile(Domain::Tile &tile, const DrawContext &ctx) const;
+  void eraseFromTile(Domain::Tile &tile) const;
 
 private:
   uint16_t selectItem(EdgeType align) const;

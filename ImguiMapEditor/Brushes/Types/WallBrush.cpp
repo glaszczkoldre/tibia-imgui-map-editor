@@ -164,8 +164,28 @@ void WallBrush::draw(Domain::ChunkedMap &map, Domain::Tile *tile,
     return;
   }
 
+  const auto placement = placeWallTile(*tile, ctx);
+  if (!placement.changed) {
+    return;
+  }
+
+  if (placement.requiresRebuild) {
+    rebuildAround(map, tile->getPosition());
+  }
+}
+
+void WallBrush::undraw(Domain::ChunkedMap &map, Domain::Tile *tile) {
+  if (!tile) {
+    return;
+  }
+  eraseFromTile(*tile);
+  rebuildAround(map, tile->getPosition());
+}
+
+WallBrush::DirectPlacementResult
+WallBrush::placeWallTile(Domain::Tile &tile, const DrawContext &ctx) const {
   if (ctx.specialAction) {
-    for (const auto &item : tile->getItems()) {
+    for (const auto &item : tile.getItems()) {
       if (!item) {
         continue;
       }
@@ -177,35 +197,29 @@ void WallBrush::draw(Domain::ChunkedMap &map, Domain::Tile *tile,
 
       const auto replacementId = findNextWallVariant(item->getServerId());
       if (!replacementId.has_value()) {
-        return;
+        return {};
       }
 
       Types::updateItemVisuals(*item, registry_, *replacementId,
                                ctx.ownerBrushId != InvalidBrushId
                                    ? ctx.ownerBrushId
                                    : item->getOwnerBrushId());
-      tile->markDirty();
-      return;
+      tile.markDirty();
+      return {.changed = true, .requiresRebuild = false};
     }
   }
 
-  tile->removeItemsIf([this](const Domain::Item *item) { return ownsItem(item); });
+  tile.removeItemsIf([this](const Domain::Item *item) { return ownsItem(item); });
   if (const auto itemId = selectWallItem(WallAlign::Horizontal); itemId != 0) {
-    tile->addItem(Types::createTypedItem(ctx, itemId));
+    tile.addItem(Types::createTypedItem(ctx, itemId));
   }
   const bool deferNeighborRebuild =
       ctx.isDragging && !ctx.specialAction;
-  if (!deferNeighborRebuild) {
-    rebuildAround(map, tile->getPosition());
-  }
+  return {.changed = true, .requiresRebuild = !deferNeighborRebuild};
 }
 
-void WallBrush::undraw(Domain::ChunkedMap &map, Domain::Tile *tile) {
-  if (!tile) {
-    return;
-  }
-  tile->removeItemsIf([this](const Domain::Item *item) { return ownsItem(item); });
-  rebuildAround(map, tile->getPosition());
+void WallBrush::eraseFromTile(Domain::Tile &tile) const {
+  tile.removeItemsIf([this](const Domain::Item *item) { return ownsItem(item); });
 }
 
 bool WallBrush::ownsItem(const Domain::Item *item) const {

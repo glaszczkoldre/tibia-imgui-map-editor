@@ -119,22 +119,13 @@ void GroundBrush::resetAltReplaceState() { resetAltGroundReplaceState(); }
 
 void GroundBrush::draw(Domain::ChunkedMap &map, Domain::Tile *tile,
                        const DrawContext &ctx) {
-  if (!tile || groundItems_.empty()) {
+  if (!tile) {
     return;
   }
 
-  if (shouldSkipAltGroundPlacement(registry_, *tile, ctx)) {
+  if (!placeGroundTile(*tile, ctx)) {
     return;
   }
-
-  const uint16_t itemId = selectWeightedItem(groundItems_);
-  if (itemId == 0) {
-    return;
-  }
-
-  auto groundItem = Types::createTypedItem(ctx, itemId);
-  tile->setGround(std::move(groundItem));
-  tile->setGroundBrushId(ctx.ownerBrushId);
 
   rebuildAround(map, tile->getPosition());
 
@@ -148,16 +139,7 @@ void GroundBrush::undraw(Domain::ChunkedMap &map, Domain::Tile *tile) {
     return;
   }
 
-  if (const auto *ground = tile->getGround(); ground && ownsItem(ground)) {
-    tile->removeGround();
-  }
-  tile->setGroundBrushId(InvalidBrushId);
-
-  tile->removeItemsIf([this](const Domain::Item *item) {
-    return item && isBorderItem(item->getServerId());
-  });
-  tile->setOptionalBorder(false);
-
+  eraseFromTile(*tile);
   rebuildAround(map, tile->getPosition());
 }
 
@@ -243,6 +225,39 @@ void GroundBrush::setOptionalBorder(BorderBlock border, bool soloOptional) {
 
 uint16_t GroundBrush::getPreviewItemId() const {
   return groundItems_.empty() ? 0 : groundItems_.front().first;
+}
+
+bool GroundBrush::placeGroundTile(Domain::Tile &tile,
+                                  const DrawContext &ctx) const {
+  if (groundItems_.empty()) {
+    return false;
+  }
+
+  if (shouldSkipAltGroundPlacement(registry_, tile, ctx)) {
+    return false;
+  }
+
+  const uint16_t itemId = selectWeightedItem(groundItems_);
+  if (itemId == 0) {
+    return false;
+  }
+
+  auto groundItem = Types::createTypedItem(ctx, itemId);
+  tile.setGround(std::move(groundItem));
+  tile.setGroundBrushId(ctx.ownerBrushId);
+  return true;
+}
+
+void GroundBrush::eraseFromTile(Domain::Tile &tile) const {
+  if (const auto *ground = tile.getGround(); ground && ownsItem(ground)) {
+    tile.removeGround();
+  }
+  tile.setGroundBrushId(InvalidBrushId);
+
+  tile.removeItemsIf([this](const Domain::Item *item) {
+    return item && isBorderItem(item->getServerId());
+  });
+  tile.setOptionalBorder(false);
 }
 
 void GroundBrush::rebuildAround(Domain::ChunkedMap &map,

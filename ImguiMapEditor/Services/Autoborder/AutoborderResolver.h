@@ -19,6 +19,10 @@ public:
   [[nodiscard]] virtual std::vector<Domain::Position>
   expandAffectedPositions(const PlacementIntent &intent) const = 0;
 
+  virtual void applyIntent(Domain::ChunkedMap &scratchMap,
+                           const Domain::ChunkedMap &sourceMap,
+                           const PlacementIntent &intent) const = 0;
+
   virtual void resolve(Domain::ChunkedMap &scratchMap,
                        const PlacementIntent &intent,
                        const std::vector<Domain::Position> &affected) const = 0;

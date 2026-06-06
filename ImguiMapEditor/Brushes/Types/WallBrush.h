@@ -19,6 +19,11 @@ class BrushRegistry;
 
 class WallBrush : public BrushBase {
 public:
+  struct DirectPlacementResult {
+    bool changed = false;
+    bool requiresRebuild = false;
+  };
+
   WallBrush(std::string name, uint32_t lookId, BrushRegistry &registry);
 
   BrushType getType() const override { return BrushType::Wall; }
@@ -39,6 +44,9 @@ public:
   void rebuildAround(Domain::ChunkedMap &map, const Domain::Position &center) const;
   void rebuildTiles(Domain::ChunkedMap &map,
                     std::span<const Domain::Position> positions) const;
+  DirectPlacementResult placeWallTile(Domain::Tile &tile,
+                                      const DrawContext &ctx) const;
+  void eraseFromTile(Domain::Tile &tile) const;
   std::vector<Services::Preview::PreviewTileData>
   buildPreviewTiles(const Domain::ChunkedMap &map,
                     const Domain::Position &anchor,
