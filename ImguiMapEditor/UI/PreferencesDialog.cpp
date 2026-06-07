@@ -7,6 +7,7 @@
 #include "IO/HotkeyJsonReader.h"
 #include "Presentation/NotificationHelper.h"
 #include "Services/AppSettings.h"
+#include "Services/BrushSettingsService.h"
 #include "Services/HotkeyRegistry.h"
 #include "Services/OtbmSettings.h"
 #include "Services/SecondaryClientData.h"
@@ -178,6 +179,47 @@ void PreferencesDialog::renderEditorTab() {
           AVAILABLE_THEMES, [this](const ThemeInfo& ti) { return ti.type == *theme_ptr_; });
       if (it != std::end(AVAILABLE_THEMES)) {
         ImGui::TextUnformatted(it->description);
+      }
+    }
+
+    ImGui::Spacing();
+  }
+
+  if (ImGui::CollapsingHeader(ICON_FA_PAINTBRUSH " Brushes",
+                              ImGuiTreeNodeFlags_DefaultOpen)) {
+    ImGui::Spacing();
+
+    if (!brush_settings_) {
+      ImGui::TextDisabled("Brush settings are unavailable.");
+    } else {
+      bool doodadEraseMatchingOnly =
+          brush_settings_->getDoodadEraseMatchingOnly();
+      if (ImGui::Checkbox("Doodad brush only erases matching items",
+                          &doodadEraseMatchingOnly)) {
+        brush_settings_->setDoodadEraseMatchingOnly(
+            doodadEraseMatchingOnly);
+        if (on_apply_settings_) {
+          on_apply_settings_();
+        }
+      }
+      if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip(
+            "Limit doodad erase operations to the currently selected doodad "
+            "brush. When disabled, erase any doodad-owned item.");
+      }
+
+      bool eraserLeaveUnique = brush_settings_->getEraserLeaveUniqueItems();
+      if (ImGui::Checkbox("Eraser leaves unique items",
+                          &eraserLeaveUnique)) {
+        brush_settings_->setEraserLeaveUniqueItems(eraserLeaveUnique);
+        if (on_apply_settings_) {
+          on_apply_settings_();
+        }
+      }
+      if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip(
+            "Preserve complex stacked doodad items such as containers with "
+            "contents and items carrying action or unique ids.");
       }
     }
 

@@ -7,7 +7,6 @@
 #include "../Enums/BrushEnums.h"
 #include <array>
 #include <cstdint>
-#include <random>
 #include <string>
 #include <vector>
 
@@ -123,7 +122,5 @@ private:
 
   std::vector<SpecificCaseBlock> specificCases_;
 
-  // Random number generator for weighted selection
-  mutable std::mt19937 rng_{std::random_device{}()};
 };
 } // namespace MapEditor::Brushes

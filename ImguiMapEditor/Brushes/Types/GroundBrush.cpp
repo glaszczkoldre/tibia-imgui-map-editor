@@ -157,14 +157,27 @@ void GroundBrush::addGroundItem(uint16_t itemId, uint32_t chance) {
 }
 
 void GroundBrush::addFriend(const std::string &name) {
-  friendNames_.insert(normalizeName(name));
+  if (!name.empty()) {
+    friendNames_.insert(normalizeName(name));
+  }
+  hateFriends_ = false;
 }
 
 void GroundBrush::addEnemy(const std::string &name) {
-  enemyNames_.insert(normalizeName(name));
+  if (!name.empty()) {
+    friendNames_.insert(normalizeName(name));
+  }
+  hateFriends_ = true;
+}
+
+void GroundBrush::clearFriends() {
+  friendNames_.clear();
+  hateFriends_ = false;
 }
 
 void GroundBrush::addBorderRule(BorderRule rule) {
+  registry_.registerBorderBlockMetadata(rule.block);
+
   const auto registerOwnedItem = [this](uint32_t itemId) {
     if (itemId == 0 || itemId > std::numeric_limits<uint16_t>::max()) {
       return;
@@ -193,8 +206,80 @@ void GroundBrush::addBorderRule(BorderRule rule) {
   borderRules_.push_back(std::move(rule));
 }
 
+void GroundBrush::clearBorderRules() {
+  auto collectBorderRuleItemIds = [](const BorderRule &rule,
+                                     std::unordered_set<uint16_t> &itemIds) {
+    const auto collectItemId = [&itemIds](uint32_t itemId) {
+      if (itemId == 0 || itemId > std::numeric_limits<uint16_t>::max()) {
+        return;
+      }
+      itemIds.insert(static_cast<uint16_t>(itemId));
+    };
+
+    for (size_t i = 0; i < BorderBlock::kEdgeTypeCount; ++i) {
+      const auto edge = static_cast<EdgeType>(i);
+      if (!rule.block.hasItemsFor(edge)) {
+        continue;
+      }
+      for (const auto &[itemId, _] : rule.block.getItems(edge)) {
+        collectItemId(itemId);
+      }
+    }
+
+    for (const auto &specificCase : rule.block.getSpecificCases()) {
+      collectItemId(specificCase.getToReplaceId());
+      collectItemId(specificCase.getWithId());
+    }
+  };
+
+  std::unordered_set<uint16_t> clearedItemIds;
+  for (const auto &rule : borderRules_) {
+    collectBorderRuleItemIds(rule, clearedItemIds);
+  }
+
+  borderRules_.clear();
+
+  for (const auto itemId : clearedItemIds) {
+    const bool isGroundItem = std::ranges::any_of(
+        groundItems_, [itemId](const auto &entry) { return entry.first == itemId; });
+    const bool isOptionalItem =
+        optionalBorder_ &&
+        ([this, itemId] {
+          for (size_t i = 0; i < BorderBlock::kEdgeTypeCount; ++i) {
+            const auto edge = static_cast<EdgeType>(i);
+            if (!optionalBorder_->hasItemsFor(edge)) {
+              continue;
+            }
+            for (const auto &[optionalItemId, _] :
+                 optionalBorder_->getItems(edge)) {
+              if (optionalItemId == itemId) {
+                return true;
+              }
+            }
+          }
+
+          for (const auto &specificCase : optionalBorder_->getSpecificCases()) {
+            if (specificCase.getToReplaceId() == itemId ||
+                specificCase.getWithId() == itemId) {
+              return true;
+            }
+          }
+
+          return false;
+        })();
+    if (isGroundItem || isOptionalItem) {
+      continue;
+    }
+
+    ownedItemIds_.erase(itemId);
+    registry_.unregisterItemBinding(itemId, this);
+  }
+}
+
 void GroundBrush::setOptionalBorder(BorderBlock border, bool soloOptional) {
   soloOptionalBorder_ = soloOptional;
+  registry_.registerBorderBlockMetadata(border);
+
   const auto registerOwnedItem = [this](uint32_t itemId) {
     if (itemId == 0 || itemId > std::numeric_limits<uint16_t>::max()) {
       return;
@@ -242,7 +327,13 @@ bool GroundBrush::placeGroundTile(Domain::Tile &tile,
     return false;
   }
 
-  auto groundItem = Types::createTypedItem(ctx, itemId);
+  uint16_t placementItemId = itemId;
+  if (const auto *metadata = registry_.getBorderItemMetadata(itemId);
+      metadata && metadata->groundEquivalent != 0) {
+    placementItemId = metadata->groundEquivalent;
+  }
+
+  auto groundItem = Types::createTypedItem(ctx, placementItemId);
   tile.setGround(std::move(groundItem));
   tile.setGroundBrushId(ctx.ownerBrushId);
   return true;
@@ -272,16 +363,39 @@ void GroundBrush::rebuildAround(Domain::ChunkedMap &map,
 void GroundBrush::rebuildTile(Domain::ChunkedMap &map,
                               const Domain::Position &pos) const {
   auto *tile = map.getTile(pos);
+  bool createdTile = false;
   if (!tile || !tile->hasGround()) {
-    return;
+    bool canBuildOuterZilch = false;
+    for (const auto &[dx, dy, _] : kNeighborOffsets) {
+      const auto *neighborTile = map.getTile(pos.x + dx, pos.y + dy, pos.z);
+      const auto *neighborBrush =
+          neighborTile ? resolveGroundBrush(registry_, *neighborTile) : nullptr;
+      if (neighborBrush && neighborBrush->hasOuterZilchBorderRule()) {
+        canBuildOuterZilch = true;
+        break;
+      }
+    }
+
+    if (!canBuildOuterZilch) {
+      return;
+    }
+
+    if (!tile) {
+      tile = map.getOrCreateTile(pos);
+      createdTile = tile != nullptr;
+    }
+
+    if (!tile) {
+      return;
+    }
   }
 
   auto *brush = const_cast<GroundBrush *>(resolveGroundBrush(registry_, *tile));
-  if (!brush) {
-    return;
-  }
+  (brush ? brush : const_cast<GroundBrush *>(this))->updateBorderItems(map, *tile);
 
-  brush->updateBorderItems(map, *tile);
+  if (createdTile && tile->isEmpty()) {
+    map.removeTile(pos);
+  }
 }
 
 const GroundBrush::BorderRule *GroundBrush::findRuleFor(
@@ -316,13 +430,15 @@ bool GroundBrush::connectsTo(const GroundBrush *other) const {
   }
 
   const auto otherName = normalizeName(other->getName());
-  if (enemyNames_.contains("all") || enemyNames_.contains(otherName)) {
-    return false;
-  }
-  if (friendNames_.contains("all") || friendNames_.contains(otherName)) {
-    return true;
-  }
-  return other->friendNames_.contains("all") || other->friendNames_.contains(normalizeName(getName()));
+  const bool listed =
+      friendNames_.contains("all") || friendNames_.contains(otherName);
+  return listed ? !hateFriends_ : hateFriends_;
+}
+
+bool GroundBrush::hasOuterZilchBorderRule() const {
+  return std::ranges::any_of(borderRules_, [](const BorderRule &rule) {
+    return rule.outer && rule.targetNone;
+  });
 }
 
 bool GroundBrush::isFriendName(const std::string &name) const {
@@ -424,6 +540,16 @@ void GroundBrush::updateBorderItems(Domain::ChunkedMap &map,
                                  const GroundBrush *neighborBrush)
       -> std::optional<ResolvedBorderRule> {
     if (!centerBrush) {
+      if (neighborBrush && hasZilchBorderRule(neighborBrush, true)) {
+        if (const auto *rule = findRule(neighborBrush, true, nullptr)) {
+          return ResolvedBorderRule{
+              .block = &rule->block,
+              .ownerBrush = neighborBrush,
+              .zOrder = neighborBrush->getZOrder(),
+          };
+        }
+      }
+
       return std::nullopt;
     }
 
@@ -443,29 +569,35 @@ void GroundBrush::updateBorderItems(Domain::ChunkedMap &map,
       return std::nullopt;
     }
 
-    const auto *lowerBrush = centerBrush;
-    const auto *higherBrush = neighborBrush;
-    if (centerBrush->getZOrder() > neighborBrush->getZOrder()) {
-      lowerBrush = neighborBrush;
-      higherBrush = centerBrush;
+    if (centerBrush->getZOrder() < neighborBrush->getZOrder() &&
+        hasBorderRule(neighborBrush, true)) {
+      if (const auto *centerInnerRule =
+              findRule(centerBrush, false, neighborBrush)) {
+        return ResolvedBorderRule{
+            .block = &centerInnerRule->block,
+            .ownerBrush = centerBrush,
+            .zOrder = centerBrush->getZOrder(),
+        };
+      }
+
+      if (const auto *neighborOuterRule =
+              findRule(neighborBrush, true, centerBrush)) {
+        return ResolvedBorderRule{
+            .block = &neighborOuterRule->block,
+            .ownerBrush = neighborBrush,
+            .zOrder = neighborBrush->getZOrder(),
+        };
+      }
+
+      return std::nullopt;
     }
 
-    const auto *lowerRule = findRule(lowerBrush, true, higherBrush);
-    const auto *higherRule = findRule(higherBrush, false, lowerBrush);
-
-    if (lowerRule) {
+    if (const auto *centerInnerRule =
+            findRule(centerBrush, false, neighborBrush)) {
       return ResolvedBorderRule{
-          .block = &lowerRule->block,
-          .ownerBrush = lowerBrush,
-          .zOrder = lowerBrush->getZOrder(),
-      };
-    }
-
-    if (higherRule) {
-      return ResolvedBorderRule{
-          .block = &higherRule->block,
-          .ownerBrush = higherBrush,
-          .zOrder = higherBrush->getZOrder(),
+          .block = &centerInnerRule->block,
+          .ownerBrush = centerBrush,
+          .zOrder = centerBrush->getZOrder(),
       };
     }
 
@@ -554,7 +686,7 @@ void GroundBrush::updateBorderItems(Domain::ChunkedMap &map,
   };
 
   const auto pos = tile.getPosition();
-  const auto *borderBrush = this;
+  const auto *borderBrush = resolveGroundBrush(registry_, tile);
   std::array<NeighborState, kNeighborOffsets.size()> neighbors {};
   for (size_t index = 0; index < kNeighborOffsets.size(); ++index) {
     const auto &[dx, dy, _] = kNeighborOffsets[index];
@@ -590,7 +722,8 @@ void GroundBrush::updateBorderItems(Domain::ChunkedMap &map,
 
     if (other) {
       bool onlyOptionalBorder = false;
-      if ((other->connectsTo(borderBrush) || borderBrush->connectsTo(other)) &&
+      if (borderBrush &&
+          (other->connectsTo(borderBrush) || borderBrush->connectsTo(other)) &&
           other->hasOptionalBorderRule()) {
         onlyOptionalBorder = true;
       }

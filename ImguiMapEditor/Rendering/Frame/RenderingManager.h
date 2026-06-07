@@ -2,9 +2,13 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <span>
 #include <unordered_map>
 
 namespace MapEditor {
+namespace Domain {
+struct Position;
+}
 namespace Rendering {
 class MapRenderer;
 class RenderState;
@@ -69,6 +73,8 @@ public:
                                  Services::ClientDataService *client_data);
   void destroyRenderState(SessionID session_id);
   RenderState *getRenderState(SessionID session_id) const;
+  void invalidateTiles(SessionID session_id,
+                       std::span<const Domain::Position> positions);
 
 private:
   std::unique_ptr<MapRenderer> renderer_;

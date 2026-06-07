@@ -1,5 +1,6 @@
 #include "BrushSettingsService.h"
 
+#include "Services/ConfigService.h"
 #include <cstdlib>
 #include <fstream>
 #include <ranges>
@@ -9,6 +10,16 @@
 namespace MapEditor::Services {
 
 namespace {
+
+constexpr const char *kPreviewBorderKey = "brush.preview_border";
+constexpr const char *kLockDoorsKey = "brush.lock_doors";
+constexpr const char *kDoodadEraseMatchingOnlyKey =
+    "brush.doodad_erase_matching_only";
+constexpr const char *kEraserLeaveUniqueItemsKey =
+    "brush.eraser_leave_unique_items";
+constexpr const char *kAutoCreateSpawnKey = "brush.auto_create_spawn";
+constexpr const char *kDefaultSpawnRadiusKey = "brush.default_spawn_radius";
+constexpr const char *kDefaultSpawnTimeKey = "brush.default_spawn_time";
 
 [[nodiscard]] int snapToDiscreteBrushSize(int size) {
   size = std::clamp(size, BrushSettingsService::MIN_SIZE,
@@ -484,6 +495,31 @@ bool BrushSettingsService::loadCustomBrushes(const std::string &filepath) {
     spdlog::error("Failed to load custom brushes: {}", e.what());
     return false;
   }
+}
+
+void BrushSettingsService::loadFromConfig(const ConfigService &config) {
+  previewBorder_ = config.get<bool>(kPreviewBorderKey, true);
+  lockDoors_ = config.get<bool>(kLockDoorsKey, false);
+  doodadEraseMatchingOnly_ =
+      config.get<bool>(kDoodadEraseMatchingOnlyKey, false);
+  eraserLeaveUniqueItems_ =
+      config.get<bool>(kEraserLeaveUniqueItemsKey, true);
+  autoCreateSpawn_ = config.get<bool>(kAutoCreateSpawnKey, false);
+  defaultSpawnRadius_ =
+      std::clamp(config.get<int>(kDefaultSpawnRadiusKey, 3), 1, 10);
+  defaultSpawnTime_ =
+      std::clamp(config.get<int>(kDefaultSpawnTimeKey, 60), 1, 86400);
+  notifyChanged();
+}
+
+void BrushSettingsService::saveToConfig(ConfigService &config) const {
+  config.set(kPreviewBorderKey, previewBorder_);
+  config.set(kLockDoorsKey, lockDoors_);
+  config.set(kDoodadEraseMatchingOnlyKey, doodadEraseMatchingOnly_);
+  config.set(kEraserLeaveUniqueItemsKey, eraserLeaveUniqueItems_);
+  config.set(kAutoCreateSpawnKey, autoCreateSpawn_);
+  config.set(kDefaultSpawnRadiusKey, defaultSpawnRadius_);
+  config.set(kDefaultSpawnTimeKey, defaultSpawnTime_);
 }
 
 // ========================

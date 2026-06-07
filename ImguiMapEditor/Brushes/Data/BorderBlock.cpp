@@ -4,7 +4,8 @@
  */
 
 #include "BorderBlock.h"
-#include <numeric>
+
+#include "Brushes/Behaviors/WeightedSelection.h"
 
 namespace MapEditor::Brushes {
 
@@ -38,19 +39,14 @@ uint32_t BorderBlock::getRandomItem(EdgeType edge) const {
     return edgeItems.front().first;
   }
 
-  // Weighted random selection
-  std::uniform_int_distribution<uint32_t> dist(1, totalWeight);
-  uint32_t roll = dist(rng_);
-
-  uint32_t cumulative = 0;
-  for (const auto &[itemId, chance] : edgeItems) {
-    cumulative += chance;
-    if (roll <= cumulative) {
-      return itemId;
-    }
+  std::vector<uint32_t> weights;
+  weights.reserve(edgeItems.size());
+  for (const auto &[_, chance] : edgeItems) {
+    weights.push_back(chance);
   }
 
-  return edgeItems.back().first;
+  const auto selected = WeightedSelection::select(weights);
+  return selected ? edgeItems[*selected].first : edgeItems.front().first;
 }
 
 uint32_t BorderBlock::getPrimaryItem(EdgeType edge) const {

@@ -103,7 +103,8 @@ BrushPreviewFactory::createProvider(const Brushes::IBrush *brush,
   }
 
   if (auto *doodadBrush = dynamic_cast<const Brushes::DoodadBrush *>(brush)) {
-    return std::make_unique<DoodadBrushPreviewProvider>(*doodadBrush, settings);
+    return std::make_unique<DoodadBrushPreviewProvider>(*doodadBrush, settings,
+                                                        map);
   }
 
   if (auto *optionalBrush =

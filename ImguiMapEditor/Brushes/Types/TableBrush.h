@@ -26,12 +26,12 @@ public:
   void addAlignedItem(TableAlign align, uint16_t itemId, uint32_t chance);
   uint16_t getPreviewItemId() const;
   void rebuildAround(Domain::ChunkedMap &map, const Domain::Position &center) const;
+  void rebuildTile(Domain::ChunkedMap &map, const Domain::Position &pos) const;
   void placeAloneTile(Domain::Tile &tile, const DrawContext &ctx) const;
   void eraseFromTile(Domain::Tile &tile) const;
 
 private:
   uint16_t selectItem(TableAlign align) const;
-  void rebuildTile(Domain::ChunkedMap &map, const Domain::Position &pos) const;
   bool tileHasBrush(const Domain::Tile *tile) const;
 
   BrushRegistry &registry_;

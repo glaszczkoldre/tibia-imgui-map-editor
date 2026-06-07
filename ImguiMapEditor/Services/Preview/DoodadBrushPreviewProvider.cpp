@@ -1,13 +1,15 @@
 #include "DoodadBrushPreviewProvider.h"
 
 #include "Brushes/Types/DoodadBrush.h"
+#include "Brushes/Types/DoodadPlacementPlanner.h"
 #include "Services/BrushSettingsService.h"
 
 namespace MapEditor::Services::Preview {
 
 DoodadBrushPreviewProvider::DoodadBrushPreviewProvider(
-    const Brushes::DoodadBrush &brush, BrushSettingsService *brushSettings)
-    : brush_(brush), brushSettings_(brushSettings) {
+    const Brushes::DoodadBrush &brush, BrushSettingsService *brushSettings,
+    const Domain::ChunkedMap *map)
+    : brush_(brush), brushSettings_(brushSettings), map_(map) {
   buildPreview();
 }
 
@@ -47,6 +49,9 @@ PreviewStyle DoodadBrushPreviewProvider::getStyle() const {
 }
 
 void DoodadBrushPreviewProvider::updateCursorPosition(const Domain::Position &cursor) {
+  if (anchor_ == cursor) {
+    return;
+  }
   anchor_ = cursor;
   needsRegen_ = true;
 }
@@ -54,7 +59,9 @@ void DoodadBrushPreviewProvider::updateCursorPosition(const Domain::Position &cu
 void DoodadBrushPreviewProvider::regenerate() { buildPreview(); }
 
 void DoodadBrushPreviewProvider::buildPreview() {
-  tiles_ = brush_.buildPreviewTiles(anchor_, brushSettings_);
+  const auto seed = Brushes::DoodadPlacementPlanner::buildSeed(
+      brush_, anchor_, brushSettings_, brush_.getVariation(), false);
+  tiles_ = brush_.buildPreviewTiles(anchor_, brushSettings_, map_, seed);
   bounds_ = PreviewBounds();
   needsRegen_ = false;
   cachedOffsets_ = brushSettings_ ? brushSettings_->getBrushOffsets()

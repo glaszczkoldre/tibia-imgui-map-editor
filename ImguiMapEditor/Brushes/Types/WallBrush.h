@@ -44,6 +44,7 @@ public:
   void rebuildAround(Domain::ChunkedMap &map, const Domain::Position &center) const;
   void rebuildTiles(Domain::ChunkedMap &map,
                     std::span<const Domain::Position> positions) const;
+  void rebuildTile(Domain::ChunkedMap &map, const Domain::Position &pos) const;
   DirectPlacementResult placeWallTile(Domain::Tile &tile,
                                       const DrawContext &ctx) const;
   void eraseFromTile(Domain::Tile &tile) const;
@@ -86,7 +87,6 @@ private:
   uint16_t selectWallItem(WallAlign align) const;
   std::optional<DoorNode> selectDoorItem(WallAlign align, DoorType type,
                                          bool open, bool preferLocked) const;
-  void rebuildTile(Domain::ChunkedMap &map, const Domain::Position &pos) const;
   void rebuildNeighbors(Domain::ChunkedMap &map,
                         const Domain::Position &center) const;
   bool tileHasWallGroup(const Domain::Tile *tile) const;

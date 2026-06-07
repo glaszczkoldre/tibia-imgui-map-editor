@@ -22,6 +22,8 @@ BrushSystem::~BrushSystem() = default;
 void BrushSystem::setConfigService(Services::ConfigService *configService) {
   if (!configService)
     return;
+  config_service_ = configService;
+  settings_service_.loadFromConfig(*config_service_);
 
   // Get brush file path from config directory
   // ConfigService stores at: %APPDATA%/TibiaMapEditor/config.json
@@ -46,6 +48,12 @@ void BrushSystem::setConfigService(Services::ConfigService *configService) {
 void BrushSystem::saveBrushes() {
   if (!brushPath_.empty()) {
     settings_service_.saveCustomBrushes(brushPath_);
+  }
+}
+
+void BrushSystem::saveSettings() {
+  if (config_service_) {
+    settings_service_.saveToConfig(*config_service_);
   }
 }
 

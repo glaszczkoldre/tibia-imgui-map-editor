@@ -1,6 +1,8 @@
 #pragma once
 
+#include "Domain/Position.h"
 #include "Services/Autoborder/PlacementIntent.h"
+#include <vector>
 
 namespace MapEditor::Domain {
 class ChunkedMap;
@@ -22,6 +24,7 @@ enum class PlannedMutationResult {
 
 [[nodiscard]] PlannedMutationResult applyPlannedIntentWithHistory(
     const AutoborderEngine &engine, Domain::ChunkedMap &map,
-    Domain::History::HistoryManager &history, const PlacementIntent &intent);
+    Domain::History::HistoryManager &history, const PlacementIntent &intent,
+    std::vector<Domain::Position> *changedPositions = nullptr);
 
 } // namespace MapEditor::Services::Autoborder

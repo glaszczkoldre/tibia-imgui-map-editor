@@ -112,6 +112,25 @@ bool snapshotsEqual(
   return lhs == rhs;
 }
 
+std::vector<MapEditor::Domain::Position> positionsFromDiffs(
+    const MapEditor::Services::Autoborder::TileDiffList &diffs) {
+  std::vector<MapEditor::Domain::Position> positions;
+  positions.reserve(diffs.size());
+  for (const auto &diff : diffs) {
+    positions.push_back(diff.position);
+  }
+  std::sort(positions.begin(), positions.end());
+  return positions;
+}
+
+void requireSamePositions(
+    std::vector<MapEditor::Domain::Position> lhs,
+    std::vector<MapEditor::Domain::Position> rhs, std::string_view label) {
+  std::sort(lhs.begin(), lhs.end());
+  std::sort(rhs.begin(), rhs.end());
+  require(lhs == rhs, label);
+}
+
 MapEditor::Services::Autoborder::PlacementIntent makeIntent(
     const MapEditor::Brushes::IBrush *brush,
     MapEditor::Brushes::BrushRegistry &registry,
@@ -134,7 +153,8 @@ void requirePlannedDrawMatchesController(
     MapEditor::Brushes::BrushRegistry &registry,
     MapEditor::Services::BrushSettingsService &settings,
     MapEditor::Brushes::IBrush *brush,
-    const MapEditor::Domain::Position &pos, std::string_view label) {
+    const MapEditor::Domain::Position &pos, std::string_view label,
+    std::vector<MapEditor::Domain::Position> *notifiedMutations = nullptr) {
   auto before = map.clone();
   auto intent = makeIntent(
       brush, registry, settings, pos,
@@ -150,9 +170,16 @@ void requirePlannedDrawMatchesController(
   MapEditor::Services::Autoborder::applyTileDiffs(*expected, diffs);
 
   controller.setBrush(brush);
+  if (notifiedMutations) {
+    notifiedMutations->clear();
+  }
   require(controller.applyBrush(pos),
           std::string(label).append(" controller draw failed"));
   requireMapsMatchInRegion(*expected, map, pos, 2, label);
+  if (notifiedMutations) {
+    requireSamePositions(*notifiedMutations, positionsFromDiffs(diffs),
+                         std::string(label).append(" notification mismatch"));
+  }
 }
 
 void requirePlannedEraseMatchesController(
@@ -161,7 +188,8 @@ void requirePlannedEraseMatchesController(
     MapEditor::Brushes::BrushRegistry &registry,
     MapEditor::Services::BrushSettingsService &settings,
     MapEditor::Brushes::IBrush *brush,
-    const MapEditor::Domain::Position &pos, std::string_view label) {
+    const MapEditor::Domain::Position &pos, std::string_view label,
+    std::vector<MapEditor::Domain::Position> *notifiedMutations = nullptr) {
   auto before = map.clone();
   auto intent = makeIntent(
       brush, registry, settings, pos,
@@ -177,9 +205,16 @@ void requirePlannedEraseMatchesController(
   MapEditor::Services::Autoborder::applyTileDiffs(*expected, diffs);
 
   controller.setBrush(brush);
+  if (notifiedMutations) {
+    notifiedMutations->clear();
+  }
   require(controller.eraseBrush(pos),
           std::string(label).append(" controller erase failed"));
   requireMapsMatchInRegion(*expected, map, pos, 2, label);
+  if (notifiedMutations) {
+    requireSamePositions(*notifiedMutations, positionsFromDiffs(diffs),
+                         std::string(label).append(" notification mismatch"));
+  }
 }
 
 std::vector<uint32_t> tileItemIds(const MapEditor::Domain::Tile *tile) {
@@ -420,10 +455,15 @@ int main() {
     controller.initialize(&map, &history, nullptr);
     controller.setBrushRegistry(&registry);
     controller.setBrushSettingsService(&settings);
+    std::vector<MapEditor::Domain::Position> notifiedMutations;
+    controller.setTilesMutatedCallback(
+        [&notifiedMutations](const auto &positions) {
+          notifiedMutations = positions;
+        });
 
     requirePlannedDrawMatchesController(map, controller, registry, settings,
                                         caveBrush, {80, 20, 7},
-                                        "ground draw");
+                                        "ground draw", &notifiedMutations);
     requirePreviewMatchesControllerDraw(map, controller, settings, caveBrush,
                                         {81, 20, 7}, "ground preview/commit");
 
@@ -443,13 +483,13 @@ int main() {
     }
     requirePlannedDrawMatchesController(map, controller, registry, settings,
                                         stoneWallBrush, {86, 20, 7},
-                                        "wall draw");
+                                        "wall draw", &notifiedMutations);
     requirePlannedDrawMatchesController(map, controller, registry, settings,
                                         stoneWallBrush, {87, 20, 7},
                                         "wall neighbor draw");
     requirePlannedEraseMatchesController(map, controller, registry, settings,
                                          stoneWallBrush, {86, 20, 7},
-                                         "wall erase");
+                                         "wall erase", &notifiedMutations);
     requirePreviewMatchesControllerDraw(map, controller, settings,
                                         stoneWallBrush, {88, 20, 7},
                                         "wall preview/commit");

@@ -6,6 +6,10 @@ namespace MapEditor::Brushes {
 class DoodadBrush;
 }
 
+namespace MapEditor::Domain {
+class ChunkedMap;
+}
+
 namespace MapEditor::Services {
 class BrushSettingsService;
 }
@@ -15,7 +19,8 @@ namespace MapEditor::Services::Preview {
 class DoodadBrushPreviewProvider : public IPreviewProvider {
 public:
   DoodadBrushPreviewProvider(const Brushes::DoodadBrush &brush,
-                             BrushSettingsService *brushSettings = nullptr);
+                             BrushSettingsService *brushSettings = nullptr,
+                             const Domain::ChunkedMap *map = nullptr);
 
   bool isActive() const override;
   Domain::Position getAnchorPosition() const override;
@@ -32,6 +37,7 @@ private:
 
   const Brushes::DoodadBrush &brush_;
   BrushSettingsService *brushSettings_ = nullptr;
+  const Domain::ChunkedMap *map_ = nullptr;
   Domain::Position anchor_{0, 0, 0};
   std::vector<PreviewTileData> tiles_;
   PreviewBounds bounds_;

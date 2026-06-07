@@ -5,7 +5,6 @@
  */
 
 #include <cstdint>
-#include <random>
 #include <vector>
 
 
@@ -90,7 +89,6 @@ public:
 private:
   std::vector<SingleItem> singles_;
   std::vector<CompositeItem> composites_;
-  mutable std::mt19937 rng_{std::random_device{}()};
 };
 
 } // namespace MapEditor::Brushes

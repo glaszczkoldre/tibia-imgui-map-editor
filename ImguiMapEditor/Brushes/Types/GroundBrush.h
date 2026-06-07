@@ -44,7 +44,9 @@ public:
   void addGroundItem(uint16_t itemId, uint32_t chance);
   void addFriend(const std::string &name);
   void addEnemy(const std::string &name);
+  void clearFriends();
   void addBorderRule(BorderRule rule);
+  void clearBorderRules();
   void setOptionalBorder(BorderBlock border, bool soloOptional);
   void setZOrder(int zOrder) { zOrder_ = zOrder; }
 
@@ -67,6 +69,7 @@ private:
   uint16_t selectWeightedItem(
       const std::vector<std::pair<uint16_t, uint32_t>> &items) const;
   void updateBorderItems(Domain::ChunkedMap &map, Domain::Tile &tile) const;
+  bool hasOuterZilchBorderRule() const;
   bool isBorderItem(uint16_t itemId) const;
 
   BrushRegistry &registry_;
@@ -77,7 +80,7 @@ private:
   bool soloOptionalBorder_ = false;
   std::unordered_set<uint16_t> ownedItemIds_;
   std::unordered_set<std::string> friendNames_;
-  std::unordered_set<std::string> enemyNames_;
+  bool hateFriends_ = false;
 };
 
 } // namespace MapEditor::Brushes

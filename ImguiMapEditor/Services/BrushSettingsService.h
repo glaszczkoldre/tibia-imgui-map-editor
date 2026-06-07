@@ -11,6 +11,8 @@
 
 namespace MapEditor::Services {
 
+class ConfigService;
+
 /**
  * Brush shape type - determines how brush positions are calculated.
  */
@@ -141,6 +143,22 @@ public:
   void setLockDoors(bool enabled);
   bool getLockDoors() const { return lockDoors_; }
 
+  void setDoodadEraseMatchingOnly(bool enabled) {
+    if (doodadEraseMatchingOnly_ != enabled) {
+      doodadEraseMatchingOnly_ = enabled;
+      notifyChanged();
+    }
+  }
+  bool getDoodadEraseMatchingOnly() const { return doodadEraseMatchingOnly_; }
+
+  void setEraserLeaveUniqueItems(bool enabled) {
+    if (eraserLeaveUniqueItems_ != enabled) {
+      eraserLeaveUniqueItems_ = enabled;
+      notifyChanged();
+    }
+  }
+  bool getEraserLeaveUniqueItems() const { return eraserLeaveUniqueItems_; }
+
   // ========================
   // Standard Size
   // ========================
@@ -251,6 +269,9 @@ public:
    */
   bool loadCustomBrushes(const std::string &filepath);
 
+  void loadFromConfig(const ConfigService &config);
+  void saveToConfig(ConfigService &config) const;
+
   // ========================
   // Change Notification
   // ========================
@@ -316,6 +337,8 @@ private:
   // Tool options
   bool previewBorder_ = true;
   bool lockDoors_ = false;
+  bool doodadEraseMatchingOnly_ = false;
+  bool eraserLeaveUniqueItems_ = true;
 
   void notifyChanged();
 

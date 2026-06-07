@@ -54,6 +54,7 @@ public:
   // Persistence wiring
   void setConfigService(Services::ConfigService *configService);
   void saveBrushes(); // Save custom brushes to JSON
+  void saveSettings();
   std::string getBrushSavePath() const { return brushPath_; }
 
   const BrushRegistry &getRegistry() const { return registry_; }
@@ -80,6 +81,7 @@ private:
   UI::TilesetWidget tileset_widget_;
   UI::Panels::BrushSizePanel brush_size_panel_;
   std::string brushPath_; // Path to custom_brushes.json
+  Services::ConfigService *config_service_ = nullptr;
 };
 
 } // namespace Brushes

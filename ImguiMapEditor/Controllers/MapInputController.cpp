@@ -58,6 +58,11 @@ void prepareContextSelection(Services::Selection::SelectionService &selection,
                 entityTypeToString(entry.getType()), pos.x, pos.y, pos.z);
 }
 
+bool brushOwnsDirtyNotification(const Brushes::BrushController *brushController) {
+  return brushController &&
+         brushController->usesPreciseMutationNotifications();
+}
+
 } // namespace
 
 MapInputController::MapInputController(Domain::SelectionSettings &settings,
@@ -135,7 +140,9 @@ void MapInputController::onLeftClick(const Domain::Position &pos, int mods,
         eraseMode ? brush_controller_->eraseBrush(pos, modifiers)
                   : brush_controller_->applyBrush(pos, modifiers);
     if (applied) {
-      session->setModified(true);
+      if (!brushOwnsDirtyNotification(brush_controller_)) {
+        session->setModified(true);
+      }
       return;
     }
   }
@@ -221,7 +228,9 @@ void MapInputController::onLeftDragStart(const Domain::Position &pos,
           eraseMode ? brush_controller_->eraseBrush(pos, modifiers)
                     : brush_controller_->applyBrush(pos, modifiers);
       if (changed) {
-        session->setModified(true);
+        if (!brushOwnsDirtyNotification(brush_controller_)) {
+          session->setModified(true);
+        }
       }
       spdlog::debug("[INPUT] Applied non-draggable {} at ({}, {}, {})",
                     eraseMode ? "eraser action" : "brush", pos.x, pos.y,
@@ -233,7 +242,9 @@ void MapInputController::onLeftDragStart(const Domain::Position &pos,
     last_brush_pos_ = pos;
     brush_controller_->beginStroke(modifiers, eraseMode);
     brush_controller_->continueStroke(pos);
-    session->setModified(true);
+    if (!brushOwnsDirtyNotification(brush_controller_)) {
+      session->setModified(true);
+    }
     spdlog::debug("[INPUT] Started {} drag stroke at ({}, {}, {})",
                   eraseMode ? "erase" : "brush", pos.x, pos.y, pos.z);
     return;
@@ -386,7 +397,9 @@ void MapInputController::onMouseMove(const Domain::Position &pos,
 
   last_brush_pos_ = pos;
   brush_controller_->continueStroke(pos);
-  session->setModified(true);
+  if (!brushOwnsDirtyNotification(brush_controller_)) {
+    session->setModified(true);
+  }
 }
 
 bool MapInputController::hasBrush() const {

@@ -21,6 +21,17 @@ std::string BrushRegistry::normalizeKey(const std::string &value) {
     return normalized;
 }
 
+namespace {
+
+uint16_t asUint16OrZero(uint32_t value) {
+    if (value == 0 || value > std::numeric_limits<uint16_t>::max()) {
+        return 0;
+    }
+    return static_cast<uint16_t>(value);
+}
+
+} // namespace
+
 // ========== Brush Management ==========
 
 void BrushRegistry::addBrush(std::unique_ptr<IBrush> brush) {
@@ -141,6 +152,49 @@ void BrushRegistry::registerItemBinding(uint16_t itemId, IBrush* brush) {
         it->second->getType() == BrushType::Raw ||
         brush->getType() != BrushType::Raw) {
         item_bindings_[itemId] = brush;
+    }
+}
+
+void BrushRegistry::unregisterItemBinding(uint16_t itemId, IBrush *brush) {
+    if (!brush || itemId == 0) {
+        return;
+    }
+
+    if (auto allIt = item_bindings_all_.find(itemId);
+        allIt != item_bindings_all_.end()) {
+        auto &allBindings = allIt->second;
+        allBindings.erase(
+            std::remove(allBindings.begin(), allBindings.end(), brush),
+            allBindings.end());
+        if (allBindings.empty()) {
+            item_bindings_all_.erase(allIt);
+        }
+    }
+
+    const auto primaryIt = item_bindings_.find(itemId);
+    if (primaryIt == item_bindings_.end() || primaryIt->second != brush) {
+        return;
+    }
+
+    IBrush *replacement = nullptr;
+    if (const auto allIt = item_bindings_all_.find(itemId);
+        allIt != item_bindings_all_.end()) {
+        const auto &allBindings = allIt->second;
+        if (const auto preferred = std::find_if(
+                allBindings.begin(), allBindings.end(), [](const IBrush *candidate) {
+                    return candidate && candidate->getType() != BrushType::Raw;
+                });
+            preferred != allBindings.end()) {
+            replacement = *preferred;
+        } else if (!allBindings.empty()) {
+            replacement = allBindings.front();
+        }
+    }
+
+    if (replacement) {
+        primaryIt->second = replacement;
+    } else {
+        item_bindings_.erase(primaryIt);
     }
 }
 
@@ -356,6 +410,12 @@ void BrushRegistry::registerBorderTemplate(uint32_t id, BorderBlock border) {
         return;
     }
 
+    registerBorderBlockMetadata(border);
+    border_templates_[id] = std::move(border);
+}
+
+void BrushRegistry::registerBorderBlockMetadata(const BorderBlock &border) {
+    const auto groundEquivalent = asUint16OrZero(border.getGroundEquivalent());
     for (size_t index = 0; index < BorderBlock::kEdgeTypeCount; ++index) {
         const auto edge = static_cast<EdgeType>(index);
         if (!border.hasItemsFor(edge)) {
@@ -367,13 +427,39 @@ void BrushRegistry::registerBorderTemplate(uint32_t id, BorderBlock border) {
                 continue;
             }
 
-            border_item_metadata_.try_emplace(
+            registerBorderItemMetadata(
                 static_cast<uint16_t>(itemId),
-                BorderItemMetadata{.group = border.getGroup(), .alignment = edge});
+                BorderItemMetadata{
+                    .group = border.getGroup(),
+                    .alignment = edge,
+                    .groundEquivalent = groundEquivalent});
         }
     }
+}
 
-    border_templates_[id] = std::move(border);
+void BrushRegistry::registerBorderItemMetadata(uint16_t itemId,
+                                               BorderItemMetadata metadata) {
+    if (itemId == 0) {
+        return;
+    }
+
+    auto [it, inserted] =
+        border_item_metadata_.try_emplace(itemId, metadata);
+    if (inserted) {
+        return;
+    }
+
+    if (it->second.group == 0 && metadata.group != 0) {
+        it->second.group = metadata.group;
+    }
+    if (it->second.alignment == EdgeType::None &&
+        metadata.alignment != EdgeType::None) {
+        it->second.alignment = metadata.alignment;
+    }
+    if (it->second.groundEquivalent == 0 &&
+        metadata.groundEquivalent != 0) {
+        it->second.groundEquivalent = metadata.groundEquivalent;
+    }
 }
 
 const BorderBlock* BrushRegistry::getBorderTemplate(uint32_t id) const {

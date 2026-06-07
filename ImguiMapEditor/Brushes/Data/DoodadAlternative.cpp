@@ -5,6 +5,9 @@
 
 #include "DoodadAlternative.h"
 
+#include "Brushes/Behaviors/WeightedSelection.h"
+#include <utility>
+
 namespace MapEditor::Brushes {
 
 void DoodadAlternative::addSingleItem(SingleItem item) {
@@ -35,27 +38,14 @@ SingleItem DoodadAlternative::selectRandomSingle() const {
     return SingleItem{};
   }
 
-  uint32_t totalWeight = 0;
+  std::vector<uint32_t> weights;
+  weights.reserve(singles_.size());
   for (const auto &item : singles_) {
-    totalWeight += item.chance;
+    weights.push_back(item.chance);
   }
 
-  if (totalWeight == 0) {
-    return singles_.front();
-  }
-
-  std::uniform_int_distribution<uint32_t> dist(1, totalWeight);
-  uint32_t roll = dist(rng_);
-
-  uint32_t cumulative = 0;
-  for (const auto &item : singles_) {
-    cumulative += item.chance;
-    if (roll <= cumulative) {
-      return item;
-    }
-  }
-
-  return singles_.back();
+  const auto selected = WeightedSelection::select(weights);
+  return selected ? singles_[*selected] : singles_.front();
 }
 
 const CompositeItem *DoodadAlternative::selectRandomComposite() const {
@@ -63,27 +53,14 @@ const CompositeItem *DoodadAlternative::selectRandomComposite() const {
     return nullptr;
   }
 
-  uint32_t totalWeight = 0;
+  std::vector<uint32_t> weights;
+  weights.reserve(composites_.size());
   for (const auto &comp : composites_) {
-    totalWeight += comp.chance;
+    weights.push_back(comp.chance);
   }
 
-  if (totalWeight == 0) {
-    return &composites_.front();
-  }
-
-  std::uniform_int_distribution<uint32_t> dist(1, totalWeight);
-  uint32_t roll = dist(rng_);
-
-  uint32_t cumulative = 0;
-  for (const auto &comp : composites_) {
-    cumulative += comp.chance;
-    if (roll <= cumulative) {
-      return &comp;
-    }
-  }
-
-  return &composites_.back();
+  const auto selected = WeightedSelection::select(weights);
+  return selected ? &composites_[*selected] : &composites_.front();
 }
 
 } // namespace MapEditor::Brushes

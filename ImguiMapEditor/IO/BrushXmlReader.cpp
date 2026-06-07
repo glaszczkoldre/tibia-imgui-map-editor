@@ -133,8 +133,8 @@ void markBrushMetadata(IBrush &brush, const fs::path &sourceFile) {
 GroundBrush::BorderRule parseInlineBorderRule(const pugi::xml_node &borderNode,
                                               BrushRegistry &registry) {
   GroundBrush::BorderRule rule;
-  rule.outer = std::string_view(borderNode.attribute("align").as_string()) ==
-               "outer";
+  const auto align = std::string_view(borderNode.attribute("align").as_string());
+  rule.outer = align.empty() || align == "outer";
   rule.superBorder = borderNode.attribute("super").as_bool(false);
   rule.targetName = borderNode.attribute("to").as_string();
   rule.targetNone = rule.targetName == "none";
@@ -428,40 +428,47 @@ void BrushXmlReader::parseGroundBrush(const pugi::xml_node &node,
     }
   }
 
-  for (const auto borderNode : node.children("border")) {
-    GroundBrush::BorderRule rule =
-        parseInlineBorderRule(borderNode, *deps_.brushRegistry);
-    if (!borderNode.child("borderitem")) {
-      const auto borderId = borderNode.attribute("id").as_uint(0);
-      if (const auto *templateBlock =
-              deps_.brushRegistry->getBorderTemplate(borderId)) {
-        auto mergedBlock = *templateBlock;
-        mergedBlock.setGroundEquivalent(
-            borderNode.attribute("ground_equivalent")
-                .as_uint(templateBlock->getGroundEquivalent()));
-        for (const auto &specificCase : rule.block.getSpecificCases()) {
-          mergedBlock.addSpecificCase(specificCase);
+  for (const auto childNode : node.children()) {
+    const auto childName = std::string_view(childNode.name());
+
+    if (childName == "border") {
+      GroundBrush::BorderRule rule =
+          parseInlineBorderRule(childNode, *deps_.brushRegistry);
+      if (!childNode.child("borderitem")) {
+        const auto borderId = childNode.attribute("id").as_uint(0);
+        if (const auto *templateBlock =
+                deps_.brushRegistry->getBorderTemplate(borderId)) {
+          auto mergedBlock = *templateBlock;
+          mergedBlock.setGroundEquivalent(
+              childNode.attribute("ground_equivalent")
+                  .as_uint(templateBlock->getGroundEquivalent()));
+          for (const auto &specificCase : rule.block.getSpecificCases()) {
+            mergedBlock.addSpecificCase(specificCase);
+          }
+          rule.block = std::move(mergedBlock);
         }
-        rule.block = std::move(mergedBlock);
       }
+      brush->addBorderRule(std::move(rule));
+    } else if (childName == "optional") {
+      if (childNode.attribute("ground_equivalent") || childNode.child("borderitem")) {
+        auto rule = parseInlineBorderRule(childNode, *deps_.brushRegistry);
+        brush->setOptionalBorder(std::move(rule.block),
+                                 node.attribute("solo_optional").as_bool(false));
+      } else if (const auto borderId = childNode.attribute("id").as_uint(0);
+                 const auto *templateBlock =
+                     deps_.brushRegistry->getBorderTemplate(borderId)) {
+        brush->setOptionalBorder(*templateBlock,
+                                  node.attribute("solo_optional").as_bool(false));
+      }
+    } else if (childName == "friend") {
+      brush->addFriend(childNode.attribute("name").as_string());
+    } else if (childName == "enemy") {
+      brush->addEnemy(childNode.attribute("name").as_string());
+    } else if (childName == "clear_borders") {
+      brush->clearBorderRules();
+    } else if (childName == "clear_friends") {
+      brush->clearFriends();
     }
-    brush->addBorderRule(std::move(rule));
-  }
-
-  if (const auto optionalNode = node.child("optional")) {
-    const auto borderId = optionalNode.attribute("id").as_uint(0);
-    if (const auto *templateBlock =
-            deps_.brushRegistry->getBorderTemplate(borderId)) {
-      brush->setOptionalBorder(*templateBlock,
-                               node.attribute("solo_optional").as_bool(false));
-    }
-  }
-
-  for (const auto friendNode : node.children("friend")) {
-    brush->addFriend(friendNode.attribute("name").as_string());
-  }
-  for (const auto enemyNode : node.children("enemy")) {
-    brush->addEnemy(enemyNode.attribute("name").as_string());
   }
 
   deps_.brushRegistry->addBrush(std::move(brush));

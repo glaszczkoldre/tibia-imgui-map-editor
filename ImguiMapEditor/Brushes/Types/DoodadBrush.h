@@ -2,18 +2,46 @@
 
 #include "Brushes/Core/BrushBase.h"
 #include "Brushes/Data/DoodadAlternative.h"
+#include "Brushes/Types/DoodadRedoBorderPlanner.h"
 #include "Services/Preview/PreviewTypes.h"
 #include <cstdint>
+#include <optional>
 #include <unordered_set>
 #include <vector>
 
 namespace MapEditor::Brushes {
 
 class BrushRegistry;
+class DoodadPlacementPlanner;
 
 class DoodadBrush : public BrushBase {
 public:
+  struct EraseOptions {
+    bool matchingBrushOnly = false;
+    bool preserveComplexItems = true;
+  };
+
   using DoodadLayout = std::vector<Services::Preview::PreviewTileData>;
+  enum class PlacementSkipReason {
+    OccupiedInPlan,
+    BlockingTile,
+    DuplicateOwnItem,
+  };
+  struct PlacementSkip {
+    Domain::Position position;
+    PlacementSkipReason reason = PlacementSkipReason::OccupiedInPlan;
+  };
+  struct PlacementPlan {
+    DoodadLayout layout;
+    std::vector<DoodadRedoBorderTouch> redoTouches;
+    std::vector<PlacementSkip> skipped;
+    std::vector<Domain::Position> affectedPositions;
+  };
+  struct ErasePlan {
+    std::vector<Domain::Position> positions;
+    std::vector<DoodadRedoBorderTouch> redoTouches;
+    std::vector<Domain::Position> affectedPositions;
+  };
 
   DoodadBrush(std::string name, uint32_t lookId, BrushRegistry &registry,
               bool draggable);
@@ -26,6 +54,8 @@ public:
   void draw(Domain::ChunkedMap &map, Domain::Tile *tile,
             const DrawContext &ctx) override;
   void undraw(Domain::ChunkedMap &map, Domain::Tile *tile) override;
+  void undraw(Domain::ChunkedMap &map, Domain::Tile *tile,
+              EraseOptions options);
   bool ownsItem(const Domain::Item *item) const override;
 
   void addAlternative(DoodadAlternative alternative);
@@ -44,26 +74,51 @@ public:
 
   uint16_t getPreviewItemId() const;
   DoodadLayout buildPreviewTiles(const Domain::Position &anchor,
-                                 const Services::BrushSettingsService *brushSettings) const;
+                                 const Services::BrushSettingsService *brushSettings,
+                                 const Domain::ChunkedMap *map = nullptr,
+                                 std::optional<uint32_t> seed = std::nullopt) const;
   DoodadLayout buildPlacementLayout(const Domain::Position &center,
                                     const Services::BrushSettingsService *brushSettings,
                                     size_t preferredVariation,
                                     const Domain::ChunkedMap *map = nullptr,
-                                    bool forcePlace = false) const;
+                                    bool forcePlace = false,
+                                    std::optional<uint32_t> seed = std::nullopt) const;
+  PlacementPlan buildPlacementPlan(const Domain::Position &center,
+                                   const Services::BrushSettingsService *brushSettings,
+                                   size_t preferredVariation,
+                                   const Domain::ChunkedMap *map = nullptr,
+                                   bool forcePlace = false,
+                                   std::optional<uint32_t> seed = std::nullopt) const;
+  ErasePlan buildErasePlan(const Domain::Position &center,
+                           const Services::BrushSettingsService *brushSettings,
+                           size_t preferredVariation,
+                           const Domain::ChunkedMap *map,
+                           bool forcePlace,
+                           std::optional<uint32_t> seed,
+                           EraseOptions options) const;
   std::vector<Domain::Position>
   getPlacementPositions(const Domain::Position &center,
                        const Services::BrushSettingsService *brushSettings,
                        size_t preferredVariation,
                        const Domain::ChunkedMap *map = nullptr,
-                       bool forcePlace = false) const;
+                       bool forcePlace = false,
+                       std::optional<uint32_t> seed = std::nullopt) const;
   void applyPlacementLayout(Domain::ChunkedMap &map,
                             const Domain::Position &center,
                             const DoodadLayout &layout,
                             const DrawContext &ctx) const;
+  void applyPlacementPlan(Domain::ChunkedMap &map,
+                          const Domain::Position &center,
+                          const PlacementPlan &plan,
+                          const DrawContext &ctx) const;
 
 private:
+  friend class DoodadPlacementPlanner;
+
   const DoodadAlternative *selectAlternative(size_t preferredIndex) const;
   bool tileHasOwnItem(const Domain::Tile *tile) const;
+  bool shouldEraseDoodadItem(const Domain::Item *item,
+                             EraseOptions options) const;
 
   BrushRegistry &registry_;
   std::vector<DoodadAlternative> alternatives_;

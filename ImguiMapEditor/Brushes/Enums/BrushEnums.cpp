@@ -171,7 +171,8 @@ DoorType parseDoorType(std::string_view name) {
       {"archway", DoorType::Archway}, {"normal", DoorType::Normal},
       {"locked", DoorType::Locked},   {"quest", DoorType::Quest},
       {"magic", DoorType::Magic},     {"normal_alt", DoorType::NormalAlt},
-      {"window", DoorType::Window},   {"hatch_window", DoorType::HatchWindow}};
+      {"window", DoorType::Window},   {"hatch_window", DoorType::HatchWindow},
+      {"hatch window", DoorType::HatchWindow}};
   auto it = map.find(name);
   return it != map.end() ? it->second : DoorType::Undefined;
 }

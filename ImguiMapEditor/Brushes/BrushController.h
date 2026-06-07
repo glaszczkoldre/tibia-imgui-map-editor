@@ -80,6 +80,8 @@ struct ResolvedBrushSelection {
 
 // Callback type for notifying when brush becomes active (to clear selection)
 using OnBrushActivatedCallback = std::function<void()>;
+using TilesMutatedCallback =
+    std::function<void(const std::vector<Domain::Position> &)>;
 
 /**
  * Controls brush selection and application.
@@ -122,6 +124,10 @@ public:
     onBrushActivated_ = std::move(callback);
   }
 
+  void setTilesMutatedCallback(TilesMutatedCallback callback) {
+    onTilesMutated_ = std::move(callback);
+  }
+
   /**
    * Clear the current brush selection.
    */
@@ -137,6 +143,7 @@ public:
                        const Domain::Item *preferredItem = nullptr) const;
   bool switchDoorAt(const Domain::Position &pos,
                     const Domain::Item *preferredItem = nullptr);
+  bool usesPreciseMutationNotifications() const;
   std::optional<bool> getDoorOpenStateAt(const Domain::Position &pos,
                                          const Domain::Item *preferredItem = nullptr) const;
 
@@ -349,6 +356,7 @@ private:
 
   // Callback when brush is activated
   OnBrushActivatedCallback onBrushActivated_;
+  TilesMutatedCallback onTilesMutated_;
 
   // Preview service for brush preview updates
   Services::Preview::PreviewService *previewService_ = nullptr;
@@ -451,6 +459,7 @@ private:
                                 bool specialAction = false) const;
   void paintTileDirect(const Domain::Position &pos, uint32_t modifiers,
                        bool specialAction = false);
+  void notifyTilesMutated(const std::vector<Domain::Position> &positions) const;
   [[nodiscard]] ResolvedBrushSelection captureCurrentSelection() const;
   bool applyResolvedSelection(const ResolvedBrushSelection &selection);
   DoorBrush *getDoorBrushForType(DoorType type) const;

@@ -66,9 +66,14 @@ bool Application::initialize() {
       &settings_registry_->getHotkeyRegistry());
   dialogs_.preferences.setOtbmSettings(
       &settings_registry_->getOtbmSettings());
+  dialogs_.preferences.setBrushSettings(
+      &brush_system_->getSettingsService());
   dialogs_.preferences.setThemePtr(
       &settings_registry_->getAppSettings().theme);
   dialogs_.preferences.setApplySettingsCallback([this]() {
+    if (brush_system_) {
+      brush_system_->saveSettings();
+    }
     settings_registry_->save();
   });
 
@@ -253,6 +258,9 @@ void Application::shutdown() {
   }
 
   if (settings_registry_) {
+    if (brush_system_) {
+      brush_system_->saveSettings();
+    }
     persistence_manager_.saveApplicationState(
         *settings_registry_, platform_manager_, version_manager_);
   }

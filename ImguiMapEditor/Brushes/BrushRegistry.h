@@ -33,6 +33,7 @@ public:
   struct BorderItemMetadata {
     uint16_t group = 0;
     EdgeType alignment = EdgeType::None;
+    uint16_t groundEquivalent = 0;
   };
 
   BrushRegistry() = default;
@@ -67,6 +68,7 @@ public:
   }
 
   void registerItemBinding(uint16_t itemId, IBrush *brush);
+  void unregisterItemBinding(uint16_t itemId, IBrush *brush);
   void registerCreatureBinding(const std::string &creatureName, IBrush *brush);
   IBrush *getBrushForItem(uint16_t itemId) const;
   std::vector<IBrush *> getBrushesForItem(uint16_t itemId) const;
@@ -80,6 +82,9 @@ public:
                                            uint16_t subtype = 1) const;
 
   void registerBorderTemplate(uint32_t id, BorderBlock border);
+  void registerBorderBlockMetadata(const BorderBlock &border);
+  void registerBorderItemMetadata(uint16_t itemId,
+                                  BorderItemMetadata metadata);
   const BorderBlock *getBorderTemplate(uint32_t id) const;
   const BorderItemMetadata *getBorderItemMetadata(uint16_t itemId) const;
   size_t getBorderTemplateCount() const { return border_templates_.size(); }

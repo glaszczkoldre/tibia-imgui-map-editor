@@ -1,8 +1,11 @@
 #include "Brushes/BrushController.h"
 #include "Brushes/BrushRegistry.h"
+#include "Brushes/Behaviors/WeightedSelection.h"
 #include "Brushes/Core/IBrush.h"
+#include "Brushes/Data/BorderBlock.h"
 #include "Brushes/Types/GroundBrush.h"
 #include "Brushes/Types/RawBrush.h"
+#include "Brushes/Types/WallBrush.h"
 #include "Application/EditorSession.h"
 #include "Controllers/MapInputController.h"
 #include "Domain/ChunkedMap.h"
@@ -12,6 +15,7 @@
 #include "Domain/SelectionSettings.h"
 #include "Domain/Tileset/TilesetEntry.h"
 #include "IO/HouseXmlReader.h"
+#include "IO/BrushXmlReader.h"
 #include "IO/HouseXmlWriter.h"
 #include "IO/Otbm/OtbmReader.h"
 #include "IO/Otbm/OtbmWriter.h"
@@ -47,6 +51,7 @@ namespace {
 using MapBrushType = MapEditor::Brushes::BrushType;
 using PickMode = MapEditor::Brushes::BrushPickMode;
 using EdgeType = MapEditor::Brushes::EdgeType;
+using DoorType = MapEditor::Brushes::DoorType;
 using TableAlign = MapEditor::Brushes::TableAlign;
 using TileNeighbor = MapEditor::Brushes::TileNeighbor;
 using WallAlign = MapEditor::Brushes::WallAlign;
@@ -128,6 +133,23 @@ bool tileContainsItemId(const MapEditor::Domain::Tile &tile, uint16_t itemId) {
   return false;
 }
 
+MapEditor::Brushes::GroundBrush *
+findGroundBrush(MapEditor::Brushes::BrushRegistry &registry,
+                std::string_view name) {
+  auto *brush = registry.getBrush(std::string(name));
+  return dynamic_cast<MapEditor::Brushes::GroundBrush *>(brush);
+}
+
+void paintGround(MapEditor::Domain::ChunkedMap &map,
+                 MapEditor::Brushes::BrushRegistry &registry,
+                 MapEditor::Brushes::GroundBrush &brush,
+                 const MapEditor::Domain::Position &pos) {
+  MapEditor::Brushes::DrawContext ctx;
+  ctx.brushRegistry = &registry;
+  ctx.ownerBrushId = registry.getBrushId(&brush);
+  brush.draw(map, map.getOrCreateTile(pos), ctx);
+}
+
 size_t countOwnedItems(const MapEditor::Domain::Tile &tile,
                        const MapEditor::Brushes::IBrush &brush) {
   size_t count = 0;
@@ -137,6 +159,17 @@ size_t countOwnedItems(const MapEditor::Domain::Tile &tile,
     }
   }
   return count;
+}
+
+std::optional<size_t>
+findFirstOwnedItemIndex(const MapEditor::Domain::Tile &tile,
+                        const MapEditor::Brushes::IBrush &brush) {
+  for (size_t index = 0; index < tile.getItemCount(); ++index) {
+    if (brush.ownsItem(tile.getItem(index))) {
+      return index;
+    }
+  }
+  return std::nullopt;
 }
 
 size_t countTiles(const MapEditor::Domain::ChunkedMap &map) {
@@ -190,6 +223,42 @@ void clearTileBrushOwnership(MapEditor::Domain::Tile &tile) {
                       MapEditor::Brushes::InvalidBrushId);
 }
 
+std::optional<std::pair<uint16_t, uint16_t>>
+findWallVariantPair(const MapEditor::Brushes::WallBrush &wallBrush) {
+  constexpr std::array<WallAlign, 17> alignments{
+      WallAlign::Pole,
+      WallAlign::SouthEnd,
+      WallAlign::EastEnd,
+      WallAlign::NorthwestDiagonal,
+      WallAlign::WestEnd,
+      WallAlign::NortheastDiagonal,
+      WallAlign::Horizontal,
+      WallAlign::SouthT,
+      WallAlign::NorthEnd,
+      WallAlign::Vertical,
+      WallAlign::SouthwestDiagonal,
+      WallAlign::EastT,
+      WallAlign::SoutheastDiagonal,
+      WallAlign::WestT,
+      WallAlign::NorthT,
+      WallAlign::Intersection,
+      WallAlign::Untouchable,
+  };
+
+  for (const auto alignment : alignments) {
+    const auto itemId = wallBrush.getWallItemForAlign(alignment);
+    if (itemId == 0) {
+      continue;
+    }
+
+    if (const auto nextItemId = wallBrush.findNextWallVariant(itemId)) {
+      return std::pair<uint16_t, uint16_t>{itemId, *nextItemId};
+    }
+  }
+
+  return std::nullopt;
+}
+
 void writeTextFile(const fs::path &path, std::string_view content) {
   std::ofstream output(path, std::ios::binary | std::ios::trunc);
   if (!output) {
@@ -198,12 +267,929 @@ void writeTextFile(const fs::path &path, std::string_view content) {
   output.write(content.data(), static_cast<std::streamsize>(content.size()));
 }
 
+void requireBorderSelectionUsesScopedSeed() {
+  MapEditor::Brushes::BorderBlock block;
+  block.addItem(EdgeType::N, 61000, 1);
+  block.addItem(EdgeType::N, 61001, 1);
+
+  for (uint32_t seed = 1; seed <= 64; ++seed) {
+    uint32_t first = 0;
+    {
+      MapEditor::Brushes::WeightedSelection::ScopedSeed scopedSeed(seed);
+      first = block.getRandomItem(EdgeType::N);
+    }
+
+    uint32_t second = 0;
+    {
+      MapEditor::Brushes::WeightedSelection::ScopedSeed scopedSeed(seed);
+      second = block.getRandomItem(EdgeType::N);
+    }
+
+    require(first == second,
+            "border item selection ignored scoped deterministic seed");
+  }
+}
+
+void requireGroundBorderMissingAlignDefaultsOuter(const fs::path &tempDir) {
+  const fs::path brushPath = tempDir / "ground_missing_align.xml";
+  writeTextFile(
+      brushPath,
+      R"xml(<brushes>
+  <brush name="missing-align-low" type="ground" lookid="61010" z-order="1">
+    <item id="61010" />
+  </brush>
+  <brush name="missing-align-high" type="ground" lookid="61011" z-order="2">
+    <item id="61011" />
+    <border to="missing-align-low">
+      <borderitem edge="n" id="61012" />
+    </border>
+  </brush>
+</brushes>)xml");
+
+  MapEditor::Brushes::BrushRegistry localRegistry;
+  MapEditor::IO::BrushXmlReader reader({&localRegistry});
+  require(reader.loadFile(brushPath), "missing-align ground brush XML failed");
+
+  auto *lowBrush = dynamic_cast<MapEditor::Brushes::GroundBrush *>(
+      localRegistry.getBrush("missing-align-low"));
+  auto *highBrush = dynamic_cast<MapEditor::Brushes::GroundBrush *>(
+      localRegistry.getBrush("missing-align-high"));
+  require(lowBrush != nullptr && highBrush != nullptr,
+          "missing-align ground brushes did not load");
+
+  MapEditor::Domain::ChunkedMap map;
+  map.createNew(16, 16, 1098);
+  const MapEditor::Domain::Position north{8, 7, 7};
+  const MapEditor::Domain::Position center{8, 8, 7};
+
+  MapEditor::Brushes::DrawContext ctx;
+  ctx.brushRegistry = &localRegistry;
+  ctx.ownerBrushId = localRegistry.getBrushId(highBrush);
+  highBrush->draw(map, map.getOrCreateTile(north), ctx);
+
+  ctx.ownerBrushId = localRegistry.getBrushId(lowBrush);
+  lowBrush->draw(map, map.getOrCreateTile(center), ctx);
+
+  const auto *centerTile = map.getTile(center);
+  require(centerTile != nullptr && tileContainsItemId(*centerTile, 61012),
+          "missing align on ground border did not default to outer");
+}
+
+void requireGroundBorderZOrderMatchesRme(const fs::path &tempDir) {
+  const fs::path brushPath = tempDir / "ground_z_order.xml";
+  writeTextFile(
+      brushPath,
+      R"xml(<brushes>
+  <brush name="z-low" type="ground" lookid="62010" z-order="1">
+    <item id="62010" />
+    <border align="inner" to="z-high">
+      <borderitem edge="n" id="62012" />
+    </border>
+    <border align="outer" to="z-high">
+      <borderitem edge="n" id="62013" />
+    </border>
+  </brush>
+  <brush name="z-high" type="ground" lookid="62011" z-order="2">
+    <item id="62011" />
+    <border align="inner" to="z-low">
+      <borderitem edge="n" id="62014" />
+    </border>
+    <border align="outer" to="z-low">
+      <borderitem edge="n" id="62015" />
+    </border>
+  </brush>
+</brushes>)xml");
+
+  MapEditor::Brushes::BrushRegistry localRegistry;
+  MapEditor::IO::BrushXmlReader reader({&localRegistry});
+  require(reader.loadFile(brushPath), "z-order ground brush XML failed");
+
+  auto *lowBrush = dynamic_cast<MapEditor::Brushes::GroundBrush *>(
+      localRegistry.getBrush("z-low"));
+  auto *highBrush = dynamic_cast<MapEditor::Brushes::GroundBrush *>(
+      localRegistry.getBrush("z-high"));
+  require(lowBrush != nullptr && highBrush != nullptr,
+          "z-order ground brushes did not load");
+
+  auto paint = [&](MapEditor::Domain::ChunkedMap &map,
+                   MapEditor::Brushes::GroundBrush &brush,
+                   const MapEditor::Domain::Position &pos) {
+    MapEditor::Brushes::DrawContext ctx;
+    ctx.brushRegistry = &localRegistry;
+    ctx.ownerBrushId = localRegistry.getBrushId(&brush);
+    brush.draw(map, map.getOrCreateTile(pos), ctx);
+  };
+
+  {
+    MapEditor::Domain::ChunkedMap map;
+    map.createNew(16, 16, 1098);
+    const MapEditor::Domain::Position north{8, 7, 7};
+    const MapEditor::Domain::Position center{8, 8, 7};
+    paint(map, *highBrush, north);
+    paint(map, *lowBrush, center);
+
+    const auto *centerTile = map.getTile(center);
+    require(centerTile != nullptr && tileContainsItemId(*centerTile, 62012),
+            "low-center/high-neighbor should prefer low inner border");
+    require(!tileContainsItemId(*centerTile, 62015),
+            "low-center/high-neighbor used high outer before low inner");
+  }
+
+  {
+    MapEditor::Domain::ChunkedMap map;
+    map.createNew(16, 16, 1098);
+    const MapEditor::Domain::Position north{8, 7, 7};
+    const MapEditor::Domain::Position center{8, 8, 7};
+    paint(map, *lowBrush, north);
+    paint(map, *highBrush, center);
+
+    const auto *centerTile = map.getTile(center);
+    require(centerTile != nullptr && tileContainsItemId(*centerTile, 62014),
+            "high-center/low-neighbor should use high inner border");
+    require(!tileContainsItemId(*centerTile, 62013),
+            "high-center/low-neighbor used low outer before high inner");
+  }
+}
+
+void requireGroundFriendEnemySemanticsMatchRme(const fs::path &tempDir) {
+  const fs::path brushPath = tempDir / "ground_friend_enemy.xml";
+  writeTextFile(
+      brushPath,
+      R"xml(<brushes>
+  <brush name="friend-owner" type="ground" lookid="63010" z-order="1">
+    <item id="63010" />
+    <friend name="friend-target" />
+  </brush>
+  <brush name="friend-target" type="ground" lookid="63011" z-order="2">
+    <item id="63011" />
+    <border align="inner" to="friend-owner">
+      <borderitem edge="n" id="63012" />
+    </border>
+  </brush>
+  <brush name="enemy-owner" type="ground" lookid="63020" z-order="1">
+    <item id="63020" />
+    <enemy name="blocked-target" />
+  </brush>
+  <brush name="friendly-target" type="ground" lookid="63021" z-order="2">
+    <item id="63021" />
+    <border align="inner" to="enemy-owner">
+      <borderitem edge="n" id="63022" />
+    </border>
+  </brush>
+  <brush name="blocked-target" type="ground" lookid="63023" z-order="2">
+    <item id="63023" />
+    <border align="inner" to="enemy-owner">
+      <borderitem edge="n" id="63024" />
+    </border>
+  </brush>
+  <brush name="enemy-all-owner" type="ground" lookid="63030" z-order="1">
+    <item id="63030" />
+    <enemy name="all" />
+  </brush>
+  <brush name="enemy-all-target" type="ground" lookid="63031" z-order="2">
+    <item id="63031" />
+    <border align="inner" to="enemy-all-owner">
+      <borderitem edge="n" id="63032" />
+    </border>
+  </brush>
+  <brush name="clear-owner" type="ground" lookid="63040" z-order="1">
+    <item id="63040" />
+    <friend name="all" />
+    <clear_friends />
+  </brush>
+  <brush name="clear-target" type="ground" lookid="63041" z-order="2">
+    <item id="63041" />
+    <border align="inner" to="clear-owner">
+      <borderitem edge="n" id="63042" />
+    </border>
+  </brush>
+</brushes>)xml");
+
+  MapEditor::Brushes::BrushRegistry localRegistry;
+  MapEditor::IO::BrushXmlReader reader({&localRegistry});
+  require(reader.loadFile(brushPath), "friend/enemy ground brush XML failed");
+
+  auto getGround = [&](std::string_view name) -> MapEditor::Brushes::GroundBrush * {
+    auto *brush = dynamic_cast<MapEditor::Brushes::GroundBrush *>(
+        localRegistry.getBrush(std::string(name)));
+    require(brush != nullptr,
+            std::string(name).append(" ground brush did not load"));
+    return brush;
+  };
+
+  auto setOptionalBorder = [](MapEditor::Brushes::GroundBrush &brush,
+                              uint16_t itemId) {
+    MapEditor::Brushes::BorderBlock optionalBorder;
+    optionalBorder.addItem(EdgeType::N, itemId, 1);
+    brush.setOptionalBorder(std::move(optionalBorder), false);
+  };
+
+  setOptionalBorder(*getGround("friend-owner"), 63110);
+  setOptionalBorder(*getGround("enemy-owner"), 63120);
+  setOptionalBorder(*getGround("enemy-all-owner"), 63130);
+  setOptionalBorder(*getGround("clear-owner"), 63140);
+
+  auto paint = [&](MapEditor::Domain::ChunkedMap &map,
+                   MapEditor::Brushes::GroundBrush &brush,
+                   const MapEditor::Domain::Position &pos) {
+    MapEditor::Brushes::DrawContext ctx;
+    ctx.brushRegistry = &localRegistry;
+    ctx.ownerBrushId = localRegistry.getBrushId(&brush);
+    brush.draw(map, map.getOrCreateTile(pos), ctx);
+  };
+
+  auto requireScenario = [&](std::string_view ownerName,
+                             std::string_view targetName,
+                             uint16_t borderItemId, bool shouldHaveBorder,
+                             std::string_view label) {
+    MapEditor::Domain::ChunkedMap map;
+    map.createNew(16, 16, 1098);
+    const MapEditor::Domain::Position north{8, 7, 7};
+    const MapEditor::Domain::Position center{8, 8, 7};
+    paint(map, *getGround(ownerName), north);
+    paint(map, *getGround(targetName), center);
+
+    const auto *centerTile = map.getTile(center);
+    const bool hasBorder =
+        centerTile && tileContainsItemId(*centerTile, borderItemId);
+    require(hasBorder == shouldHaveBorder, label);
+  };
+
+  requireScenario("friend-owner", "friend-target", 63012, false,
+                  "named friend should suppress normal border");
+  requireScenario("enemy-owner", "friendly-target", 63022, false,
+                  "named enemy should make unlisted targets friendly");
+  requireScenario("enemy-owner", "blocked-target", 63024, true,
+                  "named enemy target should still receive normal border");
+  requireScenario("enemy-all-owner", "enemy-all-target", 63032, true,
+                  "enemy all should make every target non-friendly");
+  requireScenario("clear-owner", "clear-target", 63042, true,
+                  "clear_friends should remove previous friend all");
+}
+
+void requireGroundInlineOptionalBorderXml(const fs::path &tempDir) {
+  const fs::path brushPath = tempDir / "ground_inline_optional.xml";
+  writeTextFile(
+      brushPath,
+      R"xml(<brushes>
+  <brush name="inline-optional-owner" type="ground" lookid="64010" z-order="1">
+    <item id="64010" />
+    <friend name="inline-optional-target" />
+    <optional ground_equivalent="64010">
+      <borderitem edge="n" id="64012" />
+    </optional>
+  </brush>
+  <brush name="inline-optional-target" type="ground" lookid="64011" z-order="2">
+    <item id="64011" />
+    <border align="inner" to="inline-optional-owner">
+      <borderitem edge="n" id="64013" />
+    </border>
+  </brush>
+</brushes>)xml");
+
+  MapEditor::Brushes::BrushRegistry localRegistry;
+  MapEditor::IO::BrushXmlReader reader({&localRegistry});
+  require(reader.loadFile(brushPath), "inline optional ground brush XML failed");
+
+  auto *ownerBrush = dynamic_cast<MapEditor::Brushes::GroundBrush *>(
+      localRegistry.getBrush("inline-optional-owner"));
+  auto *targetBrush = dynamic_cast<MapEditor::Brushes::GroundBrush *>(
+      localRegistry.getBrush("inline-optional-target"));
+  require(ownerBrush != nullptr && targetBrush != nullptr,
+          "inline optional ground brushes did not load");
+
+  MapEditor::Domain::ChunkedMap map;
+  map.createNew(16, 16, 1098);
+  const MapEditor::Domain::Position north{8, 7, 7};
+  const MapEditor::Domain::Position center{8, 8, 7};
+
+  auto paint = [&](MapEditor::Brushes::GroundBrush &brush,
+                   const MapEditor::Domain::Position &pos) {
+    MapEditor::Brushes::DrawContext ctx;
+    ctx.brushRegistry = &localRegistry;
+    ctx.ownerBrushId = localRegistry.getBrushId(&brush);
+    brush.draw(map, map.getOrCreateTile(pos), ctx);
+  };
+
+  paint(*ownerBrush, north);
+  paint(*targetBrush, center);
+
+  auto *centerTile = map.getTile(center);
+  require(centerTile != nullptr, "inline optional target tile missing");
+  centerTile->setOptionalBorder(true);
+  targetBrush->rebuildTile(map, center);
+
+  require(tileContainsItemId(*centerTile, 64012),
+          "inline optional ground_equivalent border item was not placed");
+  require(!tileContainsItemId(*centerTile, 64013),
+          "friendly inline optional border should suppress normal border");
+}
+
+void requireGroundOuterZilchMaterializesEmptyTile(const fs::path &tempDir) {
+  const fs::path brushPath = tempDir / "ground_outer_zilch.xml";
+  writeTextFile(
+      brushPath,
+      R"xml(<brushes>
+  <brush name="outer-zilch-owner" type="ground" lookid="64500" z-order="10">
+    <item id="64500" />
+    <border align="outer" to="none" id="6451" />
+  </brush>
+</brushes>)xml");
+
+  MapEditor::Brushes::BrushRegistry localRegistry;
+  MapEditor::Brushes::BorderBlock borderBlock;
+  borderBlock.addItem(EdgeType::N, 64510, 1);
+  localRegistry.registerBorderTemplate(6451, std::move(borderBlock));
+
+  MapEditor::IO::BrushXmlReader reader({&localRegistry});
+  require(reader.loadFile(brushPath),
+          "outer-zilch ground brush XML failed");
+
+  auto *ownerBrush = dynamic_cast<MapEditor::Brushes::GroundBrush *>(
+      localRegistry.getBrush("outer-zilch-owner"));
+  require(ownerBrush != nullptr, "outer-zilch ground brush did not load");
+
+  MapEditor::Domain::ChunkedMap map;
+  map.createNew(16, 16, 1098);
+  const MapEditor::Domain::Position north{8, 7, 7};
+  const MapEditor::Domain::Position center{8, 8, 7};
+
+  MapEditor::Brushes::DrawContext ctx;
+  ctx.brushRegistry = &localRegistry;
+  ctx.ownerBrushId = localRegistry.getBrushId(ownerBrush);
+  ownerBrush->draw(map, map.getOrCreateTile(north), ctx);
+
+  const auto *centerTile = map.getTile(center);
+  require(centerTile != nullptr && !centerTile->hasGround(),
+          "outer-zilch border did not materialize an empty target tile");
+  require(tileContainsItemId(*centerTile, 64510),
+          "outer-zilch border item was not placed on the empty target tile");
+}
+
+void requireGroundClearBordersMatchesRme(const fs::path &tempDir) {
+  auto registerTemplate = [](MapEditor::Brushes::BrushRegistry &registry,
+                             uint32_t templateId, uint16_t itemId,
+                             EdgeType edge) {
+    MapEditor::Brushes::BorderBlock block;
+    block.addItem(edge, itemId, 1);
+    registry.registerBorderTemplate(templateId, std::move(block));
+  };
+
+  const fs::path brushPath = tempDir / "ground_clear_borders.xml";
+  writeTextFile(
+      brushPath,
+      R"xml(<brushes>
+  <brush name="clear-border-owner" type="ground" lookid="64600" z-order="10">
+    <item id="64600" />
+    <border align="inner" to="clear-border-north" id="6461" />
+    <clear_borders />
+    <border align="inner" to="clear-border-east" id="6462" />
+  </brush>
+  <brush name="clear-border-north" type="ground" lookid="64601" z-order="1">
+    <item id="64601" />
+  </brush>
+  <brush name="clear-border-east" type="ground" lookid="64602" z-order="1">
+    <item id="64602" />
+  </brush>
+</brushes>)xml");
+
+  MapEditor::Brushes::BrushRegistry localRegistry;
+  registerTemplate(localRegistry, 6461, 64610, EdgeType::N);
+  registerTemplate(localRegistry, 6462, 64620, EdgeType::E);
+  MapEditor::IO::BrushXmlReader reader({&localRegistry});
+  require(reader.loadFile(brushPath), "clear_borders ground brush XML failed");
+
+  auto *ownerBrush = dynamic_cast<MapEditor::Brushes::GroundBrush *>(
+      localRegistry.getBrush("clear-border-owner"));
+  auto *northBrush = dynamic_cast<MapEditor::Brushes::GroundBrush *>(
+      localRegistry.getBrush("clear-border-north"));
+  auto *eastBrush = dynamic_cast<MapEditor::Brushes::GroundBrush *>(
+      localRegistry.getBrush("clear-border-east"));
+  require(ownerBrush != nullptr && northBrush != nullptr && eastBrush != nullptr,
+          "clear_borders ground brushes did not load");
+  require(localRegistry.getBrushForItem(64610) != ownerBrush,
+          "clear_borders left cleared border item bound to owner brush");
+
+  auto paint = [](MapEditor::Domain::ChunkedMap &map,
+                  MapEditor::Brushes::BrushRegistry &registry,
+                  MapEditor::Brushes::GroundBrush &brush,
+                  const MapEditor::Domain::Position &pos) {
+    MapEditor::Brushes::DrawContext ctx;
+    ctx.brushRegistry = &registry;
+    ctx.ownerBrushId = registry.getBrushId(&brush);
+    brush.draw(map, map.getOrCreateTile(pos), ctx);
+  };
+
+  MapEditor::Domain::ChunkedMap map;
+  map.createNew(16, 16, 1098);
+  const MapEditor::Domain::Position north{8, 7, 7};
+  const MapEditor::Domain::Position center{8, 8, 7};
+  const MapEditor::Domain::Position east{9, 8, 7};
+
+  paint(map, localRegistry, *northBrush, north);
+  paint(map, localRegistry, *eastBrush, east);
+  paint(map, localRegistry, *ownerBrush, center);
+
+  const auto *centerTile = map.getTile(center);
+  require(centerTile != nullptr && !tileContainsItemId(*centerTile, 64610),
+          "clear_borders did not remove the earlier border rule");
+  require(tileContainsItemId(*centerTile, 64620),
+          "clear_borders prevented later border rules from applying");
+}
+
+void requireGroundTerrainPlacementUsesGroundEquivalent(const fs::path &tempDir) {
+  const fs::path brushPath = tempDir / "ground_terrain_equivalent.xml";
+  writeTextFile(
+      brushPath,
+      R"xml(<brushes>
+  <brush name="terrain-equivalent-owner" type="ground" lookid="64700" z-order="10">
+    <item id="64710" />
+    <border align="inner" ground_equivalent="64700">
+      <borderitem edge="n" id="64710" />
+    </border>
+  </brush>
+  <brush name="terrain-template-equivalent-owner" type="ground" lookid="64700" z-order="10">
+    <item id="64720" />
+    <border align="inner" id="6471" ground_equivalent="64700" />
+  </brush>
+</brushes>)xml");
+
+  MapEditor::Brushes::BrushRegistry localRegistry;
+  MapEditor::Brushes::BorderBlock templateBlock;
+  templateBlock.addItem(EdgeType::N, 64720, 1);
+  localRegistry.registerBorderTemplate(6471, std::move(templateBlock));
+
+  MapEditor::IO::BrushXmlReader reader({&localRegistry});
+  require(reader.loadFile(brushPath),
+          "terrain-equivalent ground brush XML failed");
+
+  auto *ownerBrush = dynamic_cast<MapEditor::Brushes::GroundBrush *>(
+      localRegistry.getBrush("terrain-equivalent-owner"));
+  auto *templateOwnerBrush = dynamic_cast<MapEditor::Brushes::GroundBrush *>(
+      localRegistry.getBrush("terrain-template-equivalent-owner"));
+  require(ownerBrush != nullptr,
+          "terrain-equivalent ground brush did not load");
+  require(templateOwnerBrush != nullptr,
+          "terrain template-equivalent ground brush did not load");
+
+  MapEditor::Domain::ChunkedMap map;
+  map.createNew(16, 16, 1098);
+  const MapEditor::Domain::Position center{8, 8, 7};
+  const MapEditor::Domain::Position east{9, 8, 7};
+
+  MapEditor::Brushes::DrawContext ctx;
+  ctx.brushRegistry = &localRegistry;
+  ctx.ownerBrushId = localRegistry.getBrushId(ownerBrush);
+  ownerBrush->draw(map, map.getOrCreateTile(center), ctx);
+
+  const auto *centerTile = map.getTile(center);
+  require(centerTile != nullptr && centerTile->hasGround(),
+          "terrain-equivalent draw did not place ground");
+  require(centerTile->getGround()->getServerId() == 64700,
+          "terrain-equivalent draw did not convert border item to base ground");
+  require(!tileContainsItemId(*centerTile, 64710),
+          "terrain-equivalent draw left the border item on the tile");
+
+  ctx.ownerBrushId = localRegistry.getBrushId(templateOwnerBrush);
+  templateOwnerBrush->draw(map, map.getOrCreateTile(east), ctx);
+
+  const auto *eastTile = map.getTile(east);
+  require(eastTile != nullptr && eastTile->hasGround(),
+          "terrain template-equivalent draw did not place ground");
+  require(eastTile->getGround()->getServerId() == 64700,
+          "terrain template-equivalent draw did not convert border item to base ground");
+  require(!tileContainsItemId(*eastTile, 64720),
+          "terrain template-equivalent draw left the border item on the tile");
+}
+
+void requireGroundSpecificCaseBorderActions(const fs::path &tempDir) {
+  auto registerTemplate = [](MapEditor::Brushes::BrushRegistry &registry,
+                             uint32_t templateId, uint16_t itemId,
+                             EdgeType edge, uint16_t group = 0) {
+    MapEditor::Brushes::BorderBlock block;
+    block.setGroup(group);
+    block.addItem(edge, itemId, 1);
+    registry.registerBorderTemplate(templateId, std::move(block));
+  };
+
+  auto paint = [](MapEditor::Domain::ChunkedMap &map,
+                  MapEditor::Brushes::BrushRegistry &registry,
+                  MapEditor::Brushes::GroundBrush &brush,
+                  const MapEditor::Domain::Position &pos) {
+    MapEditor::Brushes::DrawContext ctx;
+    ctx.brushRegistry = &registry;
+    ctx.ownerBrushId = registry.getBrushId(&brush);
+    brush.draw(map, map.getOrCreateTile(pos), ctx);
+  };
+
+  {
+    const fs::path brushPath = tempDir / "ground_specific_replace.xml";
+    writeTextFile(
+        brushPath,
+        R"xml(<brushes>
+  <brush name="specific-replace-owner" type="ground" lookid="65000" z-order="10">
+    <item id="65000" />
+    <border align="inner" to="specific-replace-north" id="6501">
+      <specific>
+        <conditions>
+          <match_border id="6501" edge="n" />
+          <match_border id="6502" edge="e" />
+        </conditions>
+        <actions>
+          <replace_border id="6502" edge="e" with="65099" />
+        </actions>
+      </specific>
+    </border>
+    <border align="inner" to="specific-replace-east" id="6502" />
+  </brush>
+  <brush name="specific-replace-north" type="ground" lookid="65001" z-order="1">
+    <item id="65001" />
+  </brush>
+  <brush name="specific-replace-east" type="ground" lookid="65002" z-order="1">
+    <item id="65002" />
+  </brush>
+</brushes>)xml");
+
+    MapEditor::Brushes::BrushRegistry localRegistry;
+    registerTemplate(localRegistry, 6501, 65010, EdgeType::N);
+    registerTemplate(localRegistry, 6502, 65020, EdgeType::E);
+    MapEditor::IO::BrushXmlReader reader({&localRegistry});
+    require(reader.loadFile(brushPath),
+            "specific replace ground brush XML failed");
+
+    auto *ownerBrush = dynamic_cast<MapEditor::Brushes::GroundBrush *>(
+        localRegistry.getBrush("specific-replace-owner"));
+    auto *northBrush = dynamic_cast<MapEditor::Brushes::GroundBrush *>(
+        localRegistry.getBrush("specific-replace-north"));
+    auto *eastBrush = dynamic_cast<MapEditor::Brushes::GroundBrush *>(
+        localRegistry.getBrush("specific-replace-east"));
+    require(ownerBrush != nullptr && northBrush != nullptr && eastBrush != nullptr,
+            "specific replace ground brushes did not load");
+
+    MapEditor::Domain::ChunkedMap map;
+    map.createNew(16, 16, 1098);
+    const MapEditor::Domain::Position north{8, 7, 7};
+    const MapEditor::Domain::Position center{8, 8, 7};
+    const MapEditor::Domain::Position east{9, 8, 7};
+    paint(map, localRegistry, *northBrush, north);
+    paint(map, localRegistry, *eastBrush, east);
+    paint(map, localRegistry, *ownerBrush, center);
+
+    const auto *centerTile = map.getTile(center);
+    require(centerTile != nullptr && tileContainsItemId(*centerTile, 65099),
+            "specific replace_border did not place replacement item");
+    require(!tileContainsItemId(*centerTile, 65020),
+            "specific replace_border left the replaced border item");
+    require(!tileContainsItemId(*centerTile, 65010),
+            "specific replace_border did not delete the other matched border");
+  }
+
+  {
+    const fs::path brushPath = tempDir / "ground_specific_delete.xml";
+    writeTextFile(
+        brushPath,
+        R"xml(<brushes>
+  <brush name="specific-delete-owner" type="ground" lookid="65100" z-order="10">
+    <item id="65100" />
+    <border align="inner" to="specific-delete-north" id="6511">
+      <specific>
+        <conditions>
+          <match_border id="6511" edge="n" />
+          <match_border id="6512" edge="e" />
+        </conditions>
+        <actions>
+          <delete_borders />
+        </actions>
+      </specific>
+    </border>
+    <border align="inner" to="specific-delete-east" id="6512" />
+  </brush>
+  <brush name="specific-delete-north" type="ground" lookid="65101" z-order="1">
+    <item id="65101" />
+  </brush>
+  <brush name="specific-delete-east" type="ground" lookid="65102" z-order="1">
+    <item id="65102" />
+  </brush>
+</brushes>)xml");
+
+    MapEditor::Brushes::BrushRegistry localRegistry;
+    registerTemplate(localRegistry, 6511, 65110, EdgeType::N);
+    registerTemplate(localRegistry, 6512, 65120, EdgeType::E);
+    MapEditor::IO::BrushXmlReader reader({&localRegistry});
+    require(reader.loadFile(brushPath),
+            "specific delete ground brush XML failed");
+
+    auto *ownerBrush = dynamic_cast<MapEditor::Brushes::GroundBrush *>(
+        localRegistry.getBrush("specific-delete-owner"));
+    auto *northBrush = dynamic_cast<MapEditor::Brushes::GroundBrush *>(
+        localRegistry.getBrush("specific-delete-north"));
+    auto *eastBrush = dynamic_cast<MapEditor::Brushes::GroundBrush *>(
+        localRegistry.getBrush("specific-delete-east"));
+    require(ownerBrush != nullptr && northBrush != nullptr && eastBrush != nullptr,
+            "specific delete ground brushes did not load");
+
+    MapEditor::Domain::ChunkedMap map;
+    map.createNew(16, 16, 1098);
+    const MapEditor::Domain::Position north{8, 7, 7};
+    const MapEditor::Domain::Position center{8, 8, 7};
+    const MapEditor::Domain::Position east{9, 8, 7};
+    paint(map, localRegistry, *northBrush, north);
+    paint(map, localRegistry, *eastBrush, east);
+    paint(map, localRegistry, *ownerBrush, center);
+
+    const auto *centerTile = map.getTile(center);
+    require(centerTile != nullptr && !tileContainsItemId(*centerTile, 65110) &&
+                !tileContainsItemId(*centerTile, 65120),
+            "specific delete_borders did not remove matched borders");
+  }
+
+  {
+    const fs::path brushPath = tempDir / "ground_specific_group.xml";
+    writeTextFile(
+        brushPath,
+        R"xml(<brushes>
+  <brush name="specific-group-owner" type="ground" lookid="65200" z-order="10">
+    <item id="65200" />
+    <border align="inner" to="specific-group-north" id="6521">
+      <specific>
+        <conditions>
+          <match_group group="1" edge="n" />
+          <match_border id="6522" edge="e" />
+        </conditions>
+        <actions>
+          <replace_border id="6522" edge="e" with="65299" />
+        </actions>
+      </specific>
+    </border>
+    <border align="inner" to="specific-group-east" id="6522" />
+  </brush>
+  <brush name="specific-group-north" type="ground" lookid="65201" z-order="1">
+    <item id="65201" />
+  </brush>
+  <brush name="specific-group-east" type="ground" lookid="65202" z-order="1">
+    <item id="65202" />
+  </brush>
+</brushes>)xml");
+
+    MapEditor::Brushes::BrushRegistry localRegistry;
+    registerTemplate(localRegistry, 6521, 65210, EdgeType::N, 1);
+    registerTemplate(localRegistry, 6522, 65220, EdgeType::E);
+    MapEditor::IO::BrushXmlReader reader({&localRegistry});
+    require(reader.loadFile(brushPath),
+            "specific group ground brush XML failed");
+
+    auto *ownerBrush = dynamic_cast<MapEditor::Brushes::GroundBrush *>(
+        localRegistry.getBrush("specific-group-owner"));
+    auto *northBrush = dynamic_cast<MapEditor::Brushes::GroundBrush *>(
+        localRegistry.getBrush("specific-group-north"));
+    auto *eastBrush = dynamic_cast<MapEditor::Brushes::GroundBrush *>(
+        localRegistry.getBrush("specific-group-east"));
+    require(ownerBrush != nullptr && northBrush != nullptr && eastBrush != nullptr,
+            "specific group ground brushes did not load");
+
+    MapEditor::Domain::ChunkedMap map;
+    map.createNew(16, 16, 1098);
+    const MapEditor::Domain::Position north{8, 7, 7};
+    const MapEditor::Domain::Position center{8, 8, 7};
+    const MapEditor::Domain::Position east{9, 8, 7};
+    paint(map, localRegistry, *northBrush, north);
+    paint(map, localRegistry, *eastBrush, east);
+    paint(map, localRegistry, *ownerBrush, center);
+
+    const auto *centerTile = map.getTile(center);
+    require(centerTile != nullptr && tileContainsItemId(*centerTile, 65299),
+            "specific match_group did not enable replacement action");
+    require(tileContainsItemId(*centerTile, 65210),
+            "specific match_group should keep the group-matched border");
+    require(!tileContainsItemId(*centerTile, 65220),
+            "specific match_group replacement left the replaced border item");
+  }
+
+  {
+    const fs::path brushPath = tempDir / "ground_specific_replace_item.xml";
+    writeTextFile(
+        brushPath,
+        R"xml(<brushes>
+  <brush name="specific-replace-item-owner" type="ground" lookid="65300" z-order="10">
+    <item id="65300" />
+    <border align="inner" to="specific-replace-item-east" id="6531">
+      <specific>
+        <conditions>
+          <match_border id="6531" edge="e" />
+        </conditions>
+        <actions>
+          <replace_item id="65310" with="65399" />
+        </actions>
+      </specific>
+    </border>
+  </brush>
+  <brush name="specific-replace-item-east" type="ground" lookid="65301" z-order="1">
+    <item id="65301" />
+  </brush>
+</brushes>)xml");
+
+    MapEditor::Brushes::BrushRegistry localRegistry;
+    registerTemplate(localRegistry, 6531, 65310, EdgeType::E);
+    MapEditor::IO::BrushXmlReader reader({&localRegistry});
+    require(reader.loadFile(brushPath),
+            "specific replace_item ground brush XML failed");
+
+    auto *ownerBrush = dynamic_cast<MapEditor::Brushes::GroundBrush *>(
+        localRegistry.getBrush("specific-replace-item-owner"));
+    auto *eastBrush = dynamic_cast<MapEditor::Brushes::GroundBrush *>(
+        localRegistry.getBrush("specific-replace-item-east"));
+    require(ownerBrush != nullptr && eastBrush != nullptr,
+            "specific replace_item ground brushes did not load");
+
+    MapEditor::Domain::ChunkedMap map;
+    map.createNew(16, 16, 1098);
+    const MapEditor::Domain::Position center{8, 8, 7};
+    const MapEditor::Domain::Position east{9, 8, 7};
+    paint(map, localRegistry, *eastBrush, east);
+    paint(map, localRegistry, *ownerBrush, center);
+
+    const auto *centerTile = map.getTile(center);
+    require(centerTile != nullptr && tileContainsItemId(*centerTile, 65399),
+            "specific replace_item did not place replacement item");
+    require(!tileContainsItemId(*centerTile, 65310),
+            "specific replace_item left the replaced item");
+  }
+
+  {
+    const fs::path brushPath = tempDir / "ground_specific_keep_border.xml";
+    writeTextFile(
+        brushPath,
+        R"xml(<brushes>
+  <brush name="specific-keep-owner" type="ground" lookid="65400" z-order="10">
+    <item id="65400" />
+    <border align="inner" to="specific-keep-north" id="6541">
+      <specific keep_border="true">
+        <conditions>
+          <match_border id="6541" edge="n" />
+          <match_border id="6542" edge="e" />
+        </conditions>
+        <actions>
+          <replace_border id="6542" edge="e" with="65499" />
+        </actions>
+      </specific>
+    </border>
+    <border align="inner" to="specific-keep-east" id="6542" />
+  </brush>
+  <brush name="specific-keep-north" type="ground" lookid="65401" z-order="1">
+    <item id="65401" />
+  </brush>
+  <brush name="specific-keep-east" type="ground" lookid="65402" z-order="1">
+    <item id="65402" />
+  </brush>
+</brushes>)xml");
+
+    MapEditor::Brushes::BrushRegistry localRegistry;
+    registerTemplate(localRegistry, 6541, 65410, EdgeType::N);
+    registerTemplate(localRegistry, 6542, 65420, EdgeType::E);
+    MapEditor::IO::BrushXmlReader reader({&localRegistry});
+    require(reader.loadFile(brushPath),
+            "specific keep_border ground brush XML failed");
+
+    auto *ownerBrush = dynamic_cast<MapEditor::Brushes::GroundBrush *>(
+        localRegistry.getBrush("specific-keep-owner"));
+    auto *northBrush = dynamic_cast<MapEditor::Brushes::GroundBrush *>(
+        localRegistry.getBrush("specific-keep-north"));
+    auto *eastBrush = dynamic_cast<MapEditor::Brushes::GroundBrush *>(
+        localRegistry.getBrush("specific-keep-east"));
+    require(ownerBrush != nullptr && northBrush != nullptr && eastBrush != nullptr,
+            "specific keep_border ground brushes did not load");
+
+    MapEditor::Domain::ChunkedMap map;
+    map.createNew(16, 16, 1098);
+    const MapEditor::Domain::Position north{8, 7, 7};
+    const MapEditor::Domain::Position center{8, 8, 7};
+    const MapEditor::Domain::Position east{9, 8, 7};
+    paint(map, localRegistry, *northBrush, north);
+    paint(map, localRegistry, *eastBrush, east);
+    paint(map, localRegistry, *ownerBrush, center);
+
+    const auto *centerTile = map.getTile(center);
+    require(centerTile != nullptr && tileContainsItemId(*centerTile, 65499),
+            "specific keep_border did not place replacement item");
+    require(tileContainsItemId(*centerTile, 65410),
+            "specific keep_border did not keep the other matched border");
+    require(!tileContainsItemId(*centerTile, 65420),
+            "specific keep_border left the replaced border item");
+  }
+}
+
+void requireRealDataGroundSpecificCaseStack(
+    MapEditor::Brushes::BrushRegistry &registry) {
+  auto *grassBrush = findGroundBrush(registry, "grass");
+  auto *snowBrush = findGroundBrush(registry, "snow");
+  auto *seaBrush = findGroundBrush(registry, "sea");
+  require(grassBrush != nullptr && snowBrush != nullptr && seaBrush != nullptr,
+          "real-data ground specific-case fixture brushes are missing");
+
+  MapEditor::Domain::ChunkedMap map;
+  map.createNew(16, 16, 1098);
+  const MapEditor::Domain::Position north{8, 7, 7};
+  const MapEditor::Domain::Position center{8, 8, 7};
+  const MapEditor::Domain::Position east{9, 8, 7};
+
+  paintGround(map, registry, *snowBrush, north);
+  paintGround(map, registry, *seaBrush, east);
+  paintGround(map, registry, *grassBrush, center);
+
+  const auto *centerTile = map.getTile(center);
+  require(centerTile != nullptr && tileContainsItemId(*centerTile, 6656),
+          "real-data snow/sea specific case did not place replacement item");
+  require(!tileContainsItemId(*centerTile, 4645),
+          "real-data snow/sea specific case left the replaced sea border");
+  require(!tileContainsItemId(*centerTile, 4737),
+          "real-data snow/sea specific case left the matched snow border");
+}
+
+void requireRealDataSandSpecificCaseReplaceItem(
+    MapEditor::Brushes::BrushRegistry &registry) {
+  auto *sandBrush = findGroundBrush(registry, "sand");
+  auto *seaBrush = findGroundBrush(registry, "sea");
+  auto *grassBrush = findGroundBrush(registry, "grass");
+  require(sandBrush != nullptr && seaBrush != nullptr && grassBrush != nullptr,
+          "real-data sand specific-case fixture brushes are missing");
+
+  MapEditor::Domain::ChunkedMap map;
+  map.createNew(16, 16, 1098);
+  const MapEditor::Domain::Position center{8, 8, 7};
+  const MapEditor::Domain::Position east{9, 8, 7};
+  const MapEditor::Domain::Position south{8, 9, 7};
+
+  paintGround(map, registry, *grassBrush, east);
+  paintGround(map, registry, *seaBrush, south);
+  paintGround(map, registry, *sandBrush, center);
+
+  const auto *centerTile = map.getTile(center);
+  require(centerTile != nullptr && tileContainsItemId(*centerTile, 4661),
+          "real-data sand specific case did not place replacement item");
+  require(tileContainsItemId(*centerTile, 4543),
+          "real-data sand specific case lost the matched grass border");
+  require(!tileContainsItemId(*centerTile, 4634),
+          "real-data sand specific case left the replaced shoreline item");
+}
+
+void requireRealDataFrozenMudSpecificCaseMatchGroup(
+    MapEditor::Brushes::BrushRegistry &registry) {
+  auto *frozenMudBrush = findGroundBrush(registry, "frozen mud");
+  auto *seaBrush = findGroundBrush(registry, "sea");
+  auto *grassBrush = findGroundBrush(registry, "grass");
+  require(frozenMudBrush != nullptr && seaBrush != nullptr &&
+              grassBrush != nullptr,
+          "real-data frozen mud specific-case fixture brushes are missing");
+
+  MapEditor::Domain::ChunkedMap map;
+  map.createNew(16, 16, 1098);
+  const MapEditor::Domain::Position center{8, 8, 7};
+  const MapEditor::Domain::Position east{9, 8, 7};
+  const MapEditor::Domain::Position south{8, 9, 7};
+
+  paintGround(map, registry, *seaBrush, east);
+  paintGround(map, registry, *grassBrush, south);
+  paintGround(map, registry, *frozenMudBrush, center);
+
+  const auto *centerTile = map.getTile(center);
+  require(centerTile != nullptr && tileContainsItemId(*centerTile, 6664),
+          "real-data frozen mud match_group case did not replace sea border");
+  require(tileContainsItemId(*centerTile, 4544),
+          "real-data frozen mud match_group case lost the matched group border");
+  require(!tileContainsItemId(*centerTile, 6640),
+          "real-data frozen mud match_group case left the replaced sea border");
+}
+
+void requireRealDataGroundOuterZilch(
+    MapEditor::Brushes::BrushRegistry &registry) {
+  auto *alternateGrassBrush = dynamic_cast<MapEditor::Brushes::GroundBrush *>(
+      registry.getBrush("grass (alternate border)"));
+  require(alternateGrassBrush != nullptr,
+          "real-data outer-zilch fixture brush is missing");
+
+  MapEditor::Domain::ChunkedMap map;
+  map.createNew(16, 16, 1098);
+  const MapEditor::Domain::Position north{8, 7, 7};
+  const MapEditor::Domain::Position center{8, 8, 7};
+
+  MapEditor::Brushes::DrawContext ctx;
+  ctx.brushRegistry = &registry;
+  ctx.ownerBrushId = registry.getBrushId(alternateGrassBrush);
+  alternateGrassBrush->draw(map, map.getOrCreateTile(north), ctx);
+
+  const auto *centerTile = map.getTile(center);
+  require(centerTile != nullptr && !centerTile->hasGround(),
+          "real-data outer-zilch did not materialize a groundless tile");
+  require(tileContainsItemId(*centerTile, 7653),
+          "real-data outer-zilch did not place border id 120 north item");
+}
+
 } // namespace
 
 int main() {
   try {
     const fs::path sourceRoot = BRUSH_SMOKE_SOURCE_DIR;
-    const fs::path dataPath = sourceRoot / "sample_data";
+    const fs::path dataPath = sourceRoot.parent_path() / "data" / "1098";
     const fs::path tempDir =
         fs::temp_directory_path() / "imgui-mapeditor-brush-smoke";
     std::error_code cleanupError;
@@ -211,7 +1197,7 @@ int main() {
     fs::create_directories(tempDir);
 
     require(fs::exists(dataPath / "materials.xml"),
-            "sample_data/materials.xml is missing");
+            "data/1098/materials.xml is missing");
 
     MapEditor::Brushes::BrushRegistry registry;
     const auto hotkeys = MapEditor::Services::HotkeyRegistry::createDefaults();
@@ -231,6 +1217,18 @@ int main() {
             "brush slot store hotkey binding is missing");
     require(hotkeys.findByAction("ROTATE_ITEM") != nullptr,
             "rotate-item hotkey binding is missing");
+    require(MapEditor::Brushes::parseDoorType("hatch window") ==
+                DoorType::HatchWindow,
+            "RME hatch window door spelling did not parse");
+    requireBorderSelectionUsesScopedSeed();
+    requireGroundBorderMissingAlignDefaultsOuter(tempDir);
+    requireGroundBorderZOrderMatchesRme(tempDir);
+    requireGroundFriendEnemySemanticsMatchRme(tempDir);
+    requireGroundInlineOptionalBorderXml(tempDir);
+    requireGroundOuterZilchMaterializesEmptyTile(tempDir);
+    requireGroundClearBordersMatchesRme(tempDir);
+    requireGroundTerrainPlacementUsesGroundEquivalent(tempDir);
+    requireGroundSpecificCaseBorderActions(tempDir);
     const auto hotkeyPath = tempDir / "hotkeys.json";
     writeTextFile(hotkeyPath,
                   R"json({"bindings":{"edit":{"SAVE":{"key":"S","mods":["Ctrl"]}}}})json");
@@ -247,13 +1245,17 @@ int main() {
             "no tilesets were registered");
     require(!tilesetService.getPaletteRegistry().empty(),
             "no palettes were registered");
+    requireRealDataGroundSpecificCaseStack(registry);
+    requireRealDataSandSpecificCaseReplaceItem(registry);
+    requireRealDataFrozenMudSpecificCaseMatchGroup(registry);
+    requireRealDataGroundOuterZilch(registry);
 
     auto *creatureOthersTileset =
         tilesetService.getTilesetRegistry().getTilesetBySourceFile(
-            dataPath / "tilesets/creatures/Others_creatures.xml");
+            dataPath / "tilesets/creatures/Others.xml");
     auto *rawOthersTileset =
         tilesetService.getTilesetRegistry().getTilesetBySourceFile(
-            dataPath / "tilesets/raw/Others_raw.xml");
+            dataPath / "tilesets/raw/Others.xml");
     require(creatureOthersTileset != nullptr,
             "creature Others tileset was not registered by source file");
     require(rawOthersTileset != nullptr,
@@ -404,6 +1406,9 @@ int main() {
     require(wallBrush != nullptr, "wall brush lookup failed");
     require(doorWallBrush != nullptr, "door wall brush lookup failed");
     require(mossyWallBrush != nullptr, "mossy wall brush lookup failed");
+    auto *doorWallTyped =
+        dynamic_cast<MapEditor::Brushes::WallBrush *>(doorWallBrush);
+    require(doorWallTyped != nullptr, "door wall brush cast failed");
     require(carpetBrush != nullptr, "carpet brush lookup failed");
     require(tableBrush != nullptr, "table brush lookup failed");
     require(earthSoftBrush != nullptr, "earth (soft) brush lookup failed");
@@ -423,6 +1428,27 @@ int main() {
     map.createNew(128, 128, 1098);
     map.setHouseFile("brush-smoke-houses.xml");
     map.setSpawnFile("brush-smoke-spawns.xml");
+
+    if (const auto variantPair = findWallVariantPair(*doorWallTyped)) {
+      const MapEditor::Domain::Position variantPos{28, 20, 7};
+      auto *variantTile = map.getOrCreateTile(variantPos);
+      require(variantTile != nullptr, "wall variant test tile missing");
+      auto variantItem =
+          std::make_unique<MapEditor::Domain::Item>(variantPair->first);
+      variantItem->setOwnerBrushId(registry.getBrushId(doorWallBrush));
+      variantTile->addItemDirect(std::move(variantItem));
+
+      MapEditor::Brushes::DrawContext variantContext;
+      variantContext.specialAction = true;
+      variantContext.ownerBrushId = registry.getBrushId(doorWallBrush);
+      const auto placement =
+          doorWallTyped->placeWallTile(*variantTile, variantContext);
+      require(placement.changed, "wall variant special action did not apply");
+      require(variantTile->getItemCount() > 0 &&
+                  variantTile->getItem(variantTile->getItemCount() - 1)
+                          ->getServerId() == variantPair->second,
+              "wall variant special action selected the wrong item");
+    }
 
     MapEditor::Domain::History::HistoryManager history;
     MapEditor::Services::BrushSettingsService settings;
@@ -482,6 +1508,18 @@ int main() {
             "ground resolver did not identify the cave brush");
     require(controller.getCurrentBrush() == wallBrush,
             "non-mutating ground resolver changed the active brush");
+
+    auto stackedBorderItem = std::make_unique<MapEditor::Domain::Item>(60000);
+    stackedBorderItem->setOwnerBrushId(registry.getBrushId(sandBrush));
+    caveTile->addItemDirect(std::move(stackedBorderItem));
+    const auto stackedGroundResolution =
+        controller.resolveBrushFromTile(*caveTile, PickMode::Ground);
+    require(stackedGroundResolution.has_value() &&
+                stackedGroundResolution->brush == groundBrush,
+            "ground resolver was confused by border stack ownership");
+    require(controller.canSelectBrushFromTile(*caveTile, PickMode::Ground),
+            "context menu should offer ground brush selection on bordered ground");
+
     require(controller.toggleSelectionTool(),
             "spacebar-style toggle should switch to selection mode");
     require(!controller.hasBrush(),
@@ -699,13 +1737,26 @@ int main() {
             "wall brush did not place wall items");
     const auto wallItemBeforeDoor =
         wallTile->getItem(wallTile->getItemCount() - 1)->getServerId();
+    const auto specialClickItemIndex =
+        findFirstOwnedItemIndex(*wallTile, *doorWallBrush);
+    require(specialClickItemIndex.has_value(),
+            "single-tile wall special click found no owned wall item");
+    const auto specialClickItemBefore =
+        wallTile->getItem(*specialClickItemIndex)->getServerId();
+    const auto expectedSpecialClickItem =
+        doorWallTyped->findNextWallVariant(specialClickItemBefore);
     controller.setBrush(doorWallBrush);
-    require(controller.applyBrush(wallCenterPos),
+    require(controller.applyBrush(wallCenterPos, GLFW_MOD_ALT),
             "single-tile wall special click failed");
-    const auto wallItemAfterSpecialClick =
-        wallTile->getItem(wallTile->getItemCount() - 1)->getServerId();
-    require(wallItemAfterSpecialClick != wallItemBeforeDoor,
-            "single-tile wall special click did not cycle the wall variant");
+    wallTile = map.getTile(wallCenterPos);
+    require(wallTile != nullptr, "wall tile missing after special click");
+    require(wallTile->getItemCount() > *specialClickItemIndex,
+            "wall special click changed the expected stack shape");
+    if (expectedSpecialClickItem) {
+      require(wallTile->getItem(*specialClickItemIndex)->getServerId() ==
+                  *expectedSpecialClickItem,
+              "single-tile wall special click selected the wrong variant");
+    }
     controller.activateMagicDoorBrush();
     require(controller.applyBrush(wallCenterPos), "door brush paint failed");
     require(wallTile->getItemCount() > 0,
@@ -765,6 +1816,8 @@ int main() {
     controller.setBrush(doorWallBrush);
     require(controller.eraseBrush(decoLeftPos),
             "wall decoration neighbor erase failed");
+    decoTile = map.getTile(decoCenterPos);
+    require(decoTile != nullptr, "wall decoration tile missing after rebuild");
     const auto decorationCountAfterRebuild =
         countOwnedItems(*decoTile, *mossyWallBrush);
     require(decorationCountAfterRebuild == decorationCountBeforeRebuild,
@@ -888,7 +1941,9 @@ int main() {
     auto *houseTile = map.getTile(housePos);
     require(houseTile != nullptr && houseTile->getHouseId() == 42,
             "house brush did not assign the house id");
-    require(map.getHouse(42) != nullptr, "house metadata was not created");
+    auto *house = map.getHouse(42);
+    require(house != nullptr, "house metadata was not created");
+    house->town_id = 1;
     require(controller.selectBrushFromTile(*houseTile, PickMode::House),
             "house brush reselection failed");
     require(controller.getHouseBrush()->getHouseId() == 42,

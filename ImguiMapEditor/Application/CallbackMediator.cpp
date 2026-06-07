@@ -33,6 +33,8 @@
 #include "UI/PreferencesDialog.h"
 #include "UI/Ribbon/Panels/FilePanel.h"
 #include "UI/Widgets/SearchResultsWidget.h"
+#include <memory>
+#include <vector>
 #include "UI/Windows/BrowseTile/BrowseTileWindow.h"
 #include "UI/Windows/IngameBoxWindow.h"
 #include "UI/Windows/MinimapWindow.h"
@@ -201,6 +203,32 @@ void CallbackMediator::wirePlatformCallbacks(Context &ctx) {
 }
 
 void CallbackMediator::wireTabCallbacks(Context &ctx) {
+  auto suppressModifiedInvalidation = std::make_shared<bool>(false);
+
+  if (ctx.brush_controller) {
+    ctx.brush_controller->setTilesMutatedCallback(
+        [ctx, suppressModifiedInvalidation](
+            const std::vector<Domain::Position> &positions) {
+          if (positions.empty() || !ctx.tab_manager) {
+            return;
+          }
+
+          auto *session = ctx.tab_manager->getActiveSession();
+          if (!session) {
+            return;
+          }
+
+          if (ctx.rendering_manager) {
+            ctx.rendering_manager->invalidateTiles(session->getID(),
+                                                   positions);
+          }
+
+          *suppressModifiedInvalidation = true;
+          session->setModified(true);
+          *suppressModifiedInvalidation = false;
+        });
+  }
+
   // Wire MainWindow close callback
   if (ctx.main_window) {
     ctx.main_window->setCloseTabCallback(
@@ -416,8 +444,11 @@ void CallbackMediator::wireTabCallbacks(Context &ctx) {
   });
 
   // Session modification callback
-  // Session modification callback
-  ctx.tab_manager->setSessionModifiedCallback([ctx](bool modified) {
+  ctx.tab_manager->setSessionModifiedCallback(
+      [ctx, suppressModifiedInvalidation](bool modified) {
+    if (*suppressModifiedInvalidation) {
+      return;
+    }
     if (auto *session = ctx.tab_manager->getActiveSession()) {
       if (ctx.rendering_manager) {
         if (auto *state =
