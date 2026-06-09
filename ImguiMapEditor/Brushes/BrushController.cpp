@@ -1551,7 +1551,6 @@ bool BrushController::paintRecordedPosition(const Domain::Position &pos,
     return false;
   }
 
-  Services::Autoborder::AutoborderEngine autoborderEngine;
   Services::Autoborder::PlacementIntent intent;
   intent.brush = currentBrush_;
   intent.context = createDrawContext(modifiers, specialAction);
@@ -1559,7 +1558,7 @@ bool BrushController::paintRecordedPosition(const Domain::Position &pos,
   intent.positions = {pos};
   std::vector<Domain::Position> changedPositions;
   const auto plannedResult = Services::Autoborder::applyPlannedIntentWithHistory(
-      autoborderEngine, *map_, *historyManager_, intent, &changedPositions);
+      autoborderEngine_, *map_, *historyManager_, intent, &changedPositions);
   if (plannedResult != Services::Autoborder::PlannedMutationResult::Unsupported) {
     if (plannedResult != Services::Autoborder::PlannedMutationResult::Applied) {
       return false;
@@ -1579,6 +1578,54 @@ bool BrushController::paintRecordedPosition(const Domain::Position &pos,
   return true;
 }
 
+bool BrushController::paintRecordedPositions(
+    std::span<const Domain::Position> positions, uint32_t modifiers,
+    bool specialAction) {
+  if (positions.empty() || !map_ || !historyManager_ || !currentBrush_) {
+    return false;
+  }
+
+  std::vector<Domain::Position> deduped;
+  deduped.reserve(positions.size());
+  bool anyNew = false;
+  for (const auto &pos : positions) {
+    if (paintedPositions_.insert(std::make_tuple(pos.x, pos.y, pos.z)).second) {
+      deduped.push_back(pos);
+      anyNew = true;
+    }
+  }
+  if (!anyNew) {
+    return false;
+  }
+
+  Services::Autoborder::PlacementIntent intent;
+  intent.brush = currentBrush_;
+  intent.context = createDrawContext(modifiers, specialAction);
+  intent.mode = Services::Autoborder::PlacementMode::Draw;
+  intent.positions = std::move(deduped);
+  std::vector<Domain::Position> changedPositions;
+  const auto plannedResult = Services::Autoborder::applyPlannedIntentWithHistory(
+      autoborderEngine_, *map_, *historyManager_, intent, &changedPositions);
+  if (plannedResult == Services::Autoborder::PlannedMutationResult::Applied) {
+    if (strokeActive_ && currentBrush_ &&
+        currentBrush_->getType() == BrushType::Wall && !specialAction) {
+      strokeNeedsAutoborderFinalize_ = true;
+    }
+    notifyTilesMutated(changedPositions);
+    return true;
+  }
+
+  if (plannedResult == Services::Autoborder::PlannedMutationResult::Unsupported) {
+    for (const auto &pos : intent.positions) {
+      historyManager_->recordTileBefore(pos, map_->getTile(pos));
+      paintTileDirect(pos, modifiers, specialAction);
+    }
+    return true;
+  }
+
+  return false;
+}
+
 void BrushController::eraseRecordedPosition(const Domain::Position &pos) {
   if (!map_ || !historyManager_ || !currentBrush_) {
     return;
@@ -1589,7 +1636,6 @@ void BrushController::eraseRecordedPosition(const Domain::Position &pos) {
     return;
   }
 
-  Services::Autoborder::AutoborderEngine autoborderEngine;
   Services::Autoborder::PlacementIntent intent;
   intent.brush = currentBrush_;
   intent.context = createDrawContext(strokeModifiers_);
@@ -1597,7 +1643,7 @@ void BrushController::eraseRecordedPosition(const Domain::Position &pos) {
   intent.positions = {pos};
   std::vector<Domain::Position> changedPositions;
   const auto plannedResult = Services::Autoborder::applyPlannedIntentWithHistory(
-      autoborderEngine, *map_, *historyManager_, intent, &changedPositions);
+      autoborderEngine_, *map_, *historyManager_, intent, &changedPositions);
   if (plannedResult != Services::Autoborder::PlannedMutationResult::Unsupported) {
     if (plannedResult != Services::Autoborder::PlannedMutationResult::Applied) {
       return;
@@ -1632,7 +1678,6 @@ void BrushController::finalizeAutoborderStroke() {
     return;
   }
 
-  Services::Autoborder::AutoborderEngine autoborderEngine;
   Services::Autoborder::PlacementIntent intent;
   intent.brush = currentBrush_;
   intent.context = createDrawContext(strokeModifiers_);
@@ -1640,7 +1685,7 @@ void BrushController::finalizeAutoborderStroke() {
   intent.positions = std::move(positions);
   std::vector<Domain::Position> changedPositions;
   Services::Autoborder::applyPlannedIntentWithHistory(
-      autoborderEngine, *map_, *historyManager_, intent, &changedPositions);
+      autoborderEngine_, *map_, *historyManager_, intent, &changedPositions);
   notifyTilesMutated(changedPositions);
 }
 
@@ -1757,9 +1802,8 @@ void BrushController::eraseDoodadRecordedPosition(const Domain::Position &pos,
 
 void BrushController::paintExpandedCenter(const Domain::Position &center,
                                           uint32_t modifiers) {
-  for (const auto &pos : getBrushPositionsForCenter(center)) {
-    paintRecordedPosition(pos, modifiers);
-  }
+  const auto expanded = getBrushPositionsForCenter(center);
+  paintRecordedPositions(expanded, modifiers);
 }
 
 void BrushController::eraseExpandedCenter(const Domain::Position &center) {

@@ -148,7 +148,7 @@ bool GroundBrush::ownsItem(const Domain::Item *item) const {
 }
 
 void GroundBrush::addGroundItem(uint16_t itemId, uint32_t chance) {
-  groundItems_.emplace_back(itemId, chance == 0 ? 1u : chance);
+  groundItems_.emplace_back(itemId, chance);
   ownedItemIds_.insert(itemId);
   registry_.registerItemBinding(itemId, this);
   if (lookId_ == 0) {
@@ -453,12 +453,22 @@ uint16_t GroundBrush::selectWeightedItem(
 
   std::vector<uint32_t> weights;
   weights.reserve(items.size());
-  for (const auto &[_, chance] : items) {
-    weights.push_back(chance == 0 ? 1u : chance);
+  std::vector<uint16_t> ids;
+  ids.reserve(items.size());
+  for (const auto &[id, chance] : items) {
+    if (chance == 0) {
+      continue;
+    }
+    weights.push_back(chance);
+    ids.push_back(id);
+  }
+
+  if (weights.empty()) {
+    return 0;
   }
 
   const auto selected = WeightedSelection::select(weights);
-  return selected ? items[*selected].first : items.front().first;
+  return selected ? ids[*selected] : ids.front();
 }
 
 void GroundBrush::updateBorderItems(Domain::ChunkedMap &map,
@@ -537,7 +547,7 @@ void GroundBrush::updateBorderItems(Domain::ChunkedMap &map,
   };
 
   const auto resolveRuleTo = [&](const GroundBrush *centerBrush,
-                                 const GroundBrush *neighborBrush)
+                                  const GroundBrush *neighborBrush)
       -> std::optional<ResolvedBorderRule> {
     if (!centerBrush) {
       if (neighborBrush && hasZilchBorderRule(neighborBrush, true)) {
@@ -549,7 +559,6 @@ void GroundBrush::updateBorderItems(Domain::ChunkedMap &map,
           };
         }
       }
-
       return std::nullopt;
     }
 
@@ -557,7 +566,6 @@ void GroundBrush::updateBorderItems(Domain::ChunkedMap &map,
       if (!hasZilchBorderRule(centerBrush, false)) {
         return std::nullopt;
       }
-
       if (const auto *rule = findRule(centerBrush, false, nullptr)) {
         return ResolvedBorderRule{
             .block = &rule->block,
@@ -565,7 +573,6 @@ void GroundBrush::updateBorderItems(Domain::ChunkedMap &map,
             .zOrder = -1000,
         };
       }
-
       return std::nullopt;
     }
 
@@ -723,8 +730,10 @@ void GroundBrush::updateBorderItems(Domain::ChunkedMap &map,
     if (other) {
       bool onlyOptionalBorder = false;
       if (borderBrush &&
-          (other->connectsTo(borderBrush) || borderBrush->connectsTo(other)) &&
-          other->hasOptionalBorderRule()) {
+          (other->connectsTo(borderBrush) || borderBrush->connectsTo(other))) {
+        if (!other->hasOptionalBorderRule()) {
+          continue;
+        }
         onlyOptionalBorder = true;
       }
 

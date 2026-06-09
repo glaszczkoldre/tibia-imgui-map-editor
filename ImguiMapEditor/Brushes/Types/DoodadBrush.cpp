@@ -63,7 +63,6 @@ void rebuildBrushesAtPosition(Domain::ChunkedMap &map, BrushRegistry &registry,
     }
   };
 
-  rebuildBrush(tile->getGround());
   for (const auto &item : tile->getItems()) {
     rebuildBrush(item.get());
   }

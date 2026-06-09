@@ -11,11 +11,13 @@
 #include "Domain/ChunkedMap.h"
 #include "Domain/History/HistoryManager.h"
 #include "Domain/Position.h"
+#include "Services/Autoborder/AutoborderEngine.h"
 #include <algorithm>
 #include <array>
 #include <functional>
 #include <memory>
 #include <optional>
+#include <span>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -398,6 +400,8 @@ private:
   std::unique_ptr<DoorBrush> windowBrush_;
   std::unique_ptr<DoorBrush> hatchWindowBrush_;
 
+  Services::Autoborder::AutoborderEngine autoborderEngine_;
+
   // Simple flag for stroke tracking (HistoryManager handles actual undo)
   bool strokeActive_ = false;
   bool strokeEraseMode_ = false;
@@ -440,6 +444,8 @@ private:
   [[nodiscard]] std::vector<Domain::Position> getPaintedStrokePositions() const;
   bool paintRecordedPosition(const Domain::Position &pos, uint32_t modifiers,
                              bool specialAction = false);
+  bool paintRecordedPositions(std::span<const Domain::Position> positions,
+                              uint32_t modifiers, bool specialAction = false);
   void eraseRecordedPosition(const Domain::Position &pos);
   void finalizeAutoborderStroke();
   void paintExpandedCenter(const Domain::Position &center, uint32_t modifiers);

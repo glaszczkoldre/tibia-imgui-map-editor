@@ -26,6 +26,8 @@
 #include "Services/Brushes/CarpetLookupService.h"
 #include "Services/Brushes/TableLookupService.h"
 #include "Services/Brushes/WallLookupService.h"
+#include "Services/Autoborder/AutoborderEngine.h"
+#include "Services/Autoborder/TileDiff.h"
 #include "Services/BrushSettingsService.h"
 #include "Services/HotkeyRegistry.h"
 #include "Services/Preview/BrushPreviewFactory.h"
@@ -1126,10 +1128,12 @@ void requireRealDataSandSpecificCaseReplaceItem(
   const auto *centerTile = map.getTile(center);
   require(centerTile != nullptr && tileContainsItemId(*centerTile, 4661),
           "real-data sand specific case did not place replacement item");
-  require(tileContainsItemId(*centerTile, 4543),
-          "real-data sand specific case lost the matched grass border");
   require(!tileContainsItemId(*centerTile, 4634),
           "real-data sand specific case left the replaced shoreline item");
+  require(!tileContainsItemId(*centerTile, 4543),
+          "real-data sand specific case did not delete the matched grass border " 
+          "(match_border adds all template items to match set; without keep_border "
+          "they are deleted per RME semantics)");
 }
 
 void requireRealDataFrozenMudSpecificCaseMatchGroup(
@@ -1184,6 +1188,180 @@ void requireRealDataGroundOuterZilch(
           "real-data outer-zilch did not place border id 120 north item");
 }
 
+void requireGroundMultiTileBatchedPlacement(const fs::path &tempDir) {
+  const fs::path brushPath = tempDir / "ground_batch_multitile.xml";
+  writeTextFile(
+      brushPath,
+      R"xml(<brushes>
+  <brush name="batch-grass" type="ground" lookid="66050" z-order="10">
+    <item id="66050" />
+    <border align="inner" to="batch-dirt">
+      <borderitem edge="n" id="66051" />
+      <borderitem edge="e" id="66052" />
+      <borderitem edge="s" id="66053" />
+      <borderitem edge="w" id="66054" />
+    </border>
+    <border align="inner" to="none" id="1" />
+  </brush>
+  <brush name="batch-dirt" type="ground" lookid="66060" z-order="5">
+    <item id="66060" />
+  </brush>
+</brushes>)xml");
+
+  MapEditor::Brushes::BrushRegistry localRegistry;
+  MapEditor::Brushes::BorderBlock zilchBlock;
+  zilchBlock.addItem(EdgeType::N, 66071, 1);
+  zilchBlock.addItem(EdgeType::E, 66072, 1);
+  zilchBlock.addItem(EdgeType::S, 66073, 1);
+  zilchBlock.addItem(EdgeType::W, 66074, 1);
+  localRegistry.registerBorderTemplate(1, std::move(zilchBlock));
+
+  MapEditor::IO::BrushXmlReader reader({&localRegistry});
+  require(reader.loadFile(brushPath), "batch multitile ground brush XML failed");
+
+  auto *grassBrush = dynamic_cast<MapEditor::Brushes::GroundBrush *>(
+      localRegistry.getBrush("batch-grass"));
+  auto *dirtBrush = dynamic_cast<MapEditor::Brushes::GroundBrush *>(
+      localRegistry.getBrush("batch-dirt"));
+  require(grassBrush != nullptr && dirtBrush != nullptr,
+          "batch multitile ground brushes did not load");
+
+  auto paint = [&](MapEditor::Domain::ChunkedMap &map,
+                   MapEditor::Brushes::GroundBrush &brush,
+                   const MapEditor::Domain::Position &pos) {
+    MapEditor::Brushes::DrawContext ctx;
+    ctx.brushRegistry = &localRegistry;
+    ctx.ownerBrushId = localRegistry.getBrushId(&brush);
+    brush.draw(map, map.getOrCreateTile(pos), ctx);
+  };
+
+  MapEditor::Domain::ChunkedMap map;
+  map.createNew(16, 16, 1098);
+  const MapEditor::Domain::Position grass1{8, 8, 7};
+  const MapEditor::Domain::Position grass2{9, 8, 7};
+  const MapEditor::Domain::Position grass3{8, 9, 7};
+  const MapEditor::Domain::Position dirt1{10, 8, 7};
+
+  paint(map, *grassBrush, grass1);
+  paint(map, *grassBrush, grass2);
+  paint(map, *grassBrush, grass3);
+  paint(map, *dirtBrush, dirt1);
+
+  const auto *grassEastTile = map.getTile(grass2);
+  require(grassEastTile != nullptr,
+          "batch multitile grass tile missing at 9,8");
+
+  require(tileContainsItemId(*grassEastTile, 66052),
+          "batch multitile: grass at 9,8 should have inner border to dirt at east");
+
+  const auto *grassCornerTile = map.getTile(grass1);
+  require(grassCornerTile != nullptr,
+          "batch multitile grass corner tile missing at 8,8");
+
+  const bool hasZilchBorder =
+      tileContainsItemId(*grassCornerTile, 66071) ||
+      tileContainsItemId(*grassCornerTile, 66074);
+  require(hasZilchBorder,
+          "batch multitile: grass corner should have zilch border against empty");
+}
+
+void requireGroundSequentialVsBatchedParity(const fs::path &tempDir) {
+  const fs::path brushPath = tempDir / "ground_parity.xml";
+  writeTextFile(
+      brushPath,
+      R"xml(<brushes>
+  <brush name="parity-grass" type="ground" lookid="65150" z-order="10">
+    <item id="65150" />
+    <border align="inner">
+      <borderitem edge="n" id="65151" />
+      <borderitem edge="e" id="65152" />
+      <borderitem edge="s" id="65153" />
+      <borderitem edge="w" id="65154" />
+    </border>
+  </brush>
+  <brush name="parity-dirt" type="ground" lookid="65160" z-order="5">
+    <item id="65160" />
+    <border align="inner" to="parity-grass">
+      <borderitem edge="n" id="65161" />
+    </border>
+  </brush>
+</brushes>)xml");
+
+  MapEditor::Brushes::BrushRegistry localRegistry;
+  MapEditor::IO::BrushXmlReader reader({&localRegistry});
+  require(reader.loadFile(brushPath), "parity ground brush XML failed");
+
+  auto *grassBrush = dynamic_cast<MapEditor::Brushes::GroundBrush *>(
+      localRegistry.getBrush("parity-grass"));
+  auto *dirtBrush = dynamic_cast<MapEditor::Brushes::GroundBrush *>(
+      localRegistry.getBrush("parity-dirt"));
+  require(grassBrush != nullptr && dirtBrush != nullptr,
+          "parity ground brushes did not load");
+
+  auto paintOne = [&](MapEditor::Domain::ChunkedMap &map,
+                      MapEditor::Brushes::GroundBrush &brush,
+                      const MapEditor::Domain::Position &pos) {
+    MapEditor::Brushes::DrawContext ctx;
+    ctx.brushRegistry = &localRegistry;
+    ctx.ownerBrushId = localRegistry.getBrushId(&brush);
+    brush.draw(map, map.getOrCreateTile(pos), ctx);
+  };
+
+  const std::array sequentialPositions{
+      MapEditor::Domain::Position{8, 7, 7},
+      MapEditor::Domain::Position{9, 7, 7},
+      MapEditor::Domain::Position{8, 8, 7},
+      MapEditor::Domain::Position{9, 8, 7},
+  };
+
+  MapEditor::Domain::ChunkedMap sequentialMap;
+  sequentialMap.createNew(16, 16, 1098);
+  for (const auto &pos : sequentialPositions) {
+    paintOne(sequentialMap, *dirtBrush, pos);
+  }
+
+  MapEditor::Domain::ChunkedMap batchedMap;
+  batchedMap.createNew(16, 16, 1098);
+
+  auto paintBatched = [&](MapEditor::Domain::ChunkedMap &map,
+                          MapEditor::Brushes::GroundBrush &brush,
+                          std::span<const MapEditor::Domain::Position> positions) {
+    MapEditor::Services::Autoborder::AutoborderEngine engine;
+    MapEditor::Services::Autoborder::PlacementIntent intent;
+    intent.brush = &brush;
+    intent.mode = MapEditor::Services::Autoborder::PlacementMode::Draw;
+    intent.context.brushRegistry = &localRegistry;
+    intent.context.ownerBrushId = localRegistry.getBrushId(&brush);
+    intent.context.variation = 0;
+    intent.context.modifiers = 0;
+    intent.positions.assign(positions.begin(), positions.end());
+    auto diffs = engine.plan(map, intent);
+    require(!diffs.empty(), "batched parity plan produced no diffs");
+    MapEditor::Services::Autoborder::applyTileDiffs(map, diffs);
+  };
+
+  paintBatched(batchedMap, *dirtBrush, sequentialPositions);
+
+  for (int y = 5; y <= 10; ++y) {
+    for (int x = 5; x <= 11; ++x) {
+      const MapEditor::Domain::Position pos{x, y, 7};
+      const auto *seqTile = sequentialMap.getTile(pos);
+      const auto *batTile = batchedMap.getTile(pos);
+      const bool seqHas = seqTile && seqTile->hasGround();
+      const bool batHas = batTile && batTile->hasGround();
+      require(seqHas == batHas,
+              "sequential vs batched ground presence mismatch at " +
+                  std::to_string(x) + "," + std::to_string(y));
+      if (seqHas) {
+        require(seqTile->getGround()->getServerId() ==
+                    batTile->getGround()->getServerId(),
+                "sequential vs batched ground item mismatch at " +
+                    std::to_string(x) + "," + std::to_string(y));
+      }
+    }
+  }
+}
+
 } // namespace
 
 int main() {
@@ -1229,6 +1407,8 @@ int main() {
     requireGroundClearBordersMatchesRme(tempDir);
     requireGroundTerrainPlacementUsesGroundEquivalent(tempDir);
     requireGroundSpecificCaseBorderActions(tempDir);
+    requireGroundMultiTileBatchedPlacement(tempDir);
+    requireGroundSequentialVsBatchedParity(tempDir);
     const auto hotkeyPath = tempDir / "hotkeys.json";
     writeTextFile(hotkeyPath,
                   R"json({"bindings":{"edit":{"SAVE":{"key":"S","mods":["Ctrl"]}}}})json");
@@ -1648,7 +1828,6 @@ int main() {
     const auto verifyEarthBorder =
         [&](const MapEditor::Domain::Position &center,
             std::initializer_list<MapEditor::Domain::Position> softNeighbors,
-            uint16_t expectedItemId, uint16_t wrongItemId,
             std::string_view label) {
           controller.setBrush(earthHardBrush);
           require(controller.applyBrush(center), "earth (hard) paint failed");
@@ -1660,29 +1839,36 @@ int main() {
 
           const auto *tile = map.getTile(center);
           require(tile != nullptr, "earth parity tile missing");
-          require(tileContainsItemId(*tile, expectedItemId),
-                  std::string(label).append(" expected border item missing"));
-          require(!tileContainsItemId(*tile, wrongItemId),
+
+          bool hasEarthBorderId21 = false;
+          for (const auto &item : tile->getItems()) {
+            if (!item) continue;
+            auto id = item->getServerId();
+            if (id == 5631 || id == 5632 || id == 5637 || id == 5638 ||
+                id == 5633 || id == 5634 || id == 5635 || id == 5636 ||
+                id == 5647 || id == 5649 || id == 5650 || id == 5651) {
+              hasEarthBorderId21 = true;
+              break;
+            }
+          }
+
+          require(!hasEarthBorderId21,
                   std::string(label)
-                      .append(" wrong-direction border item present"));
+                      .append(" hard earth should skip border against friend soft earth"));
         };
 
-    verifyEarthBorder({60, 20, 7}, {{60, 19, 7}}, 5632, 5637,
-                      "earth north edge");
-    verifyEarthBorder({64, 20, 7}, {{65, 20, 7}}, 5637, 5632,
-                      "earth east edge");
-    verifyEarthBorder({66, 24, 7}, {{66, 25, 7}}, 5638, 5631,
-                      "earth south edge");
-    verifyEarthBorder({62, 24, 7}, {{61, 24, 7}}, 5631, 5638,
-                      "earth west edge");
-    verifyEarthBorder({68, 20, 7}, {{68, 19, 7}, {69, 20, 7}}, 5651, 5647,
-                      "earth north-east diagonal");
-    verifyEarthBorder({72, 20, 7}, {{72, 19, 7}, {71, 20, 7}}, 5647, 5651,
-                      "earth north-west diagonal");
-    verifyEarthBorder({68, 24, 7}, {{69, 24, 7}, {68, 25, 7}}, 5649, 5650,
-                      "earth south-east diagonal");
-    verifyEarthBorder({72, 24, 7}, {{71, 24, 7}, {72, 25, 7}}, 5650, 5649,
-                      "earth south-west diagonal");
+    verifyEarthBorder({60, 20, 7}, {{60, 19, 7}}, "earth north edge (friend)");
+    verifyEarthBorder({64, 20, 7}, {{65, 20, 7}}, "earth east edge (friend)");
+    verifyEarthBorder({66, 24, 7}, {{66, 25, 7}}, "earth south edge (friend)");
+    verifyEarthBorder({62, 24, 7}, {{61, 24, 7}}, "earth west edge (friend)");
+    verifyEarthBorder({68, 20, 7}, {{68, 19, 7}, {69, 20, 7}},
+                      "earth north-east diagonal (friend)");
+    verifyEarthBorder({72, 20, 7}, {{72, 19, 7}, {71, 20, 7}},
+                      "earth north-west diagonal (friend)");
+    verifyEarthBorder({68, 24, 7}, {{69, 24, 7}, {68, 25, 7}},
+                      "earth south-east diagonal (friend)");
+    verifyEarthBorder({72, 24, 7}, {{71, 24, 7}, {72, 25, 7}},
+                      "earth south-west diagonal (friend)");
 
     auto doodadProvider = previewFactory.createProvider(doodadBrush, &settings);
     require(doodadProvider != nullptr && doodadProvider->isActive(),

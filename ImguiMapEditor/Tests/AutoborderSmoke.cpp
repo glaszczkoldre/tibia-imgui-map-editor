@@ -419,6 +419,52 @@ void requireWallDragPlanSkipsNeighborResolve(
           std::string(label).append(" final resolve produced no diffs"));
 }
 
+void requireBatchedVsSequentialPlanParity(
+    MapEditor::Domain::ChunkedMap &map,
+    MapEditor::Brushes::IBrush *brush,
+    MapEditor::Brushes::BrushRegistry &registry,
+    MapEditor::Services::BrushSettingsService &settings,
+    std::span<const MapEditor::Domain::Position> positions,
+    std::string_view label) {
+  require(positions.size() >= 2,
+          std::string(label).append(" needs at least two positions"));
+
+  auto before = map.clone();
+
+  MapEditor::Services::Autoborder::AutoborderEngine engine;
+
+  auto batchedIntent = makeIntent(brush, registry, settings, positions.front(),
+                                  MapEditor::Services::Autoborder::PlacementMode::Draw);
+  batchedIntent.positions.assign(positions.begin(), positions.end());
+  require(engine.canPlan(batchedIntent),
+          std::string(label).append(" batched plan not available"));
+  auto batchedDiffs = engine.plan(*before, batchedIntent);
+  require(!batchedDiffs.empty(),
+          std::string(label).append(" batched plan produced no diffs"));
+  auto batchedResult = before->clone();
+  MapEditor::Services::Autoborder::applyTileDiffs(*batchedResult, batchedDiffs);
+
+  auto sequentialResult = before->clone();
+  for (const auto &pos : positions) {
+    auto singleIntent = makeIntent(brush, registry, settings, pos,
+                                   MapEditor::Services::Autoborder::PlacementMode::Draw);
+    auto singleDiffs = engine.plan(*sequentialResult, singleIntent);
+    require(!singleDiffs.empty(),
+            std::string(label).append(" single plan produced no diffs"));
+    MapEditor::Services::Autoborder::applyTileDiffs(*sequentialResult,
+                                                    singleDiffs);
+  }
+
+  for (const auto &pos : positions) {
+    const auto *batchedTile = batchedResult->getTile(pos);
+    const auto *sequentialTile = sequentialResult->getTile(pos);
+    require(batchedTile != nullptr && sequentialTile != nullptr,
+            std::string(label).append(" tile missing after paint"));
+    require(batchedTile->hasGround() && sequentialTile->hasGround(),
+            std::string(label).append(" ground missing after paint"));
+  }
+}
+
 } // namespace
 
 int main() {
@@ -466,6 +512,16 @@ int main() {
                                         "ground draw", &notifiedMutations);
     requirePreviewMatchesControllerDraw(map, controller, settings, caveBrush,
                                         {81, 20, 7}, "ground preview/commit");
+
+    const std::array batchedPositions{
+        MapEditor::Domain::Position{130, 20, 7},
+        MapEditor::Domain::Position{131, 20, 7},
+        MapEditor::Domain::Position{130, 21, 7},
+        MapEditor::Domain::Position{131, 21, 7},
+    };
+    requireBatchedVsSequentialPlanParity(map, caveBrush, registry, settings,
+                                         batchedPositions,
+                                         "ground batched/sequential parity");
 
     controller.setBrush(seaBrush);
     require(controller.applyBrush({82, 20, 7}), "sea support paint failed");
