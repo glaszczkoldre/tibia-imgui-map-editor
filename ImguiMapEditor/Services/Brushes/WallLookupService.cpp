@@ -11,11 +11,11 @@ namespace Brushes {
 
 WallLookupService::WallLookupService() { initializeTable(); }
 
-WallAlign WallLookupService::getFullType(WallNeighbor neighbors) const {
+WallAlign WallLookupService::getFullType(WallNeighbor neighbors) const noexcept {
   return fullTable_[static_cast<uint8_t>(neighbors) & 0x0F];
 }
 
-WallAlign WallLookupService::getHalfType(WallNeighbor neighbors) const {
+WallAlign WallLookupService::getHalfType(WallNeighbor neighbors) const noexcept {
   return halfTable_[static_cast<uint8_t>(neighbors) & 0x0F];
 }
 

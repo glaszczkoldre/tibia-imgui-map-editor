@@ -11,6 +11,9 @@ namespace MapEditor::Brushes {
 
 namespace {
 
+constexpr bool kPreferLocked = true;
+constexpr bool kNoLockPref = false;
+
 bool resolveDoorOpenState(const Domain::Tile &tile, const WallBrush &wallBrush) {
   for (const auto &item : tile.getItems()) {
     if (!item) {
@@ -41,8 +44,8 @@ bool DoorBrush::canDraw(const Domain::ChunkedMap &map,
   }
 
   const bool open = open_ || resolveDoorOpenState(*tile, *wallBrush);
-  return wallBrush->canApplyDoor(*tile, doorType_, open, false) ||
-         wallBrush->canApplyDoor(*tile, doorType_, open, true);
+  return wallBrush->canApplyDoor(*tile, doorType_, open, kNoLockPref) ||
+         wallBrush->canApplyDoor(*tile, doorType_, open, kPreferLocked);
 }
 
 void DoorBrush::draw(Domain::ChunkedMap &map, Domain::Tile *tile,

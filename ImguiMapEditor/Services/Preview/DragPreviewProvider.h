@@ -1,5 +1,4 @@
 #pragma once
-#include "Domain/Selection/SelectionEntry.h"
 #include "IPreviewProvider.h"
 #include "Services/Selection/SelectionService.h"
 
@@ -50,6 +49,10 @@ private:
   void addSingleItem(const Domain::Position &pos, const Domain::Item *item);
   void addCreature(const Domain::Position &pos, const Domain::Creature *creature);
   void addSpawn(const Domain::Position &pos);
+
+  Domain::Position relativeToDragStart(const Domain::Position &pos) const {
+    return {static_cast<int16_t>(pos.x - dragStartPos_.x), static_cast<int16_t>(pos.y - dragStartPos_.y), static_cast<int16_t>(pos.z - dragStartPos_.z)};
+  }
 };
 
 } // namespace MapEditor::Services::Preview

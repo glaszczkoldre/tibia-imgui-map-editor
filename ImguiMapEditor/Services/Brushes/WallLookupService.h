@@ -6,7 +6,6 @@
 
 #include "../../Brushes/Enums/BrushEnums.h"
 #include <array>
-#include <cstdint>
 
 namespace MapEditor {
 namespace Services {
@@ -29,13 +28,13 @@ public:
    * Get wall alignment for full wall connections.
    * Used for standard walls that connect in all directions.
    */
-  WallAlign getFullType(WallNeighbor neighbors) const;
+  [[nodiscard]] WallAlign getFullType(WallNeighbor neighbors) const noexcept;
 
   /**
    * Get wall alignment for half wall (decoration) connections.
    * Used for wall decorations that only consider certain neighbors.
    */
-  WallAlign getHalfType(WallNeighbor neighbors) const;
+  [[nodiscard]] WallAlign getHalfType(WallNeighbor neighbors) const noexcept;
 
 private:
   void initializeTable();

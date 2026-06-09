@@ -1,15 +1,11 @@
 #pragma once
 #include "IPreviewProvider.h"
 
-namespace MapEditor {
-namespace Services {
+namespace MapEditor::Services {
 class BrushSettingsService;
-} // namespace Services
-} // namespace MapEditor
+} // namespace MapEditor::Services
 
-namespace MapEditor {
-namespace Services {
-namespace Preview {
+namespace MapEditor::Services::Preview {
 
 /**
  * Preview provider for Creature brush placement.
@@ -76,6 +72,4 @@ private:
   bool checkSettingsChanged() const;
 };
 
-} // namespace Preview
-} // namespace Services
-} // namespace MapEditor
+} // namespace MapEditor::Services::Preview

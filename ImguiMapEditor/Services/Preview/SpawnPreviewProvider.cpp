@@ -6,9 +6,7 @@
 #include "SpawnPreviewProvider.h"
 #include "Services/BrushSettingsService.h"
 
-namespace MapEditor {
-namespace Services {
-namespace Preview {
+namespace MapEditor::Services::Preview {
 
 SpawnPreviewProvider::SpawnPreviewProvider(BrushSettingsService *brushSettings)
     : brushSettings_(brushSettings) {
@@ -53,7 +51,7 @@ void SpawnPreviewProvider::buildSquarePreview() {
   tiles_.clear();
   bounds_ = PreviewBounds();
 
-  int radius = 3;
+  int radius = kDefaultSpawnRadius;
   if (brushSettings_) {
     radius = brushSettings_->getDefaultSpawnRadius();
   }
@@ -71,6 +69,4 @@ void SpawnPreviewProvider::buildSquarePreview() {
   bounds_.expand(radius, radius, 0);
 }
 
-} // namespace Preview
-} // namespace Services
-} // namespace MapEditor
+} // namespace MapEditor::Services::Preview

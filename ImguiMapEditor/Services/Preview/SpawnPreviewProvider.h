@@ -1,15 +1,11 @@
 #pragma once
 #include "IPreviewProvider.h"
 
-namespace MapEditor {
-namespace Services {
+namespace MapEditor::Services {
 class BrushSettingsService;
-} // namespace Services
-} // namespace MapEditor
+} // namespace MapEditor::Services
 
-namespace MapEditor {
-namespace Services {
-namespace Preview {
+namespace MapEditor::Services::Preview {
 
 /**
  * Preview provider for Spawn brush placement.
@@ -56,12 +52,12 @@ private:
   PreviewBounds bounds_;
   mutable bool needsRegen_ = true;
 
+  static constexpr int kDefaultSpawnRadius = 3;
+
   // Cached radius for change detection
-  mutable int cachedRadius_ = 3;
+  mutable int cachedRadius_ = kDefaultSpawnRadius;
 
   void buildSquarePreview();
 };
 
-} // namespace Preview
-} // namespace Services
-} // namespace MapEditor
+} // namespace MapEditor::Services::Preview

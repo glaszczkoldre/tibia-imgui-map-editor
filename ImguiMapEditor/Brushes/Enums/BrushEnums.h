@@ -10,6 +10,7 @@
 #include "Utils/EnumFlags.h"
 #include <cstdint>
 #include <string_view>
+#include <vector>
 
 namespace MapEditor::Brushes {
 
@@ -152,10 +153,22 @@ ENABLE_BITMASK_OPERATORS(WallNeighbor)
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
- * Parse edge name from XML attribute to EdgeType.
- * @param name XML attribute value (e.g., "n", "cne", "dsw")
- * @return Corresponding EdgeType, or EdgeType::None if not found
+ * Unpack edge types from a byte-slot-packed 32-bit value.
+ * Used by BorderLookupService and CarpetLookupService to decode
+ * lookup table entries into individual EdgeType values.
  */
+inline std::vector<EdgeType> unpackEdgeTypes(uint32_t packed) {
+  std::vector<EdgeType> result;
+  result.reserve(4);
+  for (int i = 0; i < 4; ++i) {
+    auto type = static_cast<EdgeType>((packed >> (i * 8)) & 0xFF);
+    if (type != EdgeType::None) {
+      result.push_back(type);
+    }
+  }
+  return result;
+}
+
 EdgeType parseEdgeName(std::string_view name);
 
 /**

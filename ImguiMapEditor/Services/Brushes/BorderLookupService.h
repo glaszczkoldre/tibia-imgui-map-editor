@@ -35,21 +35,14 @@ public:
    * @return Packed value: (type1) | (type2 << 8) | (type3 << 16) | (type4 <<
    * 24)
    */
-  uint32_t getBorderTypes(TileNeighbor neighbors) const;
+  [[nodiscard]] uint32_t getBorderTypes(TileNeighbor neighbors) const noexcept;
 
   /**
    * Unpack border types from packed value.
    * @param packed The packed border value
    * @return Vector of 1-4 EdgeType values (excludes None)
    */
-  static std::vector<EdgeType> unpack(uint32_t packed);
-
-  /**
-   * Pack border types into single value.
-   * @param types Vector of EdgeType values (max 4)
-   * @return Packed uint32_t value
-   */
-  static uint32_t pack(const std::vector<EdgeType> &types);
+  static std::vector<EdgeType> unpack(uint32_t packed) noexcept;
 
 private:
   void initializeTable();

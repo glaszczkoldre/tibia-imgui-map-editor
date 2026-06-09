@@ -48,7 +48,8 @@ buildDoodadRedoBorderPositions(std::span<const DoodadRedoBorderTouch> touches) {
 
     if (touch.placedGround) {
       appendGroundRedoPositions(positions, seen, touch.position);
-    } else if (touch.placedWall) {
+    }
+    if (touch.placedWall) {
       appendWallRedoPositions(positions, seen, touch.position);
     }
   }

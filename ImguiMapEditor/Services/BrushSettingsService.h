@@ -3,7 +3,6 @@
 #include "Domain/Position.h"
 #include <array>
 #include <algorithm>
-#include <cmath>
 #include <functional>
 #include <span>
 #include <string>
@@ -226,7 +225,7 @@ public:
   /**
    * Get currently selected custom brush (may be nullptr).
    */
-  const CustomBrushShape *getSelectedCustomBrush() const;
+  [[nodiscard]] const CustomBrushShape *getSelectedCustomBrush() const;
 
   /**
    * Get all custom brushes.
@@ -245,7 +244,7 @@ public:
    * @param center The center position (usually cursor position)
    * @return Vector of positions to paint/erase
    */
-  std::vector<Domain::Position>
+  [[nodiscard]] std::vector<Domain::Position>
   getBrushPositions(const Domain::Position &center) const;
 
   /**
@@ -253,7 +252,7 @@ public:
    * These are (dx, dy) pairs relative to center (0,0).
    * Useful for preview rendering.
    */
-  std::vector<std::pair<int, int>> getBrushOffsets() const;
+  [[nodiscard]] std::vector<std::pair<int, int>> getBrushOffsets() const;
 
   // ========================
   // Persistence
@@ -262,12 +261,12 @@ public:
   /**
    * Save custom brushes to JSON file.
    */
-  bool saveCustomBrushes(const std::string &filepath) const;
+  [[nodiscard]] bool saveCustomBrushes(const std::string &filepath) const;
 
   /**
    * Load custom brushes from JSON file.
    */
-  bool loadCustomBrushes(const std::string &filepath);
+  [[nodiscard]] bool loadCustomBrushes(const std::string &filepath);
 
   void loadFromConfig(const ConfigService &config);
   void saveToConfig(ConfigService &config) const;

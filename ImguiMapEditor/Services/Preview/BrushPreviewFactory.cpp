@@ -2,7 +2,6 @@
 #include "AutoborderBrushPreviewProvider.h"
 #include "MultiItemBrushPreviewProvider.h"
 #include "PreviewTypes.h"
-#include "WallBrushPreviewProvider.h"
 #include "Brushes/Types/CarpetBrush.h"
 #include "Brushes/Types/CreatureBrush.h"
 #include "Brushes/Types/DoodadBrush.h"
@@ -25,6 +24,17 @@
 #include "SpawnPreviewProvider.h"
 #include "ZoneBrushPreviewProvider.h"
 #include <spdlog/spdlog.h>
+
+namespace {
+
+constexpr uint32_t kOptionalBorderColor = 0x80D7C45A;
+constexpr uint32_t kHouseExitColor = 0x80FFAA44;
+constexpr uint32_t kFlagBrushColor = 0x80FFFF00;
+constexpr uint32_t kEraserBrushColor = 0x80FF4444;
+constexpr uint32_t kHouseBrushColor = 0x804488FF;
+constexpr uint32_t kWaypointBrushColor = 0x8044FF44;
+
+} // namespace
 
 namespace MapEditor::Services::Preview {
 
@@ -110,13 +120,13 @@ BrushPreviewFactory::createProvider(const Brushes::IBrush *brush,
   if (auto *optionalBrush =
           dynamic_cast<const Brushes::OptionalBorderBrush *>(brush)) {
     (void)optionalBrush;
-    return std::make_unique<ZoneBrushPreviewProvider>(0x80D7C45A, settings);
+    return std::make_unique<ZoneBrushPreviewProvider>(kOptionalBorderColor, settings);
   }
 
   if (auto *houseExitBrush =
           dynamic_cast<const Brushes::HouseExitBrush *>(brush)) {
     (void)houseExitBrush;
-    return std::make_unique<ZoneBrushPreviewProvider>(0x80FFAA44, settings);
+    return std::make_unique<ZoneBrushPreviewProvider>(kHouseExitColor, settings);
   }
 
   // Flag Brush -> ZoneBrushPreviewProvider (yellow for zone flags)
@@ -124,7 +134,7 @@ BrushPreviewFactory::createProvider(const Brushes::IBrush *brush,
     spdlog::debug("[BrushPreviewFactory] Creating ZoneBrushPreviewProvider for "
                   "FlagBrush");
     return std::make_unique<ZoneBrushPreviewProvider>(
-        0x80FFFF00, settings); // Semi-transparent yellow
+        kFlagBrushColor, settings); // Semi-transparent yellow
   }
 
   // Eraser Brush -> ZoneBrushPreviewProvider (red for eraser)
@@ -132,7 +142,7 @@ BrushPreviewFactory::createProvider(const Brushes::IBrush *brush,
     spdlog::debug("[BrushPreviewFactory] Creating ZoneBrushPreviewProvider for "
                   "EraserBrush");
     return std::make_unique<ZoneBrushPreviewProvider>(
-        0x80FF4444, settings); // Semi-transparent red
+        kEraserBrushColor, settings); // Semi-transparent red
   }
 
   // House Brush -> ZoneBrushPreviewProvider (blue for houses)
@@ -140,7 +150,7 @@ BrushPreviewFactory::createProvider(const Brushes::IBrush *brush,
     spdlog::debug("[BrushPreviewFactory] Creating ZoneBrushPreviewProvider for "
                   "HouseBrush");
     return std::make_unique<ZoneBrushPreviewProvider>(
-        0x804488FF, settings); // Semi-transparent blue
+        kHouseBrushColor, settings); // Semi-transparent blue
   }
 
   // Waypoint Brush -> ZoneBrushPreviewProvider (green for waypoints)
@@ -149,7 +159,7 @@ BrushPreviewFactory::createProvider(const Brushes::IBrush *brush,
     spdlog::debug("[BrushPreviewFactory] Creating ZoneBrushPreviewProvider for "
                   "WaypointBrush");
     return std::make_unique<ZoneBrushPreviewProvider>(
-        0x8044FF44, settings); // Semi-transparent green
+        kWaypointBrushColor, settings); // Semi-transparent green
   }
 
   // Unknown brush type - no preview

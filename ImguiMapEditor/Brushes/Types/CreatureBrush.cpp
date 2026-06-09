@@ -38,10 +38,10 @@ void CreatureBrush::draw(Domain::ChunkedMap &map, Domain::Tile *tile,
 
     // Search nearby tiles for spawns that cover this position
     Domain::Position pos = tile->getPosition();
-    int maxRadius = 10; // Max possible spawn radius
+    constexpr int kMaxSpawnSearchRadius = 10;
 
-    for (int dy = -maxRadius; dy <= maxRadius && !withinExistingSpawn; ++dy) {
-      for (int dx = -maxRadius; dx <= maxRadius && !withinExistingSpawn; ++dx) {
+    for (int dy = -kMaxSpawnSearchRadius; dy <= kMaxSpawnSearchRadius && !withinExistingSpawn; ++dy) {
+      for (int dx = -kMaxSpawnSearchRadius; dx <= kMaxSpawnSearchRadius && !withinExistingSpawn; ++dx) {
         Domain::Tile *nearbyTile = map.getTile(pos.x + dx, pos.y + dy, pos.z);
         if (nearbyTile && nearbyTile->hasSpawn()) {
           const Domain::Spawn *spawn = nearbyTile->getSpawn();
@@ -68,14 +68,17 @@ void CreatureBrush::draw(Domain::ChunkedMap &map, Domain::Tile *tile,
           radius);
     }
   }
+
+  map.markChanged();
 }
 
-void CreatureBrush::undraw(Domain::ChunkedMap& /*map*/, Domain::Tile* tile) {
+void CreatureBrush::undraw(Domain::ChunkedMap& map, Domain::Tile* tile) {
   if (!tile)
     return;
   // Remove creature from tile
   tile->removeCreature();
   tile->setCreatureBrushId(InvalidBrushId);
+  map.markChanged();
 }
 
 } // namespace MapEditor::Brushes

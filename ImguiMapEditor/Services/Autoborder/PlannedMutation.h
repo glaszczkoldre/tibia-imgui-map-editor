@@ -1,7 +1,6 @@
 #pragma once
 
 #include "Domain/Position.h"
-#include "Services/Autoborder/PlacementIntent.h"
 #include <vector>
 
 namespace MapEditor::Domain {
@@ -14,6 +13,7 @@ class HistoryManager;
 
 namespace MapEditor::Services::Autoborder {
 
+struct PlacementIntent;
 class AutoborderEngine;
 
 enum class PlannedMutationResult {

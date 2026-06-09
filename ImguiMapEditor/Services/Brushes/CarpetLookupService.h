@@ -29,12 +29,12 @@ public:
    * @param neighbors 8-bit TileNeighbor bitmask
    * @return Packed edge types (same format as BorderLookupService)
    */
-  uint32_t getCarpetTypes(TileNeighbor neighbors) const;
+  [[nodiscard]] uint32_t getCarpetTypes(TileNeighbor neighbors) const noexcept;
 
   /**
    * Unpack edge types from packed value.
    */
-  static std::vector<EdgeType> unpack(uint32_t packed);
+  static std::vector<EdgeType> unpack(uint32_t packed) noexcept;
 
 private:
   void initializeTable();

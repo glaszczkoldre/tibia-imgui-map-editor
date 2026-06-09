@@ -18,7 +18,7 @@ struct PlacementIntent {
   PlacementMode mode = PlacementMode::Draw;
   std::vector<Domain::Position> positions;
 
-  [[nodiscard]] bool isValid() const {
+  [[nodiscard]] bool isValid() const noexcept {
     return brush != nullptr && !positions.empty();
   }
 };

@@ -55,14 +55,17 @@ void updateItemVisuals(Domain::Item &item, BrushRegistry &registry,
   updateItemVisuals(item, registry.getClientDataService(), itemId, ownerBrushId);
 }
 
+constexpr uint32_t kBlockingItemFlags = static_cast<uint32_t>(Domain::ItemFlag::Unpassable) |
+                                        static_cast<uint32_t>(Domain::ItemFlag::BlockPathfinder) |
+                                        static_cast<uint32_t>(Domain::ItemFlag::FullTile);
+
 bool itemBlocksPlacement(const Domain::Item *item) {
   if (!item) {
     return false;
   }
   const auto *type = item->getType();
-  return type && (type->is_blocking || type->hasFlag(Domain::ItemFlag::Unpassable) ||
-                  type->hasFlag(Domain::ItemFlag::BlockPathfinder) ||
-                  type->hasFlag(Domain::ItemFlag::FullTile));
+  return type && (type->is_blocking ||
+                  (static_cast<uint32_t>(type->flags) & kBlockingItemFlags) != 0);
 }
 
 bool tileHasBlockingContents(const Domain::Tile *tile) {

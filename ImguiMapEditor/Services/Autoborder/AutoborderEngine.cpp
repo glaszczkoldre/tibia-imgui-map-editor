@@ -50,26 +50,27 @@ expandByOne(std::span<const Domain::Position> centers) {
 
 bool sameTileState(const Domain::Tile *lhs, const Domain::Tile *rhs,
                    const Domain::Position &pos) {
-  const auto left =
-      Domain::History::TileSnapshot::capture(lhs, pos).data();
-  const auto right =
-      Domain::History::TileSnapshot::capture(rhs, pos).data();
-  return left == right;
+  auto leftSnap = Domain::History::TileSnapshot::capture(lhs, pos);
+  auto rightSnap = Domain::History::TileSnapshot::capture(rhs, pos);
+  return leftSnap.data() == rightSnap.data();
 }
 
-void mixSeed(uint32_t &seed, uint32_t value) {
+constexpr uint32_t kFnvPrime = 16777619u;
+constexpr uint32_t kFnvOffsetBasis = 2166136261u;
+
+void mixSeed(uint32_t &seed, uint32_t value) noexcept {
   seed ^= value;
-  seed *= 16777619u;
+  seed *= kFnvPrime;
 }
 
-void mixSeed(uint32_t &seed, std::string_view value) {
+void mixSeed(uint32_t &seed, std::string_view value) noexcept {
   for (const auto ch : value) {
     mixSeed(seed, static_cast<uint8_t>(ch));
   }
 }
 
-uint32_t deterministicSeed(const PlacementIntent &intent) {
-  uint32_t seed = 2166136261u;
+uint32_t deterministicSeed(const PlacementIntent &intent) noexcept {
+  uint32_t seed = kFnvOffsetBasis;
   if (intent.brush) {
     mixSeed(seed, intent.brush->getName());
     mixSeed(seed, static_cast<uint32_t>(intent.brush->getType()));

@@ -11,7 +11,7 @@ namespace Brushes {
 
 TableLookupService::TableLookupService() { initializeTable(); }
 
-TableAlign TableLookupService::getTableType(TileNeighbor neighbors) const {
+TableAlign TableLookupService::getTableType(TileNeighbor neighbors) const noexcept {
   return table_[static_cast<uint8_t>(neighbors)];
 }
 

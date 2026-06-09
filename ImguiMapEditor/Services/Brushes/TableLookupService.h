@@ -27,7 +27,7 @@ public:
    * @param neighbors 8-bit TileNeighbor bitmask
    * @return TableAlign value
    */
-  TableAlign getTableType(TileNeighbor neighbors) const;
+  [[nodiscard]] TableAlign getTableType(TileNeighbor neighbors) const noexcept;
 
 private:
   void initializeTable();

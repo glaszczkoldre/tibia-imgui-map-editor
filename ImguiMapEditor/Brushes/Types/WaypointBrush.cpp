@@ -29,6 +29,8 @@ void WaypointBrush::draw(Domain::ChunkedMap &map, Domain::Tile *tile,
   spdlog::trace("[WaypointBrush] Set waypoint '{}' at ({},{},{})",
                 waypointName_, tile->getPosition().x, tile->getPosition().y,
                 tile->getPosition().z);
+
+  map.markChanged();
 }
 
 void WaypointBrush::undraw(Domain::ChunkedMap &map, Domain::Tile *tile) {
@@ -41,6 +43,8 @@ void WaypointBrush::undraw(Domain::ChunkedMap &map, Domain::Tile *tile) {
   spdlog::trace("[WaypointBrush] Removed waypoint from ({},{},{})",
                 tile->getPosition().x, tile->getPosition().y,
                 tile->getPosition().z);
+
+  map.markChanged();
 }
 
 } // namespace MapEditor::Brushes

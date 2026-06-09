@@ -32,6 +32,7 @@ Domain::Item* ItemPlacement::placeItem(
     return result;
 }
 
+// Caller is responsible for calling map.markChanged() after removal
 size_t ItemPlacement::removeItemsById(Domain::Tile* tile, uint32_t itemId) {
     if (!tile) {
         return 0;
@@ -42,6 +43,7 @@ size_t ItemPlacement::removeItemsById(Domain::Tile* tile, uint32_t itemId) {
     });
 }
 
+// Caller is responsible for calling map.markChanged() after removal
 size_t ItemPlacement::removeItemsByBrush(Domain::Tile* tile, const IBrush* brush) {
     if (!tile || !brush) {
         return 0;

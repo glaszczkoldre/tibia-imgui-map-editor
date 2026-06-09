@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Domain/Position.h"
+#include "Domain/Tile.h"
 #include <memory>
 #include <vector>
 
