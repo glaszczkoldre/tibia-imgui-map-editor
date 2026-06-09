@@ -7,42 +7,11 @@
  * strings. All string conversions are provided for XML parsing compatibility.
  */
 
-#include "../../Utils/EnumFlags.h"
+#include "Utils/EnumFlags.h"
 #include <cstdint>
 #include <string_view>
 
 namespace MapEditor::Brushes {
-
-// ═══════════════════════════════════════════════════════════════════════════
-// Edge Name Constants (Match XML brush attributes exactly)
-// ═══════════════════════════════════════════════════════════════════════════
-
-/**
- * String constants that match RME brushes.xml edge attribute values.
- * Used for XML parsing and serialization.
- */
-namespace EdgeName {
-// Cardinal directions (borders, carpets)
-constexpr std::string_view N = "n";
-constexpr std::string_view S = "s";
-constexpr std::string_view E = "e";
-constexpr std::string_view W = "w";
-
-// Corners (c = outer corner)
-constexpr std::string_view CNE = "cne"; // corner northeast
-constexpr std::string_view CNW = "cnw"; // corner northwest
-constexpr std::string_view CSE = "cse"; // corner southeast
-constexpr std::string_view CSW = "csw"; // corner southwest
-
-// Diagonals (d = diagonal/inner)
-constexpr std::string_view DNE = "dne"; // diagonal northeast
-constexpr std::string_view DNW = "dnw"; // diagonal northwest
-constexpr std::string_view DSE = "dse"; // diagonal southeast
-constexpr std::string_view DSW = "dsw"; // diagonal southwest
-
-// Carpet center
-constexpr std::string_view CENTER = "center";
-} // namespace EdgeName
 
 // ═══════════════════════════════════════════════════════════════════════════
 // EdgeType - Border/Carpet edge alignment
@@ -177,23 +146,6 @@ enum class WallNeighbor : uint8_t {
   South = 1 << 3  // 8
 };
 ENABLE_BITMASK_OPERATORS(WallNeighbor)
-
-// ═══════════════════════════════════════════════════════════════════════════
-// ZoneFlag - Tile metadata flags
-// ═══════════════════════════════════════════════════════════════════════════
-
-/**
- * Zone flags for tile metadata (PZ, noPVP, etc.)
- */
-enum class ZoneFlag : uint32_t {
-  None = 0,
-  ProtectionZone = 1 << 0,
-  NoPvp = 1 << 1,
-  NoLogout = 1 << 2,
-  PvpZone = 1 << 3,
-  Refresh = 1 << 4
-};
-ENABLE_BITMASK_OPERATORS(ZoneFlag)
 
 // ═══════════════════════════════════════════════════════════════════════════
 // XML String ↔ Enum Conversion Functions

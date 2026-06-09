@@ -4,7 +4,7 @@
  * @brief Data structures for border item storage and specific case handling.
  */
 
-#include "../Enums/BrushEnums.h"
+#include "Brushes/Enums/BrushEnums.h"
 #include <array>
 #include <cstdint>
 #include <string>

@@ -9,7 +9,6 @@
 #include "Domain/Tile.h"
 #include "Services/Brushes/BorderLookupService.h"
 #include "Services/ClientDataService.h"
-#include <GLFW/glfw3.h>
 #include <algorithm>
 #include <array>
 #include <cctype>
@@ -78,7 +77,7 @@ void resetAltGroundReplaceState() {
 [[nodiscard]] bool shouldSkipAltGroundPlacement(const BrushRegistry &registry,
                                                 const Domain::Tile &tile,
                                                 const DrawContext &ctx) {
-  const bool altPressed = (ctx.modifiers & GLFW_MOD_ALT) != 0;
+  const bool altPressed = (ctx.modifiers & Modifiers::Alt) != 0;
   if (!altPressed) {
     resetAltGroundReplaceState();
     return false;
@@ -398,29 +397,6 @@ void GroundBrush::rebuildTile(Domain::ChunkedMap &map,
   }
 }
 
-const GroundBrush::BorderRule *GroundBrush::findRuleFor(
-    const GroundBrush *other, bool requireOuter) const {
-  const std::string otherName =
-      other ? normalizeName(other->getName()) : std::string{};
-
-  for (const auto &rule : borderRules_) {
-    if (rule.outer != requireOuter) {
-      continue;
-    }
-    if (!other) {
-      if (rule.targetNone) {
-        return &rule;
-      }
-      continue;
-    }
-    if (rule.targetName.empty() || normalizeName(rule.targetName) == otherName ||
-        normalizeName(rule.targetName) == "all") {
-      return &rule;
-    }
-  }
-  return nullptr;
-}
-
 bool GroundBrush::connectsTo(const GroundBrush *other) const {
   if (other == nullptr) {
     return false;
@@ -439,10 +415,6 @@ bool GroundBrush::hasOuterZilchBorderRule() const {
   return std::ranges::any_of(borderRules_, [](const BorderRule &rule) {
     return rule.outer && rule.targetNone;
   });
-}
-
-bool GroundBrush::isFriendName(const std::string &name) const {
-  return friendNames_.contains(normalizeName(name));
 }
 
 uint16_t GroundBrush::selectWeightedItem(

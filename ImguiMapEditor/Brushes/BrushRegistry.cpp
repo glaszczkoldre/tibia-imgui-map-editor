@@ -1,5 +1,4 @@
 #include "BrushRegistry.h"
-#include "Domain/ChunkedMap.h"
 #include "Domain/Creature.h"
 #include "Domain/Item.h"
 #include "Domain/ItemType.h"

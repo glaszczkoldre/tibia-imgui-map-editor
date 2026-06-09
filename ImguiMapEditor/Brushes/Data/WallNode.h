@@ -4,7 +4,7 @@
  * @brief Data structures for wall and door item storage.
  */
 
-#include "../Enums/BrushEnums.h"
+#include "Brushes/Enums/BrushEnums.h"
 #include <cstdint>
 #include <random>
 #include <vector>

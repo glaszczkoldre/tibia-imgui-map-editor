@@ -30,7 +30,7 @@ void HouseBrush::draw(Domain::ChunkedMap &map, Domain::Tile *tile,
                 tile->getPosition().z);
 }
 
-void HouseBrush::undraw(Domain::ChunkedMap &map, Domain::Tile *tile) {
+void HouseBrush::undraw(Domain::ChunkedMap& map, Domain::Tile* tile) {
   if (!tile)
     return;
 

@@ -1034,7 +1034,7 @@ void WallDecorationBrush::draw(Domain::ChunkedMap &, Domain::Tile *tile,
       continue;
     }
 
-    const auto *baseBrush = resolveWallBrushForItem(*item, brushRegistry());
+    const auto *baseBrush = resolveWallBrushForItem(*item, getBrushRegistry());
     if (!baseBrush || baseBrush->getType() == BrushType::WallDecoration) {
       continue;
     }

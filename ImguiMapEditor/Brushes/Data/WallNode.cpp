@@ -16,7 +16,6 @@ uint32_t WallNode::getRandomItem() const {
     return 0;
   }
 
-  // Calculate total weight
   uint32_t totalWeight = 0;
   for (const auto &[itemId, chance] : items_) {
     totalWeight += chance;
@@ -26,7 +25,6 @@ uint32_t WallNode::getRandomItem() const {
     return items_.front().first;
   }
 
-  // Weighted random selection
   std::uniform_int_distribution<uint32_t> dist(1, totalWeight);
   uint32_t roll = dist(rng_);
 

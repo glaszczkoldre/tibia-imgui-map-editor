@@ -18,14 +18,11 @@
 #include <memory>
 #include <optional>
 #include <span>
-#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
-// Forward declarations
 namespace MapEditor::Brushes {
 class BrushRegistry;
-class DoodadBrush;
 }
 
 namespace MapEditor::Domain {
@@ -75,7 +72,7 @@ struct ResolvedBrushSelection {
   std::optional<uint32_t> houseExitHouseId;
   std::optional<std::string> waypointName;
 
-  [[nodiscard]] bool isValid() const {
+  [[nodiscard]] bool isValid() const noexcept {
     return brush != nullptr || rawItemId.has_value();
   }
 };
@@ -93,7 +90,7 @@ using TilesMutatedCallback =
  */
 class BrushController {
 public:
-  BrushController() = default;
+  BrushController() noexcept = default;
   ~BrushController();
 
   // Non-copyable

@@ -62,10 +62,7 @@ public:
   static void resetAltReplaceState();
 
 private:
-  const BorderRule *findRuleFor(const GroundBrush *other,
-                                bool requireOuter) const;
   bool connectsTo(const GroundBrush *other) const;
-  bool isFriendName(const std::string &name) const;
   uint16_t selectWeightedItem(
       const std::vector<std::pair<uint16_t, uint32_t>> &items) const;
   void updateBorderItems(Domain::ChunkedMap &map, Domain::Tile &tile) const;

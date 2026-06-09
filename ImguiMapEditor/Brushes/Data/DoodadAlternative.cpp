@@ -5,8 +5,8 @@
 
 #include "DoodadAlternative.h"
 
-#include "Brushes/Behaviors/WeightedSelection.h"
 #include <utility>
+#include "Brushes/Behaviors/WeightedSelection.h"
 
 namespace MapEditor::Brushes {
 
@@ -20,17 +20,6 @@ void DoodadAlternative::addComposite(CompositeItem composite) {
 
 bool DoodadAlternative::hasContent() const {
   return !singles_.empty() || !composites_.empty();
-}
-
-uint32_t DoodadAlternative::getTotalChance() const {
-  uint32_t total = 0;
-  for (const auto &item : singles_) {
-    total += item.chance;
-  }
-  for (const auto &comp : composites_) {
-    total += comp.chance;
-  }
-  return total;
 }
 
 SingleItem DoodadAlternative::selectRandomSingle() const {

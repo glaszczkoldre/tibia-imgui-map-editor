@@ -2,7 +2,6 @@
 
 #include "Brushes/Types/DoodadBrush.h"
 #include <optional>
-#include <unordered_set>
 
 namespace MapEditor::Brushes {
 

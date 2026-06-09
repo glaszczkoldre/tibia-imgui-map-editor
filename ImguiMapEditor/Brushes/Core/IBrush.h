@@ -69,10 +69,6 @@ struct BrushPreviewDescriptor {
     return {.kind = BrushPreviewKind::ServerItem, .numericId = itemId};
   }
 
-  [[nodiscard]] static BrushPreviewDescriptor clientSprite(uint32_t spriteId) {
-    return {.kind = BrushPreviewKind::ClientSprite, .numericId = spriteId};
-  }
-
   [[nodiscard]] static BrushPreviewDescriptor creature(
       const Domain::Outfit &creatureOutfit) {
     return {.kind = BrushPreviewKind::Creature, .outfit = creatureOutfit};
@@ -102,12 +98,16 @@ defaultPreviewDescriptor(BrushType type, uint32_t lookId, std::string label) {
 // Draw Context
 // ============================================================================
 
+namespace Modifiers {
+constexpr uint32_t Alt = 0x0004; // Equivalent to GLFW_MOD_ALT
+}
+
 /**
  * Parameters passed to brush draw operations.
  */
 struct DrawContext {
   int variation = 0;       // Which size/variant to use (for alternates)
-  uint32_t modifiers = 0;  // GLFW modifier bitmask
+  uint32_t modifiers = 0;  // Modifier key bitmask (see Modifiers::Alt)
   bool isDragging = false; // Part of a drag stroke
   bool specialAction = false; // wx-style single-tile special click behavior
   bool forcePlace = false; // Ignore blocking/duplicate checks
@@ -213,7 +213,7 @@ public:
   /**
    * Set the current variation index.
    */
-  virtual void setVariation(size_t /*index*/) {}
+  virtual void setVariation([[maybe_unused]] size_t index) {}
 
   // ─── Core Operations ──────────────────────────────────────────────────
 

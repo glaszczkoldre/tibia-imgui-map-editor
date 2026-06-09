@@ -1,14 +1,12 @@
 #pragma once
 
 #include <cstdint>
-#include <memory>
 
 namespace MapEditor::Domain {
     class ChunkedMap;
     class Tile;
     class Item;
     struct Position;
-    struct ItemType;
 }
 
 namespace MapEditor::Brushes {

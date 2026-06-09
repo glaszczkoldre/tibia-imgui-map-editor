@@ -29,9 +29,9 @@ struct CompositeItem {
    * Tile offset within the composite.
    */
   struct TileOffset {
-    int dx = 0;
-    int dy = 0;
-    int dz = 0;
+    int32_t dx = 0;
+    int32_t dy = 0;
+    int32_t dz = 0;
     std::vector<SingleItem> items;
   };
 
@@ -63,11 +63,6 @@ public:
    * Check if this alternative uses composites.
    */
   bool isComposite() const { return !composites_.empty(); }
-
-  /**
-   * Get total chance weight for selection.
-   */
-  uint32_t getTotalChance() const;
 
   /**
    * Select a random single item using weighted selection.

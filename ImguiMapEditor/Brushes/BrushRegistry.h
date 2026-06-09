@@ -2,7 +2,6 @@
 #include "Brushes/Core/IBrush.h"
 #include "Brushes/Core/BrushId.h"
 #include "Brushes/Data/BorderBlock.h"
-#include "Domain/Position.h"
 #include <map>
 #include <memory>
 #include <string>
@@ -36,8 +35,8 @@ public:
     uint16_t groundEquivalent = 0;
   };
 
-  BrushRegistry() = default;
-  ~BrushRegistry() = default;
+  BrushRegistry() noexcept = default;
+  ~BrushRegistry() noexcept = default;
 
   // Non-copyable
   BrushRegistry(const BrushRegistry &) = delete;

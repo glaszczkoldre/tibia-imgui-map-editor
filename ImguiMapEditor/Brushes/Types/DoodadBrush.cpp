@@ -22,12 +22,6 @@ namespace MapEditor::Brushes {
 
 namespace {
 
-int64_t encodeRelativePosition(const Domain::Position &position) {
-  return (static_cast<int64_t>(position.x) << 32) ^
-         (static_cast<int64_t>(position.y) << 16) ^
-         static_cast<uint16_t>(position.z);
-}
-
 void rebuildTileWithBrush(Domain::ChunkedMap &map,
                           const Domain::Position &position, IBrush *brush) {
   if (auto *groundBrush = dynamic_cast<GroundBrush *>(brush)) {
@@ -87,10 +81,7 @@ void recordRedoBorderTouch(
 
 std::vector<Domain::Position>
 dedupeSorted(std::vector<Domain::Position> positions) {
-  std::sort(positions.begin(), positions.end());
-  positions.erase(std::unique(positions.begin(), positions.end()),
-                  positions.end());
-  return positions;
+  return dedupeAndSortPositions(std::move(positions));
 }
 
 } // namespace
@@ -281,7 +272,7 @@ DoodadBrush::getPlacementPositions(const Domain::Position &center,
     const Domain::Position absolutePosition(
         center.x + tile.relativePosition.x, center.y + tile.relativePosition.y,
         static_cast<int16_t>(center.z + tile.relativePosition.z));
-    if (!uniquePositions.insert(encodeRelativePosition(absolutePosition)).second) {
+    if (!uniquePositions.insert(encodeDoodadPosition(absolutePosition)).second) {
       continue;
     }
 

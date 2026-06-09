@@ -6,7 +6,6 @@
 #include "Domain/Tile.h"
 #include "Brushes/Types/WallBrush.h"
 #include "Services/BrushSettingsService.h"
-#include <GLFW/glfw3.h>
 
 namespace MapEditor::Brushes {
 
@@ -53,7 +52,7 @@ void DoorBrush::draw(Domain::ChunkedMap &map, Domain::Tile *tile,
   }
 
   if (auto *wallBrush = findWallBrush(tile)) {
-    const bool open = ((ctx.modifiers & GLFW_MOD_ALT) != 0) ||
+    const bool open = ((ctx.modifiers & Modifiers::Alt) != 0) ||
                       open_ || resolveDoorOpenState(*tile, *wallBrush);
     const bool lockedPref =
         ctx.brushSettings && ctx.brushSettings->getLockDoors();

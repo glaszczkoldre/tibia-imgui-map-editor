@@ -18,14 +18,7 @@ namespace MapEditor::Brushes {
  */
 class BrushBase : public IBrush {
 public:
-    /**
-     * Construct a brush with the given properties.
-     * 
-     * @param name Brush name (used for lookup and display)
-     * @param lookId Preview sprite ID
-     * @param draggable Whether the brush supports drag-painting
-     */
-    BrushBase(std::string name, uint32_t lookId, bool draggable = true)
+    explicit BrushBase(std::string name, uint32_t lookId, bool draggable = true)
         : name_(std::move(name))
         , lookId_(lookId)
         , draggable_(draggable) 
@@ -47,14 +40,16 @@ public:
         return IBrush::getPreviewDescriptor();
     }
 
-    void setPreviewDescriptor(BrushPreviewDescriptor descriptor) {
+    void setPreviewDescriptor(BrushPreviewDescriptor descriptor) noexcept {
         previewDescriptor_ = std::move(descriptor);
     }
     
+private:
+    const std::string name_;
+    const bool draggable_;
+
 protected:
-    std::string name_;
     uint32_t lookId_;
-    bool draggable_;
     bool visible_ = false;
     bool usesCollection_ = false;
     BrushPreviewDescriptor previewDescriptor_;

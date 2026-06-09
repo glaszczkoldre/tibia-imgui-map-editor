@@ -70,7 +70,7 @@ void CreatureBrush::draw(Domain::ChunkedMap &map, Domain::Tile *tile,
   }
 }
 
-void CreatureBrush::undraw(Domain::ChunkedMap &map, Domain::Tile *tile) {
+void CreatureBrush::undraw(Domain::ChunkedMap& /*map*/, Domain::Tile* tile) {
   if (!tile)
     return;
   // Remove creature from tile

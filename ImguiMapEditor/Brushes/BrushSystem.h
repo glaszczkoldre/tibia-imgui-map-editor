@@ -6,7 +6,6 @@
 #include "Services/TilesetService.h"
 #include "UI/Panels/BrushSizePanel.h"
 #include "UI/Widgets/TilesetWidget.h"
-#include <memory>
 
 namespace MapEditor {
 
@@ -14,19 +13,7 @@ namespace Services {
 class ClientDataService;
 class SpriteManager;
 class ConfigService;
-
-namespace Brushes {
-// Lookup services for auto-alignment
-class BorderLookupService;
-class WallLookupService;
-class TableLookupService;
-class CarpetLookupService;
-} // namespace Brushes
 } // namespace Services
-
-namespace AppLogic {
-class EditorSession;
-}
 
 namespace Brushes {
 

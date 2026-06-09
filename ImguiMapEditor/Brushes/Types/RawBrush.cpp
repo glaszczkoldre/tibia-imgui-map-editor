@@ -1,11 +1,9 @@
 #include "RawBrush.h"
-#include "Brushes/Behaviors/ItemPlacement.h"
 #include "BrushUtils.h"
 #include "Domain/ChunkedMap.h"
 #include "Domain/Tile.h"
 #include "Domain/Item.h"
 #include "Domain/ItemType.h"
-#include "Domain/Position.h"
 namespace MapEditor::Brushes {
 
 RawBrush::RawBrush(uint32_t itemId, const Domain::ItemType* type)
@@ -16,7 +14,7 @@ RawBrush::RawBrush(uint32_t itemId, const Domain::ItemType* type)
     // For raw brushes, lookId is the same as itemId
 }
 
-void RawBrush::draw(Domain::ChunkedMap& map, 
+void RawBrush::draw(Domain::ChunkedMap& /*map*/, 
                     Domain::Tile* tile,
                     const DrawContext& ctx) 
 {
@@ -36,7 +34,7 @@ void RawBrush::draw(Domain::ChunkedMap& map,
     tile->addItem(std::move(item));
 }
 
-void RawBrush::undraw(Domain::ChunkedMap& map, 
+void RawBrush::undraw(Domain::ChunkedMap& /*map*/, 
                       Domain::Tile* tile) 
 {
     if (!tile) {

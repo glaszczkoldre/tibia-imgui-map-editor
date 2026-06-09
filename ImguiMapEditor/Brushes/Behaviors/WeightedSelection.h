@@ -37,15 +37,6 @@ public:
     static std::optional<size_t> select(const std::vector<uint32_t>& weights);
     
     /**
-     * Thickness probability check.
-     * Returns true if placement should proceed based on thickness value.
-     * 
-     * @param thickness Value between 0.0 and 1.0
-     * @return true if placement should proceed
-     */
-    static bool passesThicknessCheck(float thickness);
-    
-    /**
      * Get a random integer in the range [min, max] inclusive.
      */
     static uint32_t randomRange(uint32_t min, uint32_t max);

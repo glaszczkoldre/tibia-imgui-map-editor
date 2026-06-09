@@ -54,12 +54,6 @@ uint32_t totalCompositeChance(const DoodadAlternative &alternative) {
                          });
 }
 
-int64_t encodePosition(const Domain::Position &position) {
-  return (static_cast<int64_t>(position.x) << 32) ^
-         (static_cast<int64_t>(position.y) << 16) ^
-         static_cast<uint16_t>(position.z);
-}
-
 uint64_t encodeSkipKey(const Domain::Position &position,
                        DoodadBrush::PlacementSkipReason reason) {
   auto key = static_cast<uint64_t>(std::hash<Domain::Position>{}(position));
@@ -175,18 +169,7 @@ void appendSkip(std::vector<DoodadBrush::PlacementSkip> &skipped,
 
 std::vector<Domain::Position>
 dedupeAndSort(std::vector<Domain::Position> positions) {
-  std::unordered_set<Domain::Position> seen;
-  std::vector<Domain::Position> result;
-  result.reserve(positions.size());
-
-  for (const auto &position : positions) {
-    if (seen.insert(position).second) {
-      result.push_back(position);
-    }
-  }
-
-  std::sort(result.begin(), result.end());
-  return result;
+  return dedupeAndSortPositions(std::move(positions));
 }
 
 } // namespace
@@ -271,7 +254,7 @@ bool DoodadPlacementPlanner::tryAppendCandidate(
 
   std::vector<DoodadBrush::PlacementSkip> candidateSkips;
   for (const auto &candidateTile : candidate) {
-    if (occupied.contains(encodePosition(candidateTile.relativePosition))) {
+    if (occupied.contains(encodeDoodadPosition(candidateTile.relativePosition))) {
       candidateSkips.push_back(
           {.position = absolutePosition(request.center,
                                         candidateTile.relativePosition),
@@ -295,7 +278,7 @@ bool DoodadPlacementPlanner::tryAppendCandidate(
   }
 
   for (const auto &candidateTile : candidate) {
-    occupied.insert(encodePosition(candidateTile.relativePosition));
+    occupied.insert(encodeDoodadPosition(candidateTile.relativePosition));
     appendLayoutTile(layout, candidateTile);
   }
 

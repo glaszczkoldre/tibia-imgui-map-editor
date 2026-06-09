@@ -17,7 +17,7 @@ BrushSystem::BrushSystem()
   controller_.setPreviewFactory(&preview_factory_);
 }
 
-BrushSystem::~BrushSystem() = default;
+BrushSystem::~BrushSystem() noexcept = default;
 
 void BrushSystem::setConfigService(Services::ConfigService *configService) {
   if (!configService)

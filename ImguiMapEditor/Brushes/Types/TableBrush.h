@@ -31,11 +31,12 @@ public:
   void eraseFromTile(Domain::Tile &tile) const;
 
 private:
+  static constexpr size_t kTableAlignCount = 7;
   uint16_t selectItem(TableAlign align) const;
   bool tileHasBrush(const Domain::Tile *tile) const;
 
   BrushRegistry &registry_;
-  std::array<std::vector<std::pair<uint16_t, uint32_t>>, 7> itemsByAlign_{};
+  std::array<std::vector<std::pair<uint16_t, uint32_t>>, kTableAlignCount> itemsByAlign_{};
   std::unordered_set<uint16_t> ownedItemIds_;
 };
 

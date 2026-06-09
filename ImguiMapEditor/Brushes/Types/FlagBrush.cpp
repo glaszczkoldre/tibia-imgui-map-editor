@@ -23,7 +23,7 @@ void FlagBrush::draw(Domain::ChunkedMap &map, Domain::Tile *tile,
                 tile->getPosition().z);
 }
 
-void FlagBrush::undraw(Domain::ChunkedMap &map, Domain::Tile *tile) {
+void FlagBrush::undraw(Domain::ChunkedMap& map, Domain::Tile* tile) {
   if (!tile)
     return;
 

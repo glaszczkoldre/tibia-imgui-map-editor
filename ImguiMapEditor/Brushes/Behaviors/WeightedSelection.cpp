@@ -51,17 +51,6 @@ std::optional<size_t> WeightedSelection::select(const std::vector<uint32_t>& wei
     return weights.size() - 1;
 }
 
-bool WeightedSelection::passesThicknessCheck(float thickness) {
-    if (thickness >= 1.0f) {
-        return true;
-    }
-    if (thickness <= 0.0f) {
-        return false;
-    }
-    
-    return randomFloat() < thickness;
-}
-
 uint32_t WeightedSelection::randomRange(uint32_t min, uint32_t max) {
     if (min >= max) {
         return min;

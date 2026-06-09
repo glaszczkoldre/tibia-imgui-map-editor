@@ -77,10 +77,8 @@ public:
     return wallHateMeItems_;
   }
 
-protected:
-  BrushRegistry &brushRegistry() const { return registry_; }
-
 private:
+  static constexpr size_t kWallAlignCount = 17;
   bool isWallGroupItem(uint16_t itemId) const;
   std::optional<WallAlign> findAlignmentForItem(uint16_t itemId) const;
   std::optional<WallAlign> findTileAlignment(const Domain::Tile &tile) const;
@@ -92,8 +90,8 @@ private:
   bool tileHasWallGroup(const Domain::Tile *tile) const;
 
   BrushRegistry &registry_;
-  std::array<WallNode, 17> wallNodes_{};
-  std::array<std::vector<DoorNode>, 17> doorNodes_{};
+  std::array<WallNode, kWallAlignCount> wallNodes_{};
+  std::array<std::vector<DoorNode>, kWallAlignCount> doorNodes_{};
   std::unordered_map<uint16_t, WallAlign> itemAlignments_;
   std::unordered_map<uint16_t, DoorNode> doorNodesByItemId_;
   std::unordered_set<uint16_t> ownedItemIds_;

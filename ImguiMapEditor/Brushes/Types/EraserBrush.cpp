@@ -56,7 +56,7 @@ void EraserBrush::draw(Domain::ChunkedMap &map, Domain::Tile *tile,
                 tile->getPosition().y, tile->getPosition().z);
 }
 
-void EraserBrush::undraw(Domain::ChunkedMap &map, Domain::Tile *tile) {
+void EraserBrush::undraw(Domain::ChunkedMap& /*map*/, Domain::Tile* tile) {
   // Eraser doesn't have undraw - history system handles undo
   // This is intentionally empty
 }

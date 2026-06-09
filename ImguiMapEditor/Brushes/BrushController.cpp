@@ -13,7 +13,6 @@
 #include "Types/WallBrush.h"
 #include "Types/DoorBrush.h"
 #include "Types/RawBrush.h"
-#include <GLFW/glfw3.h>
 #include <cmath>
 #include <spdlog/spdlog.h>
 
@@ -225,7 +224,7 @@ ResolvedDoorTarget resolveDoorTarget(const Domain::Tile *tile, BrushRegistry *re
 
 } // namespace
 
-BrushController::~BrushController() = default;
+BrushController::~BrushController() noexcept = default;
 
 void BrushController::initialize(
     Domain::ChunkedMap *map, Domain::History::HistoryManager *historyManager,
@@ -1249,7 +1248,7 @@ bool BrushController::applyBrush(const Domain::Position &pos,
     break;
   case BrushActionFamily::WallLike:
     if (currentBrush_->getType() == BrushType::Wall &&
-        (modifiers & GLFW_MOD_ALT) != 0 &&
+        (modifiers & Modifiers::Alt) != 0 &&
         getBrushPositionsForCenter(pos).size() == 1) {
       paintRecordedPosition(pos, modifiers, true);
     } else {
@@ -1355,7 +1354,7 @@ DrawContext BrushController::createDrawContext(uint32_t modifiers,
   ctx.modifiers = modifiers;
   ctx.isDragging = strokeActive_;
   ctx.specialAction = specialAction;
-  ctx.forcePlace = (modifiers & GLFW_MOD_ALT) != 0;
+  ctx.forcePlace = (modifiers & Modifiers::Alt) != 0;
   ctx.brushSettings = brushSettingsService_;
   ctx.clientData = clientData_;
   ctx.brushRegistry = registry_;
@@ -1701,7 +1700,7 @@ void BrushController::paintDoodadRecordedPosition(const Domain::Position &pos,
     return;
   }
 
-  const auto forcePlace = (modifiers & GLFW_MOD_ALT) != 0;
+  const auto forcePlace = (modifiers & Modifiers::Alt) != 0;
   const auto seed = DoodadPlacementPlanner::buildSeed(
       *doodadBrush, pos, brushSettingsService_, static_cast<size_t>(variation_),
       forcePlace);
@@ -1762,7 +1761,7 @@ void BrushController::eraseDoodadRecordedPosition(const Domain::Position &pos,
       .preserveComplexItems =
           !brushSettingsService_ ||
           brushSettingsService_->getEraserLeaveUniqueItems()};
-  const auto forcePlace = (modifiers & GLFW_MOD_ALT) != 0;
+  const auto forcePlace = (modifiers & Modifiers::Alt) != 0;
   const auto seed = DoodadPlacementPlanner::buildSeed(
       *doodadBrush, pos, brushSettingsService_, static_cast<size_t>(variation_),
       forcePlace);
@@ -1835,7 +1834,7 @@ void BrushController::continueGroundLikeStroke(const Domain::Position &pos) {
 }
 
 void BrushController::continueWallLikeStroke(const Domain::Position &pos) {
-  const bool altPressed = (strokeModifiers_ & GLFW_MOD_ALT) != 0;
+  const bool altPressed = (strokeModifiers_ & Modifiers::Alt) != 0;
   const bool wallVariantShift =
       !strokeEraseMode_ && altPressed && currentBrush_ &&
       currentBrush_->getType() == BrushType::Wall &&

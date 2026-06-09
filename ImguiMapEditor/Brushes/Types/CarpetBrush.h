@@ -31,11 +31,12 @@ public:
   void eraseFromTile(Domain::Tile &tile) const;
 
 private:
+  static constexpr size_t kEdgeTypeCount = 14;
   uint16_t selectItem(EdgeType align) const;
   bool tileHasBrush(const Domain::Tile *tile) const;
 
   BrushRegistry &registry_;
-  std::array<std::vector<std::pair<uint16_t, uint32_t>>, 14> itemsByEdge_{};
+  std::array<std::vector<std::pair<uint16_t, uint32_t>>, kEdgeTypeCount> itemsByEdge_{};
   std::unordered_set<uint16_t> ownedItemIds_;
 };
 
