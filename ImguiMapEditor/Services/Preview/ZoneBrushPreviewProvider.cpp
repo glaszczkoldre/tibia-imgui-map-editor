@@ -29,7 +29,7 @@ const std::vector<PreviewTileData> &ZoneBrushPreviewProvider::getTiles() const {
   }
 
   if (needsRegen_) {
-    const_cast<ZoneBrushPreviewProvider *>(this)->buildPreview();
+    buildPreview();
   }
   return tiles_;
 }
@@ -43,7 +43,7 @@ void ZoneBrushPreviewProvider::updateCursorPosition(
 
 void ZoneBrushPreviewProvider::regenerate() { buildPreview(); }
 
-void ZoneBrushPreviewProvider::buildPreview() {
+void ZoneBrushPreviewProvider::buildPreview() const {
   tiles_.clear();
   bounds_ = PreviewBounds();
   needsRegen_ = false;

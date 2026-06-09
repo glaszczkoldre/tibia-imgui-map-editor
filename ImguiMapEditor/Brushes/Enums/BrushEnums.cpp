@@ -4,7 +4,9 @@
  */
 
 #include "BrushEnums.h"
-#include <unordered_map>
+#include <algorithm>
+#include <array>
+#include <spdlog/spdlog.h>
 
 namespace MapEditor::Brushes {
 
@@ -13,16 +15,26 @@ namespace MapEditor::Brushes {
 // ═══════════════════════════════════════════════════════════════════════════
 
 EdgeType parseEdgeName(std::string_view name) {
-  static const std::unordered_map<std::string_view, EdgeType> map = {
-      {"n", EdgeType::N},          {"e", EdgeType::E},
-      {"s", EdgeType::S},          {"w", EdgeType::W},
-      {"cnw", EdgeType::CNW},      {"cne", EdgeType::CNE},
-      {"csw", EdgeType::CSW},      {"cse", EdgeType::CSE},
-      {"dnw", EdgeType::DNW},      {"dne", EdgeType::DNE},
-      {"dse", EdgeType::DSE},      {"dsw", EdgeType::DSW},
-      {"center", EdgeType::Center}};
-  auto it = map.find(name);
-  return it != map.end() ? it->second : EdgeType::None;
+  static constexpr std::array<std::pair<std::string_view, EdgeType>, 13> kMap = {{
+      {"center", EdgeType::Center},
+      {"cne", EdgeType::CNE},
+      {"cnw", EdgeType::CNW},
+      {"cse", EdgeType::CSE},
+      {"csw", EdgeType::CSW},
+      {"dne", EdgeType::DNE},
+      {"dnw", EdgeType::DNW},
+      {"dse", EdgeType::DSE},
+      {"dsw", EdgeType::DSW},
+      {"e", EdgeType::E},
+      {"n", EdgeType::N},
+      {"s", EdgeType::S},
+      {"w", EdgeType::W},
+  }};
+  auto it = std::lower_bound(kMap.begin(), kMap.end(), name,
+      [](const auto& entry, std::string_view key) { return entry.first < key; });
+  if (it != kMap.end() && it->first == name) return it->second;
+  spdlog::warn("[BrushEnums] Unknown edge name: {}", name);
+  return EdgeType::None;
 }
 
 std::string_view edgeTypeToString(EdgeType type) {
@@ -63,13 +75,20 @@ std::string_view edgeTypeToString(EdgeType type) {
 // ═══════════════════════════════════════════════════════════════════════════
 
 TableAlign parseTableAlign(std::string_view name) {
-  static const std::unordered_map<std::string_view, TableAlign> map = {
-      {"alone", TableAlign::Alone},      {"north", TableAlign::North},
-      {"south", TableAlign::South},      {"east", TableAlign::East},
-      {"west", TableAlign::West},        {"horizontal", TableAlign::Horizontal},
-      {"vertical", TableAlign::Vertical}};
-  auto it = map.find(name);
-  return it != map.end() ? it->second : TableAlign::Alone;
+  static constexpr std::array<std::pair<std::string_view, TableAlign>, 7> kMap = {{
+      {"alone", TableAlign::Alone},
+      {"east", TableAlign::East},
+      {"horizontal", TableAlign::Horizontal},
+      {"north", TableAlign::North},
+      {"south", TableAlign::South},
+      {"vertical", TableAlign::Vertical},
+      {"west", TableAlign::West},
+  }};
+  auto it = std::lower_bound(kMap.begin(), kMap.end(), name,
+      [](const auto& entry, std::string_view key) { return entry.first < key; });
+  if (it != kMap.end() && it->first == name) return it->second;
+  spdlog::warn("[BrushEnums] Unknown table align: {}", name);
+  return TableAlign::Alone;
 }
 
 std::string_view tableAlignToString(TableAlign align) {
@@ -98,27 +117,31 @@ std::string_view tableAlignToString(TableAlign align) {
 // ═══════════════════════════════════════════════════════════════════════════
 
 WallAlign parseWallType(std::string_view name) {
-  static const std::unordered_map<std::string_view, WallAlign> map = {
-      {"pole", WallAlign::Pole},
+  static constexpr std::array<std::pair<std::string_view, WallAlign>, 18> kMap = {{
       {"corner", WallAlign::Corner},
-      {"horizontal", WallAlign::Horizontal},
-      {"vertical", WallAlign::Vertical},
-      {"north end", WallAlign::NorthEnd},
-      {"south end", WallAlign::SouthEnd},
       {"east end", WallAlign::EastEnd},
-      {"west end", WallAlign::WestEnd},
-      {"north T", WallAlign::NorthT},
-      {"south T", WallAlign::SouthT},
       {"east T", WallAlign::EastT},
-      {"west T", WallAlign::WestT},
+      {"horizontal", WallAlign::Horizontal},
       {"intersection", WallAlign::Intersection},
-      {"northwest diagonal", WallAlign::NorthwestDiagonal},
+      {"north end", WallAlign::NorthEnd},
+      {"north T", WallAlign::NorthT},
       {"northeast diagonal", WallAlign::NortheastDiagonal},
-      {"southwest diagonal", WallAlign::SouthwestDiagonal},
+      {"northwest diagonal", WallAlign::NorthwestDiagonal},
+      {"pole", WallAlign::Pole},
+      {"south end", WallAlign::SouthEnd},
+      {"south T", WallAlign::SouthT},
       {"southeast diagonal", WallAlign::SoutheastDiagonal},
-      {"untouchable", WallAlign::Untouchable}};
-  auto it = map.find(name);
-  return it != map.end() ? it->second : WallAlign::Pole;
+      {"southwest diagonal", WallAlign::SouthwestDiagonal},
+      {"untouchable", WallAlign::Untouchable},
+      {"vertical", WallAlign::Vertical},
+      {"west end", WallAlign::WestEnd},
+      {"west T", WallAlign::WestT},
+  }};
+  auto it = std::lower_bound(kMap.begin(), kMap.end(), name,
+      [](const auto& entry, std::string_view key) { return entry.first < key; });
+  if (it != kMap.end() && it->first == name) return it->second;
+  spdlog::warn("[BrushEnums] Unknown wall type: {}", name);
+  return WallAlign::Pole;
 }
 
 std::string_view wallAlignToString(WallAlign align) {
@@ -167,14 +190,22 @@ std::string_view wallAlignToString(WallAlign align) {
 // ═══════════════════════════════════════════════════════════════════════════
 
 DoorType parseDoorType(std::string_view name) {
-  static const std::unordered_map<std::string_view, DoorType> map = {
-      {"archway", DoorType::Archway}, {"normal", DoorType::Normal},
-      {"locked", DoorType::Locked},   {"quest", DoorType::Quest},
-      {"magic", DoorType::Magic},     {"normal_alt", DoorType::NormalAlt},
-      {"window", DoorType::Window},   {"hatch_window", DoorType::HatchWindow},
-      {"hatch window", DoorType::HatchWindow}};
-  auto it = map.find(name);
-  return it != map.end() ? it->second : DoorType::Undefined;
+  static constexpr std::array<std::pair<std::string_view, DoorType>, 9> kMap = {{
+      {"archway", DoorType::Archway},
+      {"hatch window", DoorType::HatchWindow},
+      {"hatch_window", DoorType::HatchWindow},
+      {"locked", DoorType::Locked},
+      {"magic", DoorType::Magic},
+      {"normal", DoorType::Normal},
+      {"normal_alt", DoorType::NormalAlt},
+      {"quest", DoorType::Quest},
+      {"window", DoorType::Window},
+  }};
+  auto it = std::lower_bound(kMap.begin(), kMap.end(), name,
+      [](const auto& entry, std::string_view key) { return entry.first < key; });
+  if (it != kMap.end() && it->first == name) return it->second;
+  spdlog::warn("[BrushEnums] Unknown door type: {}", name);
+  return DoorType::Undefined;
 }
 
 std::string_view doorTypeToString(DoorType type) {
@@ -196,7 +227,7 @@ std::string_view doorTypeToString(DoorType type) {
   case DoorType::HatchWindow:
     return "hatch_window";
   default:
-    return "";
+    return "undefined";
   }
 }
 

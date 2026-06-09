@@ -365,15 +365,21 @@ set(BRUSHES_SOURCES
     Brushes/BrushSystem.cpp
     Brushes/BrushRegistry.cpp
     Brushes/BrushController.cpp
+    Brushes/BrushDoorOps.cpp
+    Brushes/BrushStroke.cpp
+    Brushes/BrushVariationOps.cpp
     Brushes/Behaviors/ItemPlacement.cpp
     Brushes/Behaviors/WeightedSelection.cpp
     Brushes/Types/RawBrush.cpp
     Brushes/Types/BrushUtils.cpp
     Brushes/Types/GroundBrush.cpp
+    Brushes/Types/GroundBorderUpdater.cpp
     Brushes/Types/DoodadBrush.cpp
     Brushes/Types/DoodadPlacementPlanner.cpp
     Brushes/Types/DoodadRedoBorderPlanner.cpp
     Brushes/Types/WallBrush.cpp
+    Brushes/Types/WallBrushPreview.cpp
+    Brushes/Types/WallDecorationBrush.cpp
     Brushes/Types/TableBrush.cpp
     Brushes/Types/CarpetBrush.cpp
     Brushes/Types/DoorBrush.cpp

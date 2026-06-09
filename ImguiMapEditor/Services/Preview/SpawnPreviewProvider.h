@@ -48,8 +48,8 @@ public:
 private:
   BrushSettingsService *brushSettings_ = nullptr;
   Domain::Position anchor_{0, 0, 0};
-  std::vector<PreviewTileData> tiles_;
-  PreviewBounds bounds_;
+  mutable std::vector<PreviewTileData> tiles_;
+  mutable PreviewBounds bounds_;
   mutable bool needsRegen_ = true;
 
   static constexpr int kDefaultSpawnRadius = 3;
@@ -57,7 +57,7 @@ private:
   // Cached radius for change detection
   mutable int cachedRadius_ = kDefaultSpawnRadius;
 
-  void buildSquarePreview();
+  void buildSquarePreview() const;
 };
 
 } // namespace MapEditor::Services::Preview

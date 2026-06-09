@@ -17,7 +17,7 @@ const std::vector<PreviewTileData> &MultiItemBrushPreviewProvider::getTiles() co
     needsRegen_ = true;
   }
   if (needsRegen_) {
-    const_cast<MultiItemBrushPreviewProvider *>(this)->buildPreview();
+    buildPreview();
   }
   return tiles_;
 }
@@ -37,7 +37,7 @@ bool MultiItemBrushPreviewProvider::checkSettingsChanged() const {
   return cachedOffsets_ != brushSettings_->getBrushOffsets();
 }
 
-void MultiItemBrushPreviewProvider::buildPreview() {
+void MultiItemBrushPreviewProvider::buildPreview() const {
   tiles_.clear();
   bounds_ = PreviewBounds{};
   needsRegen_ = false;

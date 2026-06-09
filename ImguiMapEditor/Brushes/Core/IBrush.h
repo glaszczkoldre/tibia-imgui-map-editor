@@ -115,6 +115,12 @@ struct DrawContext {
   Services::ClientDataService *clientData = nullptr;
   BrushRegistry *brushRegistry = nullptr;
   BrushId ownerBrushId = InvalidBrushId;
+  struct AltGroundReplaceState {
+    bool active = false;
+    bool emptyOnly = false;
+    const class GroundBrush *replaceBrush = nullptr;
+  };
+  mutable AltGroundReplaceState altReplace;
 };
 
 // ============================================================================

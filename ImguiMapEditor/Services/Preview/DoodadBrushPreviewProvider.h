@@ -33,14 +33,14 @@ public:
 
 private:
   bool checkSettingsChanged() const;
-  void buildPreview();
+  void buildPreview() const;
 
   const Brushes::DoodadBrush &brush_;
   BrushSettingsService *brushSettings_ = nullptr;
   const Domain::ChunkedMap *map_ = nullptr;
   Domain::Position anchor_{0, 0, 0};
-  std::vector<PreviewTileData> tiles_;
-  PreviewBounds bounds_;
+  mutable std::vector<PreviewTileData> tiles_;
+  mutable PreviewBounds bounds_;
   mutable bool needsRegen_ = true;
   mutable std::vector<std::pair<int, int>> cachedOffsets_;
 };

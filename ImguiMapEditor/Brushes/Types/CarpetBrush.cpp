@@ -13,6 +13,14 @@ namespace MapEditor::Brushes {
 
 namespace {
 
+DrawContext makeBorderContext(BrushRegistry& registry, const IBrush* owner) {
+    DrawContext ctx;
+    ctx.clientData = registry.getClientDataService();
+    ctx.brushRegistry = &registry;
+    ctx.ownerBrushId = registry.getBrushId(owner);
+    return ctx;
+}
+
 constexpr std::array<std::tuple<int, int, TileNeighbor>, 8> kNeighborOffsets{{
     {-1, -1, TileNeighbor::Northwest},
     {0, -1, TileNeighbor::North},
@@ -155,11 +163,7 @@ void CarpetBrush::rebuildTile(Domain::ChunkedMap &map,
       Types::updateItemVisuals(*ownedItems[itemIndex], registry_, itemId,
                                ownerBrushId);
     } else {
-      DrawContext ctx;
-      ctx.clientData = registry_.getClientDataService();
-      ctx.brushRegistry = &registry_;
-      ctx.ownerBrushId = ownerBrushId;
-      tile->addItem(Types::createTypedItem(ctx, itemId));
+      tile->addItem(Types::createTypedItem(makeBorderContext(registry_, this), itemId));
     }
 
     ++itemIndex;
@@ -167,11 +171,7 @@ void CarpetBrush::rebuildTile(Domain::ChunkedMap &map,
 
   if (itemIndex == 0) {
     if (const auto centerId = selectItem(EdgeType::Center); centerId != 0) {
-      DrawContext ctx;
-      ctx.clientData = registry_.getClientDataService();
-      ctx.brushRegistry = &registry_;
-      ctx.ownerBrushId = ownerBrushId;
-      tile->addItem(Types::createTypedItem(ctx, centerId));
+      tile->addItem(Types::createTypedItem(makeBorderContext(registry_, this), centerId));
       itemIndex = 1;
     }
   }

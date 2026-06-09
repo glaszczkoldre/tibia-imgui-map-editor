@@ -30,7 +30,8 @@ const std::vector<PreviewTileData> &SpawnPreviewProvider::getTiles() const {
   }
 
   if (needsRegen_) {
-    const_cast<SpawnPreviewProvider *>(this)->regenerate();
+    buildSquarePreview();
+    needsRegen_ = false;
   }
   return tiles_;
 }
@@ -47,7 +48,7 @@ void SpawnPreviewProvider::regenerate() {
   needsRegen_ = false;
 }
 
-void SpawnPreviewProvider::buildSquarePreview() {
+void SpawnPreviewProvider::buildSquarePreview() const {
   tiles_.clear();
   bounds_ = PreviewBounds();
 

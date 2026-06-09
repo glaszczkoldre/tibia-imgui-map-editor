@@ -72,6 +72,8 @@ public:
   std::optional<DoorNode> findDoorForItem(uint16_t itemId) const;
   const std::vector<const WallBrush *> &getRedirectBrushes() const;
   BrushRegistry &getBrushRegistry() const { return registry_; }
+  static const WallBrush *resolveWallBrushForItem(const Domain::Item &item,
+                                                   BrushRegistry &registry);
   bool connectsTo(const IBrush *brush) const;
   const std::unordered_set<uint16_t> &getWallHateMeItems() const {
     return wallHateMeItems_;

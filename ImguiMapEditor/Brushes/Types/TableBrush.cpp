@@ -13,6 +13,14 @@ namespace MapEditor::Brushes {
 
 namespace {
 
+DrawContext makeBorderContext(BrushRegistry& registry, const IBrush* owner) {
+    DrawContext ctx;
+    ctx.clientData = registry.getClientDataService();
+    ctx.brushRegistry = &registry;
+    ctx.ownerBrushId = registry.getBrushId(owner);
+    return ctx;
+}
+
 constexpr std::array<std::tuple<int, int, TileNeighbor>, 8> kNeighborOffsets{{
     {-1, -1, TileNeighbor::Northwest},
     {0, -1, TileNeighbor::North},
@@ -155,11 +163,7 @@ void TableBrush::rebuildTile(Domain::ChunkedMap &map,
     return;
   }
 
-  DrawContext ctx;
-  ctx.clientData = registry_.getClientDataService();
-  ctx.brushRegistry = &registry_;
-  ctx.ownerBrushId = ownerBrushId;
-  tile->addItem(Types::createTypedItem(ctx, itemId));
+  tile->addItem(Types::createTypedItem(makeBorderContext(registry_, this), itemId));
 }
 
 bool TableBrush::tileHasBrush(const Domain::Tile *tile) const {

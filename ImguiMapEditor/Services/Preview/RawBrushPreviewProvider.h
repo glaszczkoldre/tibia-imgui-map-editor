@@ -73,14 +73,14 @@ private:
   uint16_t subtype_;
   BrushSettingsService *brushSettings_ = nullptr;
   Domain::Position anchor_{0, 0, 0};
-  std::vector<PreviewTileData> tiles_;
-  PreviewBounds bounds_;
+  mutable std::vector<PreviewTileData> tiles_;
+  mutable PreviewBounds bounds_;
   mutable bool needsRegen_ = false;
 
   // Cached settings for change detection (actual offsets, not just count)
   mutable std::vector<std::pair<int, int>> cachedOffsets_;
 
-  void buildPreview();
+  void buildPreview() const;
   bool checkSettingsChanged() const;
 };
 

@@ -23,7 +23,8 @@ Domain::Position CreaturePreviewProvider::getAnchorPosition() const {
 const std::vector<PreviewTileData> &CreaturePreviewProvider::getTiles() const {
   // Check for changes in brush settings before returning
   if (checkSettingsChanged()) {
-    const_cast<CreaturePreviewProvider *>(this)->regenerate();
+    buildPreview();
+    needsRegen_ = false;
   }
   return tiles_;
 }
@@ -40,7 +41,7 @@ void CreaturePreviewProvider::regenerate() {
   needsRegen_ = false;
 }
 
-void CreaturePreviewProvider::buildPreview() {
+void CreaturePreviewProvider::buildPreview() const {
   tiles_.clear();
   bounds_ = PreviewBounds{};
 

@@ -34,7 +34,7 @@ const std::vector<PreviewTileData> &DoodadBrushPreviewProvider::getTiles() const
   }
 
   if (needsRegen_) {
-    const_cast<DoodadBrushPreviewProvider *>(this)->buildPreview();
+    buildPreview();
   }
 
   return tiles_;
@@ -58,7 +58,7 @@ void DoodadBrushPreviewProvider::updateCursorPosition(const Domain::Position &cu
 
 void DoodadBrushPreviewProvider::regenerate() { buildPreview(); }
 
-void DoodadBrushPreviewProvider::buildPreview() {
+void DoodadBrushPreviewProvider::buildPreview() const {
   const auto seed = Brushes::DoodadPlacementPlanner::buildSeed(
       brush_, anchor_, brushSettings_, brush_.getVariation(), false);
   tiles_ = brush_.buildPreviewTiles(anchor_, brushSettings_, map_, seed);

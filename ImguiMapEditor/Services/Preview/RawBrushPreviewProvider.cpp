@@ -75,7 +75,7 @@ const std::vector<PreviewTileData> &RawBrushPreviewProvider::getTiles() const {
 
   // Lazy regeneration if needed
   if (needsRegen_) {
-    const_cast<RawBrushPreviewProvider *>(this)->buildPreview();
+    buildPreview();
   }
   return tiles_;
 }
@@ -95,7 +95,7 @@ void RawBrushPreviewProvider::updateCursorPosition(
 
 void RawBrushPreviewProvider::regenerate() { buildPreview(); }
 
-void RawBrushPreviewProvider::buildPreview() {
+void RawBrushPreviewProvider::buildPreview() const {
   tiles_.clear();
   bounds_ = PreviewBounds();
   needsRegen_ = false;

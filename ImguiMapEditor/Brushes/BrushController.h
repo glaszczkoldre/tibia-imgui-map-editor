@@ -467,6 +467,9 @@ private:
   bool applyResolvedSelection(const ResolvedBrushSelection &selection);
   DoorBrush *getDoorBrushForType(DoorType type) const;
   std::optional<ResolvedBrushSelection> lastBrushSelection_;
+
+  // Alt-replace state for GroundBrush (per-stroke, replaces global)
+  DrawContext::AltGroundReplaceState altReplaceState_;
 };
 
 } // namespace MapEditor::Brushes
