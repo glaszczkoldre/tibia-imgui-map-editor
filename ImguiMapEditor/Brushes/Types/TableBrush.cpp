@@ -134,7 +134,8 @@ void TableBrush::rebuildTile(Domain::ChunkedMap &map,
     }
   }
 
-  const auto align = Services::Brushes::TableLookupService{}.getTableType(neighbors);
+  static const Services::Brushes::TableLookupService tableLookupService;
+  const auto align = tableLookupService.getTableType(neighbors);
   auto itemId = selectItem(align);
   if (itemId == 0) {
     itemId = selectItem(TableAlign::Alone);

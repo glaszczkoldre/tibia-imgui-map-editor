@@ -389,8 +389,8 @@ void GroundBrush::rebuildTile(Domain::ChunkedMap &map,
     }
   }
 
-  auto *brush = const_cast<GroundBrush *>(resolveGroundBrush(registry_, *tile));
-  (brush ? brush : const_cast<GroundBrush *>(this))->updateBorderItems(map, *tile);
+  const auto *brush = resolveGroundBrush(registry_, *tile);
+  (brush ? brush : this)->updateBorderItems(map, *tile);
 
   if (createdTile && tile->isEmpty()) {
     map.removeTile(pos);
@@ -749,7 +749,7 @@ void GroundBrush::updateBorderItems(Domain::ChunkedMap &map,
     }
   }
 
-  const Services::Brushes::BorderLookupService borderLookupService;
+  static const Services::Brushes::BorderLookupService borderLookupService;
   for (auto it = clusters.rbegin(); it != clusters.rend(); ++it) {
     const auto packed = borderLookupService.getBorderTypes(it->alignment);
     for (const auto edge : Services::Brushes::BorderLookupService::unpack(packed)) {

@@ -133,8 +133,9 @@ void CarpetBrush::rebuildTile(Domain::ChunkedMap &map,
     }
   }
 
+  static const Services::Brushes::CarpetLookupService carpetLookupService;
   const auto packed =
-      Services::Brushes::CarpetLookupService{}.getCarpetTypes(neighbors);
+      carpetLookupService.getCarpetTypes(neighbors);
   auto types = Services::Brushes::CarpetLookupService::unpack(packed);
   if (types.empty()) {
     types.push_back(EdgeType::Center);

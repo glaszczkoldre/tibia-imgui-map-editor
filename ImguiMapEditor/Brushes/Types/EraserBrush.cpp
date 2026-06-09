@@ -5,7 +5,7 @@
 
 namespace MapEditor::Brushes {
 
-EraserBrush::EraserBrush() = default;
+EraserBrush::EraserBrush() noexcept = default;
 
 void EraserBrush::draw(Domain::ChunkedMap &map, Domain::Tile *tile,
                        const DrawContext &ctx) {

@@ -5,7 +5,7 @@
 
 namespace MapEditor::Brushes {
 
-HouseBrush::HouseBrush() = default;
+HouseBrush::HouseBrush() noexcept = default;
 
 void HouseBrush::draw(Domain::ChunkedMap &map, Domain::Tile *tile,
                       const DrawContext &ctx) {

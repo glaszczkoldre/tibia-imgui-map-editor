@@ -15,7 +15,7 @@ namespace MapEditor::Brushes {
  */
 class EraserBrush : public IBrush {
 public:
-  EraserBrush();
+  EraserBrush() noexcept;
   ~EraserBrush() override = default;
 
   // IBrush interface

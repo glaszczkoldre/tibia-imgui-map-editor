@@ -10,7 +10,7 @@ namespace MapEditor::Brushes {
  */
 class HouseBrush : public IBrush {
 public:
-  HouseBrush();
+  HouseBrush() noexcept;
   ~HouseBrush() override = default;
 
   // IBrush interface

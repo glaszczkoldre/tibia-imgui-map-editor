@@ -133,8 +133,8 @@ private:
 };
 
 inline int64_t encodeDoodadPosition(const Domain::Position &position) {
-  return (static_cast<int64_t>(position.x) << 32) ^
-         (static_cast<int64_t>(position.y) << 16) ^
+  return (static_cast<int64_t>(position.x) << 32) |
+         (static_cast<int64_t>(position.y) << 16) |
          static_cast<uint16_t>(position.z);
 }
 

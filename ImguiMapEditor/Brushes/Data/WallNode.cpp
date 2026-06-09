@@ -4,6 +4,7 @@
  */
 
 #include "WallNode.h"
+#include "Brushes/Behaviors/WeightedSelection.h"
 
 namespace MapEditor::Brushes {
 
@@ -16,27 +17,14 @@ uint32_t WallNode::getRandomItem() const {
     return 0;
   }
 
-  uint32_t totalWeight = 0;
+  std::vector<uint32_t> weights;
+  weights.reserve(items_.size());
   for (const auto &[itemId, chance] : items_) {
-    totalWeight += chance;
+    weights.push_back(chance);
   }
 
-  if (totalWeight == 0) {
-    return items_.front().first;
-  }
-
-  std::uniform_int_distribution<uint32_t> dist(1, totalWeight);
-  uint32_t roll = dist(rng_);
-
-  uint32_t cumulative = 0;
-  for (const auto &[itemId, chance] : items_) {
-    cumulative += chance;
-    if (roll <= cumulative) {
-      return itemId;
-    }
-  }
-
-  return items_.back().first;
+  const auto selected = WeightedSelection::select(weights);
+  return selected ? items_[*selected].first : items_.front().first;
 }
 
 } // namespace MapEditor::Brushes

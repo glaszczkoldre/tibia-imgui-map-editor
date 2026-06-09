@@ -6,7 +6,6 @@
 
 #include "Brushes/Enums/BrushEnums.h"
 #include <cstdint>
-#include <random>
 #include <vector>
 
 
@@ -40,8 +39,7 @@ public:
   }
 
 private:
-  std::vector<std::pair<uint32_t, uint32_t>> items_; // (itemId, chance)
-  mutable std::mt19937 rng_{std::random_device{}()};
+  std::vector<std::pair<uint32_t, uint32_t>> items_;
 };
 
 /**
