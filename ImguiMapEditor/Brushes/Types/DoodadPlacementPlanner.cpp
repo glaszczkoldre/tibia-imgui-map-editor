@@ -340,6 +340,50 @@ DoodadPlacementPlanner::buildPlanUnseeded(const Request &request) {
           .affectedPositions = std::move(affectedPositions)};
 }
 
+DoodadBrush::DoodadLayout
+buildSpecificSingleCandidate(const DoodadAlternative &alternative,
+                             size_t itemIndex, int anchorX, int anchorY) {
+  DoodadBrush::DoodadLayout candidate;
+  const auto &singles = alternative.getSingleItems();
+  if (itemIndex >= singles.size()) {
+    return candidate;
+  }
+  const auto &item = singles[itemIndex];
+  if (item.itemId == 0) {
+    return candidate;
+  }
+
+  Services::Preview::PreviewTileData tile(anchorX, anchorY, 0);
+  tile.addItem(item.itemId, static_cast<uint16_t>(item.subtype));
+  candidate.push_back(std::move(tile));
+  return candidate;
+}
+
+DoodadBrush::DoodadLayout
+buildSpecificCompositeCandidate(const DoodadAlternative &alternative,
+                                size_t compositeIndex, int anchorX,
+                                int anchorY) {
+  DoodadBrush::DoodadLayout candidate;
+  const auto &composites = alternative.getComposites();
+  if (compositeIndex >= composites.size()) {
+    return candidate;
+  }
+  const auto &composite = composites[compositeIndex];
+
+  for (const auto &offset : composite.tiles) {
+    Services::Preview::PreviewTileData tile(anchorX + offset.dx,
+                                            anchorY + offset.dy, offset.dz);
+    for (const auto &item : offset.items) {
+      if (item.itemId != 0) {
+        tile.addItem(item.itemId, static_cast<uint16_t>(item.subtype));
+      }
+    }
+    appendLayoutTile(candidate, std::move(tile));
+  }
+
+  return candidate;
+}
+
 DoodadPlacementPlanner::LayoutBuildResult
 DoodadPlacementPlanner::buildLayoutUnseeded(const Request &request) {
   LayoutBuildResult result;
@@ -350,6 +394,29 @@ DoodadPlacementPlanner::buildLayoutUnseeded(const Request &request) {
   }
 
   const auto anchors = getAnchors(request.brush.oneSize_, request.brushSettings);
+
+  if (request.specificVariant) {
+    const auto &v = *request.specificVariant;
+    const auto *alt = request.brush.getAlternative(v.alternativeIndex);
+    if (!alt) {
+      return result;
+    }
+
+    std::unordered_set<int64_t> occupied;
+    std::unordered_set<uint64_t> skippedKeys;
+    for (const auto &[anchorX, anchorY] : anchors) {
+      auto candidate =
+          v.isSingle
+              ? buildSpecificSingleCandidate(*alt, v.itemIndex, anchorX,
+                                             anchorY)
+              : buildSpecificCompositeCandidate(*alt, v.itemIndex,
+                                                anchorX, anchorY);
+      tryAppendCandidate(request, result.layout, result.skipped, skippedKeys,
+                         occupied, candidate);
+    }
+    return result;
+  }
+
   const auto singleChance = totalSingleChance(*alternative);
   const auto compositeChance = totalCompositeChance(*alternative);
   const auto scatterMode = !request.brush.oneSize_ && anchors.size() > 1;

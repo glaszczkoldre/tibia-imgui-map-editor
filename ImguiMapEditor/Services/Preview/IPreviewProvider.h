@@ -1,5 +1,7 @@
 #pragma once
 #include "PreviewTypes.h"
+#include <cstdint>
+#include <optional>
 #include <vector>
 
 namespace MapEditor::Services::Preview {
@@ -77,6 +79,15 @@ public:
      * Called when brush size/shape changes for example.
      */
     virtual void regenerate() {}
+
+    /**
+     * Get the current deterministic seed used by the preview.
+     * Providers that use seeded randomness should return the seed
+     * so that the placement operation produces the exact same result
+     * as the preview.
+     * @return Seed value, or std::nullopt if not applicable
+     */
+    virtual std::optional<uint32_t> getCurrentSeed() const { return std::nullopt; }
 };
 
 } // namespace MapEditor::Services::Preview

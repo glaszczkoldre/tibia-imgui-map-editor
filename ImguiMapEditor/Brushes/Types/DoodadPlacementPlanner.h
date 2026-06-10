@@ -15,6 +15,7 @@ public:
     const Domain::ChunkedMap *map = nullptr;
     bool forcePlace = false;
     std::optional<uint32_t> seed;
+    std::optional<DoodadBrush::Variant> specificVariant;
   };
 
   static DoodadBrush::DoodadLayout build(const Request &request);

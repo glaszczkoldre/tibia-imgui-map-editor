@@ -208,6 +208,14 @@ void DoodadBrush::addAlternative(DoodadAlternative alternative) {
   }
 
   alternatives_.push_back(std::move(alternative));
+  const auto &added = alternatives_.back();
+
+  for (size_t i = 0; i < added.getSingleItems().size(); ++i) {
+    variants_.push_back({alternatives_.size() - 1, true, i});
+  }
+  for (size_t i = 0; i < added.getComposites().size(); ++i) {
+    variants_.push_back({alternatives_.size() - 1, false, i});
+  }
 }
 
 uint16_t DoodadBrush::getPreviewItemId() const {
@@ -249,7 +257,8 @@ DoodadBrush::buildPlacementPlan(const Domain::Position &center,
        .preferredVariation = preferredVariation,
        .map = map,
        .forcePlace = forcePlace,
-       .seed = seed});
+       .seed = seed,
+       .specificVariant = getSpecificVariant()});
 }
 
 std::vector<Domain::Position>

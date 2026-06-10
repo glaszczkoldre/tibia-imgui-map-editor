@@ -1,6 +1,7 @@
 #pragma once
 
 #include "IPreviewProvider.h"
+#include <optional>
 
 namespace MapEditor::Brushes {
 class DoodadBrush;
@@ -30,10 +31,12 @@ public:
   void updateCursorPosition(const Domain::Position &cursor) override;
   bool needsRegeneration() const override { return needsRegen_; }
   void regenerate() override;
+  std::optional<uint32_t> getCurrentSeed() const override;
 
 private:
   bool checkSettingsChanged() const;
   void buildPreview() const;
+  uint32_t buildStableSeed() const;
 
   const Brushes::DoodadBrush &brush_;
   BrushSettingsService *brushSettings_ = nullptr;
@@ -43,6 +46,8 @@ private:
   mutable PreviewBounds bounds_;
   mutable bool needsRegen_ = true;
   mutable std::vector<std::pair<int, int>> cachedOffsets_;
+  mutable uint32_t previewNonce_ = 0;
+  mutable uint32_t currentSeed_ = 0;
 };
 
 } // namespace MapEditor::Services::Preview

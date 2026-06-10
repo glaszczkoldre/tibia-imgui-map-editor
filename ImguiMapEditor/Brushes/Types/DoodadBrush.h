@@ -43,13 +43,31 @@ public:
     std::vector<Domain::Position> affectedPositions;
   };
 
+  struct Variant {
+    size_t alternativeIndex = 0;
+    bool isSingle = true;
+    size_t itemIndex = 0;
+  };
+
   DoodadBrush(std::string name, uint32_t lookId, BrushRegistry &registry,
               bool draggable);
 
   BrushType getType() const override { return BrushType::Doodad; }
   bool needsBorderUpdate() const override { return redoBorders_; }
-  size_t getMaxVariation() const override { return alternatives_.size(); }
+  size_t getMaxVariation() const override {
+    return variants_.empty() ? alternatives_.size() : variants_.size();
+  }
   void setVariation(size_t index) override { activeVariation_ = index; }
+
+  [[nodiscard]] std::optional<Variant> getSpecificVariant() const {
+    if (activeVariation_ >= variants_.size()) return std::nullopt;
+    return variants_[activeVariation_];
+  }
+
+  [[nodiscard]] const DoodadAlternative *getAlternative(size_t index) const {
+    if (index >= alternatives_.size()) return nullptr;
+    return &alternatives_[index];
+  }
 
   void draw(Domain::ChunkedMap &map, Domain::Tile *tile,
             const DrawContext &ctx) override;
@@ -122,6 +140,7 @@ private:
 
   BrushRegistry &registry_;
   std::vector<DoodadAlternative> alternatives_;
+  std::vector<Variant> variants_;
   std::unordered_set<uint16_t> ownedItemIds_;
   size_t activeVariation_ = 0;
   float thickness_ = 1.0f;

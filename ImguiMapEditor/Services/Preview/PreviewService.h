@@ -1,6 +1,7 @@
 #pragma once
 #include "IPreviewProvider.h"
 #include <memory>
+#include <optional>
 
 namespace MapEditor::Services::Preview {
 
@@ -93,6 +94,14 @@ public:
      * Used when brush parameters change (size, shape).
      */
     void regenerate();
+
+    /**
+     * Get the current deterministic seed from the active provider.
+     * Providers that produce preview results deterministically from a seed
+     * expose it here so placement code can reproduce the exact preview result.
+     * @return Seed value, or std::nullopt if provider doesn't support it
+     */
+    std::optional<uint32_t> getCurrentSeed() const;
 
 private:
     std::unique_ptr<IPreviewProvider> provider_;

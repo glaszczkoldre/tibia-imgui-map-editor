@@ -57,9 +57,16 @@ void PreviewService::updateFractional(float fracX, float fracY) {
 }
 
 void PreviewService::regenerate() {
-    if (provider_ && provider_->needsRegeneration()) {
+    if (provider_) {
         provider_->regenerate();
     }
+}
+
+std::optional<uint32_t> PreviewService::getCurrentSeed() const {
+    if (provider_) {
+        return provider_->getCurrentSeed();
+    }
+    return std::nullopt;
 }
 
 } // namespace MapEditor::Services::Preview
