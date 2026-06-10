@@ -55,7 +55,7 @@ public:
   BrushType getType() const override { return BrushType::Doodad; }
   bool needsBorderUpdate() const override { return redoBorders_; }
   size_t getMaxVariation() const override {
-    return variants_.empty() ? alternatives_.size() : variants_.size();
+    return variants_.empty() ? alternatives_.size() : variants_.size() + 1;
   }
   void setVariation(size_t index) override { activeVariation_ = index; }
 
@@ -152,9 +152,10 @@ private:
 };
 
 inline int64_t encodeDoodadPosition(const Domain::Position &position) {
-  return (static_cast<int64_t>(position.x) << 32) |
-         (static_cast<int64_t>(position.y) << 16) |
-         static_cast<uint16_t>(position.z);
+  const uint64_t ux = static_cast<uint16_t>(static_cast<int16_t>(position.x));
+  const uint64_t uy = static_cast<uint16_t>(static_cast<int16_t>(position.y));
+  const uint64_t uz = static_cast<uint16_t>(position.z);
+  return static_cast<int64_t>((ux << 48) | (uy << 32) | uz);
 }
 
 } // namespace MapEditor::Brushes

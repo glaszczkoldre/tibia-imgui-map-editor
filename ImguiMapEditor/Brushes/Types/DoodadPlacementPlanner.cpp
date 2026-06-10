@@ -404,16 +404,40 @@ DoodadPlacementPlanner::buildLayoutUnseeded(const Request &request) {
 
     std::unordered_set<int64_t> occupied;
     std::unordered_set<uint64_t> skippedKeys;
-    for (const auto &[anchorX, anchorY] : anchors) {
+
+    if (v.isSingle) {
+      const auto scatterMode = !request.brush.oneSize_ && anchors.size() > 1;
+      const int count = scatterMode
+                            ? calculateObjectCount(anchors.size(),
+                                                   request.brush.thickness_)
+                            : static_cast<int>(anchors.size());
+
+      std::vector<size_t> order(anchors.size());
+      for (size_t j = 0; j < anchors.size(); ++j) {
+        order[j] = j;
+      }
+      if (scatterMode) {
+        WeightedSelection::shuffleIndices(order);
+      }
+
+      size_t placed = 0;
+      for (size_t si = 0;
+           si < order.size() && placed < static_cast<size_t>(count); ++si) {
+        const auto &[anchorX, anchorY] = anchors[order[si]];
+        auto candidate = buildSpecificSingleCandidate(*alt, v.itemIndex,
+                                                      anchorX, anchorY);
+        if (tryAppendCandidate(request, result.layout, result.skipped,
+                               skippedKeys, occupied, candidate)) {
+          ++placed;
+        }
+      }
+    } else {
       auto candidate =
-          v.isSingle
-              ? buildSpecificSingleCandidate(*alt, v.itemIndex, anchorX,
-                                             anchorY)
-              : buildSpecificCompositeCandidate(*alt, v.itemIndex,
-                                                anchorX, anchorY);
+          buildSpecificCompositeCandidate(*alt, v.itemIndex, 0, 0);
       tryAppendCandidate(request, result.layout, result.skipped, skippedKeys,
                          occupied, candidate);
     }
+
     return result;
   }
 

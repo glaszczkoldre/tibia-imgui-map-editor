@@ -40,6 +40,11 @@ public:
      * Get a random integer in the range [min, max] inclusive.
      */
     static uint32_t randomRange(uint32_t min, uint32_t max);
+
+    /**
+     * Shuffle a vector of indices in-place using the shared RNG.
+     */
+    static void shuffleIndices(std::vector<size_t>& indices);
     
 private:
     static thread_local std::mt19937 rng_;

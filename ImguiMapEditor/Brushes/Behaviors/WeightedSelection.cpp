@@ -61,4 +61,9 @@ uint32_t WeightedSelection::randomRange(uint32_t min, uint32_t max) {
     return dist(rng_);
 }
 
+void WeightedSelection::shuffleIndices(std::vector<size_t>& indices) {
+    ensureInitialized();
+    std::shuffle(indices.begin(), indices.end(), rng_);
+}
+
 } // namespace MapEditor::Brushes

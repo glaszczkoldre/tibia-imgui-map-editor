@@ -221,6 +221,10 @@ void BrushController::setBrush(IBrush *brush) {
 
   currentBrush_ = brush;
   currentBrushName_ = brush->getName();
+  const auto maxVar = static_cast<int>(currentBrush_->getMaxVariation());
+  if (variation_ < 0 || variation_ >= maxVar) {
+    variation_ = maxVar > 0 ? maxVar - 1 : 0;
+  }
   currentBrush_->setVariation(static_cast<size_t>(variation_));
   lastBrushSelection_ = captureCurrentSelection();
 

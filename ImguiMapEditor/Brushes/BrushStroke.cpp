@@ -3,6 +3,7 @@
 #include "Services/Autoborder/AutoborderEngine.h"
 #include "Services/Autoborder/PlannedMutation.h"
 #include "Services/BrushSettingsService.h"
+#include "Services/Preview/PreviewService.h"
 #include "Types/DoodadBrush.h"
 #include "Types/DoodadPlacementPlanner.h"
 #include <spdlog/spdlog.h>
@@ -360,13 +361,18 @@ void BrushController::paintDoodadRecordedPosition(const Domain::Position &pos,
     return;
   }
 
-  const auto forcePlace = (modifiers & Modifiers::Alt) != 0;
-  const auto seed = DoodadPlacementPlanner::buildSeed(
-      *doodadBrush, pos, brushSettingsService_, static_cast<size_t>(variation_),
-      forcePlace);
+  std::optional<uint32_t> seed;
+  if (previewService_) {
+    seed = previewService_->getCurrentSeed();
+  }
+  if (!seed) {
+    seed = DoodadPlacementPlanner::buildSeed(
+        *doodadBrush, pos, brushSettingsService_, static_cast<size_t>(variation_),
+        true);
+  }
   const auto plan = doodadBrush->buildPlacementPlan(
       pos, brushSettingsService_, static_cast<size_t>(variation_), map_,
-      forcePlace, seed);
+      true, *seed);
   if (plan.layout.empty()) {
     return;
   }
@@ -393,6 +399,18 @@ void BrushController::paintDoodadRecordedPosition(const Domain::Position &pos,
   ctx.isDragging = strokeActive_;
   doodadBrush->applyPlacementPlan(*map_, pos, plan, ctx);
   notifyTilesMutated(plan.affectedPositions);
+
+  if (previewService_) {
+    previewService_->regenerate();
+  }
+
+  const auto maxVar = static_cast<int>(doodadBrush->getMaxVariation());
+  if (maxVar > 0) {
+    const auto specVar = doodadBrush->getSpecificVariant();
+    if (specVar) {
+      cycleBrushVariation(1);
+    }
+  }
 }
 
 void BrushController::eraseDoodadRecordedPosition(const Domain::Position &pos,
@@ -448,6 +466,9 @@ void BrushController::eraseDoodadRecordedPosition(const Domain::Position &pos,
   }
   if (mutated) {
     notifyTilesMutated(plan.affectedPositions);
+    if (previewService_) {
+      previewService_->regenerate();
+    }
   }
 }
 

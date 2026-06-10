@@ -53,15 +53,6 @@ bool BrushController::applyBrush(const Domain::Position &pos,
   const bool changed = !paintedPositions_.empty();
   if (changed) {
     historyManager_->endOperation(map_, nullptr);
-    if (getActionFamily() == BrushActionFamily::DoodadLike) {
-      auto *doodadBrush = dynamic_cast<DoodadBrush *>(currentBrush_);
-      if (doodadBrush) {
-        const auto maxVar = static_cast<int>(doodadBrush->getMaxVariation());
-        if (maxVar > 0) {
-          cycleBrushVariation(1);
-        }
-      }
-    }
   } else {
     historyManager_->cancelOperation();
   }

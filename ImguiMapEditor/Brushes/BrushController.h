@@ -402,7 +402,7 @@ private:
   bool strokeActive_ = false;
   bool strokeEraseMode_ = false;
   bool strokeNeedsAutoborderFinalize_ = false;
-  int variation_ = 0;
+  int variation_ = -1;
   uint32_t strokeModifiers_ = 0;
 
   std::array<std::optional<ResolvedBrushSelection>, 10> brushHotkeys_{};

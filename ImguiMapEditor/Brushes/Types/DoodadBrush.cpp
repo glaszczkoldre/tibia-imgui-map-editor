@@ -95,7 +95,7 @@ void DoodadBrush::draw(Domain::ChunkedMap &map, Domain::Tile *tile,
   const auto plan =
       buildPlacementPlan(tile->getPosition(), ctx.brushSettings,
                          static_cast<size_t>(ctx.variation), &map,
-                         ctx.forcePlace);
+                         true);
   if (plan.layout.empty()) {
     return;
   }
@@ -227,7 +227,7 @@ DoodadBrush::buildPreviewTiles(const Domain::Position &anchor,
                                const Services::BrushSettingsService *brushSettings,
                                const Domain::ChunkedMap *map,
                                std::optional<uint32_t> seed) const {
-  return buildPlacementLayout(anchor, brushSettings, activeVariation_, map, false,
+  return buildPlacementLayout(anchor, brushSettings, activeVariation_, map, true,
                               seed);
 }
 
