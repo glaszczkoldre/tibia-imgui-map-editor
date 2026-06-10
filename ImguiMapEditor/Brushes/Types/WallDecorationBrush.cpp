@@ -1,5 +1,4 @@
 #include "WallDecorationBrush.h"
-#include "WallBrush.h"
 #include "BrushUtils.h"
 #include "Domain/Tile.h"
 #include "Domain/Item.h"

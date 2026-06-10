@@ -348,24 +348,18 @@ BrushController::resolveBrushFromTile(const Domain::Tile &tile,
     return std::nullopt;
   };
 
-  auto selectNamedBrush =
-      [&makeSelection](IBrush *brush,
-                       BrushPickMode selectionMode) -> std::optional<ResolvedBrushSelection> {
-    return makeSelection(brush, selectionMode);
-  };
-
   auto selectBrushById =
-      [this, &selectNamedBrush](BrushId brushId,
+      [this, &makeSelection](BrushId brushId,
                                 BrushPickMode selectionMode)
       -> std::optional<ResolvedBrushSelection> {
     if (!registry_ || brushId == InvalidBrushId) {
       return std::nullopt;
     }
-    return selectNamedBrush(registry_->getBrushById(brushId), selectionMode);
+    return makeSelection(registry_->getBrushById(brushId), selectionMode);
   };
 
   auto selectPreferredBrushByType =
-      [this, preferredItem, &selectBrushById, &selectNamedBrush](
+      [this, preferredItem, &selectBrushById, &makeSelection](
           BrushType type, BrushPickMode selectionMode)
       -> std::optional<ResolvedBrushSelection> {
     if (!preferredItem || !registry_) {
@@ -380,7 +374,7 @@ BrushController::resolveBrushFromTile(const Domain::Tile &tile,
 
     for (auto *brush : registry_->getBrushesForItem(preferredItem->getServerId())) {
       if (matchesBrushType(brush, type)) {
-        return selectNamedBrush(brush, selectionMode);
+        return makeSelection(brush, selectionMode);
       }
     }
 
@@ -416,8 +410,7 @@ BrushController::resolveBrushFromTile(const Domain::Tile &tile,
     return std::nullopt;
   };
 
-  auto selectGroundBrush = [this, &tile, &selectNamedBrush,
-                            &selectBrushById]()
+  auto selectGroundBrush = [this, &tile, &selectBrushById, &makeSelection]()
       -> std::optional<ResolvedBrushSelection> {
     if (!registry_ || !tile.hasGround()) {
       return std::nullopt;
@@ -430,7 +423,7 @@ BrushController::resolveBrushFromTile(const Domain::Tile &tile,
 
     for (auto *brush : registry_->getBrushesForItem(tile.getGround()->getServerId())) {
       if (brush && brush->getType() == BrushType::Ground) {
-        return selectNamedBrush(brush, BrushPickMode::Ground);
+        return makeSelection(brush, BrushPickMode::Ground);
       }
     }
 
@@ -624,7 +617,7 @@ BrushController::resolveBrushFromTile(const Domain::Tile &tile,
     return first ? std::move(first) : std::move(second);
   };
 
-  auto selectSpecificMode = [this, &tile, &selectGroundBrush, &selectNamedBrush,
+  auto selectSpecificMode = [this, &tile, &selectGroundBrush,
                              &selectDoorBrush, &selectRawBrush,
                              &selectWaypointBrush, &selectHouseExitBrush,
                              &selectOptionalBorderBrush, &selectFlagBrush,
@@ -644,10 +637,10 @@ BrushController::resolveBrushFromTile(const Domain::Tile &tile,
           selectPreferredBrushByType(BrushType::Doodad,
                                      BrushPickMode::Doodad),
           chooseFirst(
-          selectNamedBrush(
+          makeSelection(
               findOwnedItemBrushByType(tile, registry_, BrushType::Doodad),
               BrushPickMode::Doodad),
-          selectNamedBrush(
+          makeSelection(
               findItemBrushByType(tile, registry_, BrushType::Doodad),
               BrushPickMode::Doodad)));
     case BrushPickMode::Collection:
@@ -658,10 +651,10 @@ BrushController::resolveBrushFromTile(const Domain::Tile &tile,
       return chooseFirst(
           selectPreferredBrushByType(BrushType::Wall, BrushPickMode::Wall),
           chooseFirst(
-          selectNamedBrush(
+          makeSelection(
               findOwnedItemBrushByType(tile, registry_, BrushType::Wall),
               BrushPickMode::Wall),
-          selectNamedBrush(
+          makeSelection(
               findItemBrushByType(tile, registry_, BrushType::Wall),
               BrushPickMode::Wall)));
     case BrushPickMode::Carpet:
@@ -669,20 +662,20 @@ BrushController::resolveBrushFromTile(const Domain::Tile &tile,
           selectPreferredBrushByType(BrushType::Carpet,
                                      BrushPickMode::Carpet),
           chooseFirst(
-          selectNamedBrush(
+          makeSelection(
               findOwnedItemBrushByType(tile, registry_, BrushType::Carpet),
               BrushPickMode::Carpet),
-          selectNamedBrush(
+          makeSelection(
               findItemBrushByType(tile, registry_, BrushType::Carpet),
               BrushPickMode::Carpet)));
     case BrushPickMode::Table:
       return chooseFirst(
           selectPreferredBrushByType(BrushType::Table, BrushPickMode::Table),
           chooseFirst(
-          selectNamedBrush(
+          makeSelection(
               findOwnedItemBrushByType(tile, registry_, BrushType::Table),
               BrushPickMode::Table),
-          selectNamedBrush(
+          makeSelection(
               findItemBrushByType(tile, registry_, BrushType::Table),
               BrushPickMode::Table)));
     case BrushPickMode::Creature:
@@ -693,7 +686,7 @@ BrushController::resolveBrushFromTile(const Domain::Tile &tile,
       if (!registry_ || !tile.hasCreature()) {
         return std::nullopt;
       }
-      return selectNamedBrush(
+      return makeSelection(
           registry_->getBrushForCreature(tile.getCreature()->name),
           BrushPickMode::Creature);
     case BrushPickMode::Spawn:

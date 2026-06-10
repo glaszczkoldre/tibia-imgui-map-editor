@@ -3,14 +3,11 @@
 #include "Brushes/BrushRegistry.h"
 #include "BrushUtils.h"
 #include "Brushes/Behaviors/WeightedSelection.h"
-#include "Brushes/Enums/BrushEnums.h"
 #include "Domain/ChunkedMap.h"
 #include "Domain/Item.h"
 #include "Domain/Tile.h"
-#include "Services/Brushes/BorderLookupService.h"
 #include "Services/ClientDataService.h"
 #include <algorithm>
-#include <array>
 #include <cctype>
 #include <limits>
 #include <ranges>
@@ -19,44 +16,45 @@ namespace MapEditor::Brushes {
 
 namespace {
 
-struct NeighborState {
-    bool visited = false;
-    const GroundBrush *brush = nullptr;
-};
+[[nodiscard]] bool shouldSkipAltGroundPlacement(const BrushRegistry &registry,
+                                                const Domain::Tile &tile,
+                                                const DrawContext &ctx) {
+  const bool altPressed = (ctx.modifiers & Modifiers::Alt) != 0;
+  if (!altPressed) {
+    ctx.altReplace = {};
+    return false;
+  }
 
-struct BorderCluster {
-    TileNeighbor alignment = TileNeighbor::None;
-    int zOrder = 0;
-    const BorderBlock *block = nullptr;
-    const GroundBrush *ownerBrush = nullptr;
-};
+  if (!ctx.altReplace.active || !ctx.isDragging) {
+    ctx.altReplace.active = true;
+    ctx.altReplace.emptyOnly = !tile.hasGround();
+    ctx.altReplace.replaceBrush = nullptr;
 
-struct ResolvedBorderRule {
-    const BorderBlock *block = nullptr;
-    const GroundBrush *ownerBrush = nullptr;
-    int zOrder = 0;
-};
+    if (!ctx.altReplace.emptyOnly) {
+      ctx.altReplace.replaceBrush = GroundBrush::resolveGroundBrush(registry, tile);
+      if (!ctx.altReplace.replaceBrush) {
+        ctx.altReplace = {};
+        return true;
+      }
+    }
+  }
 
-constexpr std::array<std::tuple<int, int, TileNeighbor>, 8> kNeighborOffsets{{
-    {-1, -1, TileNeighbor::Northwest},
-    {0, -1, TileNeighbor::North},
-    {1, -1, TileNeighbor::Northeast},
-    {-1, 0, TileNeighbor::West},
-    {1, 0, TileNeighbor::East},
-    {-1, 1, TileNeighbor::Southwest},
-    {0, 1, TileNeighbor::South},
-    {1, 1, TileNeighbor::Southeast},
-}};
+  if (ctx.altReplace.emptyOnly) {
+    return tile.hasGround();
+  }
 
-std::string normalizeName(const std::string &value) {
-  std::string normalized = value;
-  std::transform(normalized.begin(), normalized.end(), normalized.begin(),
-                 [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
-  return normalized;
+  const auto *currentBrush = GroundBrush::resolveGroundBrush(registry, tile);
+  if (!currentBrush) {
+    return true;
+  }
+
+  return currentBrush != ctx.altReplace.replaceBrush;
 }
 
-[[nodiscard]] const GroundBrush *resolveGroundBrush(const BrushRegistry &registry,
-                                                    const Domain::Tile &tile) {
+} // namespace
+
+const GroundBrush *GroundBrush::resolveGroundBrush(const BrushRegistry &registry,
+                                                   const Domain::Tile &tile) {
   if (tile.getGroundBrushId() != InvalidBrushId) {
     if (const auto *brush =
             dynamic_cast<const GroundBrush *>(registry.getBrushById(tile.getGroundBrushId()))) {
@@ -80,42 +78,12 @@ std::string normalizeName(const std::string &value) {
       registry.getBrushForItem(ground->getServerId()));
 }
 
-[[nodiscard]] bool shouldSkipAltGroundPlacement(const BrushRegistry &registry,
-                                                const Domain::Tile &tile,
-                                                const DrawContext &ctx) {
-  const bool altPressed = (ctx.modifiers & Modifiers::Alt) != 0;
-  if (!altPressed) {
-    ctx.altReplace = {};
-    return false;
-  }
-
-  if (!ctx.altReplace.active || !ctx.isDragging) {
-    ctx.altReplace.active = true;
-    ctx.altReplace.emptyOnly = !tile.hasGround();
-    ctx.altReplace.replaceBrush = nullptr;
-
-    if (!ctx.altReplace.emptyOnly) {
-      ctx.altReplace.replaceBrush = resolveGroundBrush(registry, tile);
-      if (!ctx.altReplace.replaceBrush) {
-        ctx.altReplace = {};
-        return true;
-      }
-    }
-  }
-
-  if (ctx.altReplace.emptyOnly) {
-    return tile.hasGround();
-  }
-
-  const auto *currentBrush = resolveGroundBrush(registry, tile);
-  if (!currentBrush) {
-    return true;
-  }
-
-  return currentBrush != ctx.altReplace.replaceBrush;
+std::string GroundBrush::normalizeName(const std::string &value) {
+  std::string normalized = value;
+  std::transform(normalized.begin(), normalized.end(), normalized.begin(),
+                 [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+  return normalized;
 }
-
-} // namespace
 
 GroundBrush::GroundBrush(std::string name, uint32_t lookId, BrushRegistry &registry)
     : BrushBase(std::move(name), lookId, true), registry_(registry) {}
@@ -365,14 +333,18 @@ void GroundBrush::rebuildTile(Domain::ChunkedMap &map,
   bool createdTile = false;
   if (!tile || !tile->hasGround()) {
     bool canBuildOuterZilch = false;
-    for (const auto &[dx, dy, _] : kNeighborOffsets) {
-      const auto *neighborTile = map.getTile(pos.x + dx, pos.y + dy, pos.z);
-      const auto *neighborBrush =
-          neighborTile ? resolveGroundBrush(registry_, *neighborTile) : nullptr;
-      if (neighborBrush && neighborBrush->hasOuterZilchBorderRule()) {
-        canBuildOuterZilch = true;
-        break;
+    for (int dy = -1; dy <= 1; ++dy) {
+      for (int dx = -1; dx <= 1; ++dx) {
+        if (dx == 0 && dy == 0) continue;
+        const auto *neighborTile = map.getTile(pos.x + dx, pos.y + dy, pos.z);
+        const auto *neighborBrush =
+            neighborTile ? resolveGroundBrush(registry_, *neighborTile) : nullptr;
+        if (neighborBrush && neighborBrush->hasOuterZilchBorderRule()) {
+          canBuildOuterZilch = true;
+          break;
+        }
       }
+      if (canBuildOuterZilch) break;
     }
 
     if (!canBuildOuterZilch) {

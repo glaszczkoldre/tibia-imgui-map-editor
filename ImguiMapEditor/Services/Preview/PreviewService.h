@@ -51,12 +51,6 @@ public:
     bool hasPreview() const;
     
     /**
-     * Get the active provider (may be null).
-     * @return Raw pointer to provider, or nullptr
-     */
-    IPreviewProvider* getProvider() const;
-    
-    /**
      * Get preview tiles from active provider.
      * @return Reference to tiles, or empty vector if no provider
      */

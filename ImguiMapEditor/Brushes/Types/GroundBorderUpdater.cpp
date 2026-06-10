@@ -12,7 +12,6 @@
 #include "Domain/Tile.h"
 #include <algorithm>
 #include <array>
-#include <cctype>
 #include <limits>
 #include <ranges>
 
@@ -49,38 +48,6 @@ constexpr std::array<std::tuple<int, int, TileNeighbor>, 8> kNeighborOffsets{{
     {1, 1, TileNeighbor::Southeast},
 }};
 
-std::string normalizeName(const std::string &value) {
-  std::string normalized = value;
-  std::transform(normalized.begin(), normalized.end(), normalized.begin(),
-                 [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
-  return normalized;
-}
-
-[[nodiscard]] const GroundBrush *resolveGroundBrush(const BrushRegistry &registry,
-                                                    const Domain::Tile &tile) {
-  if (tile.getGroundBrushId() != InvalidBrushId) {
-    if (const auto *brush =
-            dynamic_cast<const GroundBrush *>(registry.getBrushById(tile.getGroundBrushId()))) {
-      return brush;
-    }
-  }
-
-  const auto *ground = tile.getGround();
-  if (!ground) {
-    return nullptr;
-  }
-
-  if (ground->getOwnerBrushId() != InvalidBrushId) {
-    if (const auto *brush = dynamic_cast<const GroundBrush *>(
-            registry.getBrushById(ground->getOwnerBrushId()))) {
-      return brush;
-    }
-  }
-
-  return dynamic_cast<const GroundBrush *>(
-      registry.getBrushForItem(ground->getServerId()));
-}
-
 } // namespace
 
 void GroundBrush::updateBorderItems(Domain::ChunkedMap &map,
@@ -115,7 +82,7 @@ void GroundBrush::updateBorderItems(Domain::ChunkedMap &map,
       return nullptr;
     }
 
-    const auto otherName = other ? normalizeName(other->getName()) : std::string{};
+    const auto otherName = other ? GroundBrush::normalizeName(other->getName()) : std::string{};
     for (const auto &rule : brush->borderRules_) {
       if (rule.outer != outerRule) {
         continue;
@@ -132,7 +99,7 @@ void GroundBrush::updateBorderItems(Domain::ChunkedMap &map,
         continue;
       }
 
-      const auto targetName = normalizeName(rule.targetName);
+      const auto targetName = GroundBrush::normalizeName(rule.targetName);
       if (targetName.empty() || targetName == otherName || targetName == "all") {
         return &rule;
       }
@@ -288,13 +255,13 @@ void GroundBrush::updateBorderItems(Domain::ChunkedMap &map,
   };
 
   const auto pos = tile.getPosition();
-  const auto *borderBrush = resolveGroundBrush(registry_, tile);
+  const auto *borderBrush = GroundBrush::resolveGroundBrush(registry_, tile);
   std::array<NeighborState, kNeighborOffsets.size()> neighbors {};
   for (size_t index = 0; index < kNeighborOffsets.size(); ++index) {
     const auto &[dx, dy, _] = kNeighborOffsets[index];
     const auto *neighborTile = map.getTile(pos.x + dx, pos.y + dy, pos.z);
     neighbors[index].brush =
-        neighborTile ? resolveGroundBrush(registry_, *neighborTile) : nullptr;
+        neighborTile ? GroundBrush::resolveGroundBrush(registry_, *neighborTile) : nullptr;
   }
 
   std::vector<BorderCluster> clusters;

@@ -172,21 +172,9 @@ inline std::vector<EdgeType> unpackEdgeTypes(uint32_t packed) {
 EdgeType parseEdgeName(std::string_view name);
 
 /**
- * Convert EdgeType to XML string.
- * @param type The edge type
- * @return XML attribute string (e.g., "n", "cne", "dsw")
- */
-std::string_view edgeTypeToString(EdgeType type);
-
-/**
  * Parse table alignment from XML attribute to TableAlign.
  */
 TableAlign parseTableAlign(std::string_view name);
-
-/**
- * Convert TableAlign to XML string.
- */
-std::string_view tableAlignToString(TableAlign align);
 
 /**
  * Parse wall type from XML attribute to WallAlign.
@@ -195,18 +183,8 @@ std::string_view tableAlignToString(TableAlign align);
 WallAlign parseWallType(std::string_view name);
 
 /**
- * Convert WallAlign to XML string.
- */
-std::string_view wallAlignToString(WallAlign align);
-
-/**
  * Parse door type from XML attribute to DoorType.
  */
 DoorType parseDoorType(std::string_view name);
-
-/**
- * Convert DoorType to XML string.
- */
-std::string_view doorTypeToString(DoorType type);
 
 } // namespace MapEditor::Brushes

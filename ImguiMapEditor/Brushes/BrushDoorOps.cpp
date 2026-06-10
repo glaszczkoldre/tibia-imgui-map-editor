@@ -127,8 +127,7 @@ bool BrushController::canRotateItemAt(const Domain::Position &pos,
   }
 
   const auto *tile = map_->getTile(pos);
-  const auto *item = resolveMutableTileItem(const_cast<Domain::Tile *>(tile),
-                                            preferredItem);
+  const auto *item = resolveTileItem(tile, preferredItem);
   const auto *type = item ? item->getType() : nullptr;
   return type && type->rotateTo != 0;
 }
@@ -189,7 +188,6 @@ DoorBrush *BrushController::getDoorBrushForType(DoorType type) const {
     case DoorType::Undefined:
       return nullptr;
     }
-  return nullptr;
 }
 
 } // namespace MapEditor::Brushes

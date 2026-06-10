@@ -353,14 +353,6 @@ IBrush* BrushRegistry::resolveBrushForTile(const Domain::Tile& tile) const {
         }
     }
 
-    if (tile.hasCreature()) {
-        if (const auto* creature = tile.getCreature()) {
-            if (auto* brush = getBrushForCreature(creature->name)) {
-                return brush;
-            }
-        }
-    }
-
     if (const auto* ground = tile.getGround()) {
         if (auto* brush = getBrushForItem(ground->getServerId())) {
             return brush;

@@ -27,17 +27,6 @@ public:
   BrushType getType() const override { return BrushType::Eraser; }
   uint32_t getLookId() const override { return 0; }
 
-  // Configuration - what to erase
-  void setEraseGround(bool val) { eraseGround_ = val; }
-  void setEraseItems(bool val) { eraseItems_ = val; }
-  void setEraseCreatures(bool val) { eraseCreatures_ = val; }
-  void setEraseSpawns(bool val) { eraseSpawns_ = val; }
-
-  bool getEraseGround() const { return eraseGround_; }
-  bool getEraseItems() const { return eraseItems_; }
-  bool getEraseCreatures() const { return eraseCreatures_; }
-  bool getEraseSpawns() const { return eraseSpawns_; }
-
 private:
   std::string name_ = "Eraser";
 

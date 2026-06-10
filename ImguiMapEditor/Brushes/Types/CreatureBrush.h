@@ -21,9 +21,7 @@ namespace MapEditor::Brushes {
     void draw(Domain::ChunkedMap& map, Domain::Tile* tile, const DrawContext& ctx) override;
     void undraw(Domain::ChunkedMap& map, Domain::Tile* tile) override;
 
-    const Domain::Outfit& getOutfit() const { return outfit_; }
-
-  private:
+private:
     std::string name_;
     Domain::Outfit outfit_;
   };

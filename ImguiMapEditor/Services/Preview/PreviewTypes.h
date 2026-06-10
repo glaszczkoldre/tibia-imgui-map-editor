@@ -77,11 +77,6 @@ struct PreviewBounds {
 
   PreviewBounds() = default;
 
-  bool contains(int32_t x, int32_t y, int32_t z) const noexcept {
-    return x >= minX && x <= maxX && y >= minY && y <= maxY && z >= minZ &&
-           z <= maxZ;
-  }
-
   void expand(int32_t x, int32_t y, int32_t z) noexcept {
     if (x < minX)
       minX = x;
@@ -98,10 +93,6 @@ struct PreviewBounds {
   }
 
   void expand(const Domain::Position &pos) noexcept { expand(pos.x, pos.y, pos.z); }
-
-  int32_t width() const noexcept { return maxX - minX + 1; }
-  int32_t height() const noexcept { return maxY - minY + 1; }
-  int32_t depth() const noexcept { return maxZ - minZ + 1; }
 
   static PreviewBounds fromSingle() noexcept {
     return PreviewBounds(); // Default constructor gives all zeros

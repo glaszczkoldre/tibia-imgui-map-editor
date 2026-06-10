@@ -8,31 +8,15 @@
 #include "Domain/ChunkedMap.h"
 #include "Domain/History/TileSnapshot.h"
 #include "Domain/Tile.h"
+#include "Utils/HashUtils.h"
+#include "Utils/PositionUtils.h"
 #include <algorithm>
 #include <span>
 #include <string_view>
-#include <unordered_set>
 
 namespace MapEditor::Services::Autoborder {
 
 namespace {
-
-std::vector<Domain::Position>
-dedupeAndSort(std::vector<Domain::Position> positions) {
-  std::unordered_set<Domain::Position> seen;
-  seen.reserve(positions.size());
-  std::vector<Domain::Position> result;
-  result.reserve(positions.size());
-
-  for (const auto &pos : positions) {
-    if (seen.insert(pos).second) {
-      result.push_back(pos);
-    }
-  }
-
-  std::sort(result.begin(), result.end());
-  return result;
-}
 
 std::vector<Domain::Position>
 expandByOne(std::span<const Domain::Position> centers) {
@@ -45,7 +29,7 @@ expandByOne(std::span<const Domain::Position> centers) {
       }
     }
   }
-  return dedupeAndSort(std::move(positions));
+  return Utils::dedupeAndSortPositions(std::move(positions));
 }
 
 bool sameTileState(const Domain::Tile *lhs, const Domain::Tile *rhs,
@@ -55,35 +39,21 @@ bool sameTileState(const Domain::Tile *lhs, const Domain::Tile *rhs,
   return leftSnap.data() == rightSnap.data();
 }
 
-constexpr uint32_t kFnvPrime = 16777619u;
-constexpr uint32_t kFnvOffsetBasis = 2166136261u;
-
-void mixSeed(uint32_t &seed, uint32_t value) noexcept {
-  seed ^= value;
-  seed *= kFnvPrime;
-}
-
-void mixSeed(uint32_t &seed, std::string_view value) noexcept {
-  for (const auto ch : value) {
-    mixSeed(seed, static_cast<uint8_t>(ch));
-  }
-}
-
 uint32_t deterministicSeed(const PlacementIntent &intent) noexcept {
-  uint32_t seed = kFnvOffsetBasis;
+  uint32_t seed = Utils::kFnvOffsetBasis;
   if (intent.brush) {
-    mixSeed(seed, intent.brush->getName());
-    mixSeed(seed, static_cast<uint32_t>(intent.brush->getType()));
+    Utils::mixSeed(seed, intent.brush->getName());
+    Utils::mixSeed(seed, static_cast<uint32_t>(intent.brush->getType()));
   }
-  mixSeed(seed, static_cast<uint32_t>(intent.mode));
-  mixSeed(seed, static_cast<uint32_t>(intent.context.variation));
-  mixSeed(seed, intent.context.modifiers);
-  mixSeed(seed, intent.context.specialAction ? 1u : 0u);
-  mixSeed(seed, intent.context.forcePlace ? 1u : 0u);
+  Utils::mixSeed(seed, static_cast<uint32_t>(intent.mode));
+  Utils::mixSeed(seed, static_cast<uint32_t>(intent.context.variation));
+  Utils::mixSeed(seed, intent.context.modifiers);
+  Utils::mixSeed(seed, intent.context.specialAction ? 1u : 0u);
+  Utils::mixSeed(seed, intent.context.forcePlace ? 1u : 0u);
   for (const auto &pos : intent.positions) {
-    mixSeed(seed, static_cast<uint32_t>(pos.x));
-    mixSeed(seed, static_cast<uint32_t>(pos.y));
-    mixSeed(seed, static_cast<uint32_t>(pos.z));
+    Utils::mixSeed(seed, static_cast<uint32_t>(pos.x));
+    Utils::mixSeed(seed, static_cast<uint32_t>(pos.y));
+    Utils::mixSeed(seed, static_cast<uint32_t>(pos.z));
   }
   return seed;
 }

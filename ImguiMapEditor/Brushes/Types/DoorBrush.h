@@ -21,9 +21,7 @@ public:
             const DrawContext &ctx) override;
   void undraw(Domain::ChunkedMap &map, Domain::Tile *tile) override;
 
-  DoorType getDoorType() const { return doorType_; }
   void setOpen(bool open) { open_ = open; }
-  bool isOpen() const { return open_; }
 
 private:
   WallBrush *findWallBrush(const Domain::Tile *tile) const;

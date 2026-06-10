@@ -6,7 +6,6 @@
 #include "Types/DoodadBrush.h"
 #include "Types/DoodadPlacementPlanner.h"
 #include <spdlog/spdlog.h>
-#include <span>
 
 namespace MapEditor::Brushes {
 
@@ -390,16 +389,8 @@ void BrushController::paintDoodadRecordedPosition(const Domain::Position &pos,
     paintedPositions_.insert(key);
   }
 
-  DrawContext ctx;
-  ctx.variation = variation_;
-  ctx.modifiers = modifiers;
+  auto ctx = createDrawContext(modifiers);
   ctx.isDragging = strokeActive_;
-  ctx.forcePlace = forcePlace;
-  ctx.brushSettings = brushSettingsService_;
-  ctx.clientData = clientData_;
-  ctx.brushRegistry = registry_;
-  ctx.ownerBrushId =
-      registry_ ? registry_->getBrushId(currentBrush_) : InvalidBrushId;
   doodadBrush->applyPlacementPlan(*map_, pos, plan, ctx);
   notifyTilesMutated(plan.affectedPositions);
 }
@@ -578,15 +569,19 @@ void BrushController::continuePointLikeStroke(const Domain::Position &pos) {
   continueDoorLikeStroke(pos);
 }
 
+void BrushController::resetStrokeState() {
+  altReplaceState_ = {};
+  strokeActive_ = false;
+  strokeEraseMode_ = false;
+  strokeNeedsAutoborderFinalize_ = false;
+  paintedPositions_.clear();
+  lastStrokePos_.reset();
+  strokeModifiers_ = 0;
+}
+
 void BrushController::endStroke() {
   if (!strokeActive_ || !historyManager_) {
-    altReplaceState_ = {};
-    strokeActive_ = false;
-    strokeEraseMode_ = false;
-    strokeNeedsAutoborderFinalize_ = false;
-    paintedPositions_.clear();
-    lastStrokePos_.reset();
-    strokeModifiers_ = 0;
+    resetStrokeState();
     return;
   }
 
@@ -600,14 +595,7 @@ void BrushController::endStroke() {
     historyManager_->cancelOperation();
   }
 
-  altReplaceState_ = {};
-
-  strokeActive_ = false;
-  strokeEraseMode_ = false;
-  strokeNeedsAutoborderFinalize_ = false;
-  paintedPositions_.clear();
-  lastStrokePos_.reset();
-  strokeModifiers_ = 0;
+  resetStrokeState();
 }
 
 std::vector<Domain::Position>

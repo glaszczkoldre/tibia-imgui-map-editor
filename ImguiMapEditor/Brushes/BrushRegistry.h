@@ -86,7 +86,6 @@ public:
                                   BorderItemMetadata metadata);
   const BorderBlock *getBorderTemplate(uint32_t id) const;
   const BorderItemMetadata *getBorderItemMetadata(uint16_t itemId) const;
-  size_t getBorderTemplateCount() const { return border_templates_.size(); }
 
   /**
    * Clear all brushes from the registry.

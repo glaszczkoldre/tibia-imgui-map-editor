@@ -133,7 +133,6 @@ public:
   void clearBrush();
   bool restoreLastBrush();
   bool toggleSelectionTool();
-  bool hasStoredBrush() const { return lastBrushSelection_.has_value(); }
   bool canRotateItemAt(const Domain::Position &pos,
                        const Domain::Item *preferredItem = nullptr) const;
   bool rotateItemAt(const Domain::Position &pos,
@@ -463,6 +462,7 @@ private:
   void paintTileDirect(const Domain::Position &pos, uint32_t modifiers,
                        bool specialAction = false);
   void notifyTilesMutated(const std::vector<Domain::Position> &positions) const;
+  void resetStrokeState();
   [[nodiscard]] ResolvedBrushSelection captureCurrentSelection() const;
   bool applyResolvedSelection(const ResolvedBrushSelection &selection);
   DoorBrush *getDoorBrushForType(DoorType type) const;

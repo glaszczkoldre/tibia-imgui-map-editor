@@ -20,13 +20,6 @@ namespace MapEditor::Services {
 class ClientDataService;
 }
 
-namespace MapEditor::Services::Brushes {
-class BorderLookupService;
-class WallLookupService;
-class TableLookupService;
-class CarpetLookupService;
-} // namespace MapEditor::Services::Brushes
-
 namespace MapEditor::IO {
 
 /**
@@ -53,10 +46,7 @@ class BrushXmlReader {
 public:
   struct Dependencies {
     MapEditor::Brushes::BrushRegistry *brushRegistry = nullptr;
-    Services::Brushes::BorderLookupService *borderLookup = nullptr;
-    Services::Brushes::WallLookupService *wallLookup = nullptr;
-    Services::Brushes::TableLookupService *tableLookup = nullptr;
-    Services::Brushes::CarpetLookupService *carpetLookup = nullptr;
+
     Services::ClientDataService *clientData = nullptr;
   };
 

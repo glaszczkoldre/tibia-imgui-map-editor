@@ -112,7 +112,7 @@ void BrushController::cycleBrushVariation(int delta) {
   }
 
   const auto maxVariation = static_cast<int>(currentBrush_->getMaxVariation());
-  if (maxVariation <= 0) {
+  if (maxVariation == 0) {
     variation_ = 0;
     return;
   }
@@ -208,8 +208,6 @@ bool BrushController::usesPreciseMutationNotifications() const {
   case BrushType::Placeholder:
     return false;
   }
-
-  return false;
 }
 
 } // namespace MapEditor::Brushes

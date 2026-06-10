@@ -61,10 +61,4 @@ uint32_t WeightedSelection::randomRange(uint32_t min, uint32_t max) {
     return dist(rng_);
 }
 
-float WeightedSelection::randomFloat() {
-    ensureInitialized();
-    std::uniform_real_distribution<float> dist(0.0f, 1.0f);
-    return dist(rng_);
-}
-
 } // namespace MapEditor::Brushes

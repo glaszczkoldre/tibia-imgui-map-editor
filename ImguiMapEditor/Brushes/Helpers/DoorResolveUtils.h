@@ -34,6 +34,29 @@ inline Domain::Item *resolveMutableTileItem(Domain::Tile *tile,
   return nullptr;
 }
 
+inline const Domain::Item *resolveTileItem(const Domain::Tile *tile,
+                                           const Domain::Item *preferredItem) {
+  if (!tile) {
+    return nullptr;
+  }
+
+  if (preferredItem) {
+    for (const auto &item : tile->getItems()) {
+      if (item.get() == preferredItem) {
+        return item.get();
+      }
+    }
+  }
+
+  for (auto it = tile->getItems().rbegin(); it != tile->getItems().rend(); ++it) {
+    if (*it) {
+      return it->get();
+    }
+  }
+
+  return nullptr;
+}
+
 inline ResolvedDoorTarget resolveDoorTarget(const Domain::Tile *tile,
                                             BrushRegistry *registry,
                                             const Domain::Item *preferredItem) {

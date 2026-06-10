@@ -52,10 +52,7 @@ struct DoorNode {
   bool isOpen = false;
   bool isLocked = false;
 
-  /**
-   * Get the first door item (doors typically have one item).
-   */
-  uint32_t getItem() const { return items.empty() ? 0 : items.front(); }
+  [[nodiscard]] uint32_t getItem() const { return items.empty() ? 0 : items.front(); }
 };
 
 } // namespace MapEditor::Brushes

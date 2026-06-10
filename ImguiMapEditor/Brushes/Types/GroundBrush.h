@@ -60,6 +60,10 @@ public:
   bool placeGroundTile(Domain::Tile &tile, const DrawContext &ctx) const;
   void eraseFromTile(Domain::Tile &tile) const;
 
+  static const GroundBrush *resolveGroundBrush(const BrushRegistry &registry,
+                                                const Domain::Tile &tile);
+  static std::string normalizeName(const std::string &value);
+
 private:
   bool connectsTo(const GroundBrush *other) const;
   uint16_t selectWeightedItem(

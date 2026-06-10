@@ -68,6 +68,12 @@ if !ERRORLEVEL! neq 0 (
 )
 echo OK - Environment initialized.
 
+where cl.exe >nul 2>&1
+if !ERRORLEVEL! neq 0 (
+    echo ERROR: cl.exe not found in PATH after initialization.
+    exit /b 1
+)
+
 echo [3/6] Locating vcpkg...
 set "VKD="
 if defined VCPKG_ROOT (
@@ -86,6 +92,19 @@ echo OK - vcpkg found at: %VKD%
 
 echo [4/6] Configuring CMake (Ninja)...
 if not exist "%BUILD_DIR%" mkdir "%BUILD_DIR%"
+
+REM Check for stale compiler in cache
+if exist "%BUILD_DIR%\CMakeCache.txt" (
+    for /f "tokens=2 delims==" %%i in ('findstr /C:"CMAKE_CXX_COMPILER:FILEPATH=" "%BUILD_DIR%\CMakeCache.txt"') do (
+        set "CACHED_CL=%%i"
+        set "CACHED_CL=!CACHED_CL:/=\!"
+        if not exist "!CACHED_CL!" (
+            echo WARNING: Cached compiler not found: !CACHED_CL!
+            echo Cleaning stale CMake cache...
+            del /q "%BUILD_DIR%\CMakeCache.txt"
+        )
+    )
+)
 
 cmake -G Ninja ^
       -S "%SOURCE_DIR%" ^

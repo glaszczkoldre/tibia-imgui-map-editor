@@ -23,14 +23,6 @@ public:
    */
   explicit SpawnPreviewProvider(BrushSettingsService *brushSettings = nullptr);
 
-  /**
-   * Set brush settings service.
-   */
-  void setBrushSettingsService(BrushSettingsService *service) {
-    brushSettings_ = service;
-    needsRegen_ = true;
-  }
-
   // IPreviewProvider interface
   bool isActive() const override;
   Domain::Position getAnchorPosition() const override;
@@ -42,8 +34,6 @@ public:
   // Regeneration support
   bool needsRegeneration() const override { return needsRegen_; }
   void regenerate() override;
-
-  void markNeedsRegeneration() { needsRegen_ = true; }
 
 private:
   BrushSettingsService *brushSettings_ = nullptr;

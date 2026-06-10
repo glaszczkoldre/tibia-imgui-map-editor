@@ -99,7 +99,7 @@ defaultPreviewDescriptor(BrushType type, uint32_t lookId, std::string label) {
 // ============================================================================
 
 namespace Modifiers {
-constexpr uint32_t Alt = 0x0004; // Equivalent to GLFW_MOD_ALT
+constexpr uint32_t Alt = 0x0004; // Alt modifier key bitmask
 }
 
 /**

@@ -16,10 +16,6 @@ bool PreviewService::hasPreview() const {
     return provider_ && provider_->isActive();
 }
 
-IPreviewProvider* PreviewService::getProvider() const {
-    return provider_.get();
-}
-
 const std::vector<PreviewTileData>& PreviewService::getPreviewTiles() const {
     if (provider_) {
         return provider_->getTiles();

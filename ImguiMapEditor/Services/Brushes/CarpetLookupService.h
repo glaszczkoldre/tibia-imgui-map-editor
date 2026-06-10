@@ -6,7 +6,6 @@
 
 #include "../../Brushes/Enums/BrushEnums.h"
 #include <array>
-#include <cstdint>
 #include <vector>
 
 namespace MapEditor {

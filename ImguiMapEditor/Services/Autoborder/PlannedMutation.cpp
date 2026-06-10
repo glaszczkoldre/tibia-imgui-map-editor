@@ -1,6 +1,5 @@
 #include "PlannedMutation.h"
 
-#include "Domain/Tile.h"
 #include "Services/Autoborder/AutoborderEngine.h"
 #include "Services/Autoborder/PlacementIntent.h"
 #include "Services/Autoborder/TileDiff.h"

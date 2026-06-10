@@ -1,234 +1,349 @@
-# Brushes Audit — Action Plan
+# Remaining Issues — Architecture-Aligned Action Plan
 
-> Generated from review of 54 `.cpp`/`.h` files. 53 issues found across 5 phases.
-
----
-
-## Phase 1 — Quick Wins (remove dead code, fix signatures)
-
-### 1.1 Remove dead enums, namespaces, and factory
-
-- [ ] **`BrushEnums.h:24-45`** — Delete entire `EdgeName` namespace (13 `constexpr string_view`, zero usages)
-- [ ] **`BrushEnums.h:188-196`** — Delete `ZoneFlag` enum and `ENABLE_BITMASK_OPERATORS(ZoneFlag)`
-- [ ] **`Core/IBrush.h:72-73`** — Delete `BrushPreviewDescriptor::clientSprite()` static factory (zero callers)
-
-### 1.2 Remove dead member functions
-
-- [ ] **`Behaviors/WeightedSelection.h:46-47`** + `.cpp:54-63` — Delete `passesThicknessCheck()`
-- [ ] **`Data/DoodadAlternative.h:70`** + `.cpp:25-34` — Delete `getTotalChance()`
-- [ ] **`Types/GroundBrush.h:65-66`** + `.cpp:401-422` — Delete `findRuleFor()`
-- [ ] **`Types/GroundBrush.h:68`** + `.cpp:444-446` — Delete `isFriendName()`
-
-### 1.3 Remove unused includes and forward declarations
-
-- [ ] **`BrushController.h:21`** — Remove `#include <unordered_map>`
-- [ ] **`BrushController.h:28`** — Remove `class DoodadBrush;` forward decl
-- [ ] **`BrushRegistry.h:5`** — Remove `#include "Domain/Position.h"`
-- [ ] **`BrushRegistry.cpp:2`** — Remove `#include "Domain/ChunkedMap.h"`
-- [ ] **`BrushSystem.h:9`** — Remove `#include <memory>`
-- [ ] **`BrushSystem.h:18-24`** — Remove `BorderLookupService`, `WallLookupService`, `TableLookupService`, `CarpetLookupService` forward decls
-- [ ] **`BrushSystem.h:28`** — Remove `class EditorSession;` forward decl
-- [ ] **`Behaviors/ItemPlacement.h:5`** — Remove `#include <memory>`
-- [ ] **`Behaviors/ItemPlacement.h:11`** — Remove `struct ItemType;` forward decl
-- [ ] **`Types/RawBrush.cpp:2`** — Remove `#include "Brushes/Behaviors/ItemPlacement.h"`
-- [ ] **`Types/RawBrush.cpp:8`** — Remove `#include "Domain/Position.h"`
-- [ ] **`Types/DoodadPlacementPlanner.h:5`** — Remove `#include <unordered_set>`
-
-### 1.4 Fix unused parameters (unnamed or [[maybe_unused]])
-
-- [ ] **`RawBrush.cpp:19,39`** — Rename `map` → `/*map*/` in `draw()` and `undraw()`
-- [ ] **`EraserBrush.cpp:59`** — Rename `map` → `/*map*/` in `undraw()`
-- [ ] **`CreatureBrush.cpp:73`** — Rename `map` → `/*map*/` in `undraw()`
-- [ ] **`FlagBrush.cpp:26`** — Rename `map` → `/*map*/` in `undraw()`
-- [ ] **`HouseBrush.cpp:33`** — Rename `map` → `/*map*/` in `undraw()`
-- [ ] **`PlaceholderBrush.h:18`** — Rename all params → unnamed in `draw()` and `undraw()`
-- [ ] **`Core/IBrush.h:216`** — Change `size_t /*index*/` → `[[maybe_unused]] size_t` or remove comment
-
-### 1.5 Fix missing noexcept
-
-- [ ] **`BrushController.h:96`** — `BrushController() = default;` → `= default noexcept`
-- [ ] **`BrushController.h:228`** — `~BrushController() = default;` → `= default noexcept`
-- [ ] **`BrushRegistry.h:39,40`** — Destructor and constructor → `= default noexcept`
-- [ ] **`BrushSystem.h:42`** — Destructor → `= default noexcept`
-- [ ] **`BrushController.h:78`** — `isValid() const` → `isValid() const noexcept`
-- [ ] **`Core/BrushBase.h:50-52`** — Add `noexcept` to `setPreviewDescriptor()`
-
-### 1.6 Fix include paths and order
-
-- [ ] **`Enums/BrushEnums.h:10`** — Change `../../Utils/EnumFlags.h` → `"Utils/EnumFlags.h"`
-- [ ] **`Data/BorderBlock.h:7`** — Change `"../Enums/BrushEnums.h"` → `"Brushes/Enums/BrushEnums.h"`
-- [ ] **`Data/WallNode.h:7`** — Change `"../Enums/BrushEnums.h"` → `"Brushes/Enums/BrushEnums.h"`
-- [ ] **`Data/DoodadAlternative.cpp:9`** — Move `<utility>` above project header per include order rules
-
-### 1.7 Fix types and magic numbers
-
-- [ ] **`Data/DoodadAlternative.h:31-33`** — `int dx, dy, dz` → `int32_t dx, dy, dz`
-- [ ] **`Types/CarpetBrush.h:38`** — `std::array<..., 14>` → use `static_cast<size_t>(EdgeType::Count)`
-- [ ] **`Types/TableBrush.h:38`** — `std::array<..., 7>` → use `static_cast<size_t>(TableAlign::Count)`
-- [ ] **`Types/WallBrush.h:95-96`** — `std::array<WallNode, 17>` → use `kWallAlignCount`
-- [ ] **`Types/GroundBrush.cpp:393-394`** — Remove unnecessary `const_cast`
-
-### 1.8 Fix BrushBase encapsulation
-
-- [ ] **`Core/BrushBase.h:55-57`** — Move `name_`, `lookId_`, `draggable_` from `protected` to `private`; mark them `const`
-
-### Smoke test — Phase 1
-
-- [ ] `build_ninja.bat` compiles with zero warnings and zero errors
-- [ ] Launch app, open a map, verify brushes palette loads
-- [ ] Paint with RawBrush, EraserBrush, CreatureBrush, FlagBrush, HouseBrush, WaypointBrush, SpawnBrush
-- [ ] Verify no crash on `undraw()` for each brush type
+> Previous phases (dead code, noexcept, includes, magic numbers, GLFW layering, dedup,
+> `map.markChanged()` consistency, preview/styling fixes) are **complete and LGTM**.
+>
+> This plan covers the 7 remaining items, re-evaluated against `AGENTS.md` rules.
 
 ---
 
-## Phase 2 — Medium (consolidate duplicates, fix patterns)
+## Architecture Rules Summary (from AGENTS.md)
 
-### 2.1 Deduplicate coordinate encoding
-
-- [ ] Create `encodePosition(Position)` in `Domain/Position.h` (combine `DoodadBrush:25-29` + `DoodadPlacementPlanner:57-61`)
-- [ ] Replace all call sites in `DoodadBrush.cpp` and `DoodadPlacementPlanner.cpp`
-
-### 2.2 Deduplicate dedup+sort utilities
-
-- [ ] Create single `dedupeAndSort(std::vector<T>&)` utility in Brushes or Utils
-- [ ] Replace `DoodadBrush.cpp:88-94` (`dedupeSorted`) with shared utility
-- [ ] Replace `DoodadPlacementPlanner.cpp:176-190` (`dedupeAndSort`) with shared utility
-
-### 2.3 WallNode — use shared WeightedSelection
-
-- [ ] Replace manual weighted random in `WallNode.cpp:14-42` with call to `WeightedSelection::select()`
-- [ ] Remove `mutable std::mt19937 rng_` from `WallNode.h:44`
-
-### 2.4 Make lookup services static const in hot paths
-
-- [ ] **`GroundBrush.cpp:780`** — `BorderLookupService borderLookupService;` → `static const`
-- [ ] **`CarpetBrush.cpp:137`** — `CarpetLookupService{}` → `static const`
-- [ ] **`TableBrush.cpp:137`** — `TableLookupService{}` → `static const`
-
-### 2.5 Fix BrushEnums.cpp parse inefficiency
-
-- [ ] Replace 4x `static std::unordered_map<std::string_view, ...>` with `static constexpr std::array<std::pair<std::string_view, T>, N>` + `std::lower_bound`
-- [ ] Add consistent fallback: log warning + return sentinel, or assert for unknown values
-- [ ] Make `doorTypeToString` return consistent default (not empty string)
-
-### 2.6 WallDecorationBrush — give it its own .cpp
-
-- [ ] Create `Types/WallDecorationBrush.cpp`
-- [ ] Move `draw()` and `undraw()` from `WallBrush.cpp:1023-1075` into new file
-- [ ] Move `rebuildTile` helper if applicable
-
-### 2.7 Fix redundant public/protected accessor in WallBrush
-
-- [ ] **`WallBrush.h:74,81`** — Remove `brushRegistry()` protected method; keep only public `getBrushRegistry()`
-
-### Smoke test — Phase 2
-
-- [ ] `build_ninja.bat` compiles with zero errors
-- [ ] Paint with GroundBrush, WallBrush, DoodadBrush, CarpetBrush, TableBrush, WallDecorationBrush
-- [ ] Use border-aware brushes (GroundBrush across terrain boundaries)
-- [ ] Verify weighted selection results haven't changed (brush alternatives randomize correctly)
-- [ ] Verify DoodadBrush placement produces same results as before
+| Rule | Implication |
+|------|-------------|
+| **No global state** | `thread_local g_altGroundReplaceState` must be eliminated |
+| **Each class owns one concept** | `WallDecorationBrush` needs its own `.cpp` |
+| **File > 500 lines → split** | `BrushController.cpp` (2083), `WallBrush.cpp` (1077), `GroundBrush.cpp` (870) |
+| **Function > 150 lines → refactor** | `WallBrush::buildPreviewTiles` (195), `GroundBrush::updateBorderItems` (~400) |
+| **No duplicate code** | `DrawContext` construction repeated 5+ times across brushes |
+| **Pass dependencies via constructor injection** | Alt-replace state → inject through `DrawContext` |
+| **Dependencies flow downwards** | Services → Domain, not Domain → Services |
+| **No `const_cast`** | 8 preview providers use `const_cast` to mutate from `const` methods |
 
 ---
 
-## Phase 3 — Hard (architectural fixes)
+## Item 1 — `BrushEnums.cpp` parse efficiency
 
-### 3.1 Eliminate global state — GroundBrush
+**Priority**: Low | **Effort**: 30 min | **Risk**: Zero
 
-- [ ] Move `thread_local AltGroundReplaceState` (`GroundBrush.cpp:29`) into `DrawContext` or per-session edit state
-- [ ] Pass via parameter to `placeGroundTile()` and `resetAltGroundReplaceState()`
-- [ ] Unify naming: `resetAltGroundReplaceState()` vs `GroundBrush::resetAltReplaceState()` (uppercase/lowercase `alt`/`Alt`)
+### Problem
+4 `static unordered_map<string_view, T>` created on every function call, doing heap allocation for 7-18 element lookups.
 
-### 3.2 Fix GLFW layering violations
+### Solution
+Replace each `static unordered_map` with a `static constexpr array<pair<string_view, T>, N>` sorted at compile time, then `std::lower_bound` at runtime. Also unify fallback behavior.
 
-- [ ] **`DoorBrush.cpp:9`** — Remove `#include <GLFW/glfw3.h>`; define `Modifier_Alt` constant locally or use a key-modifier enum from `DrawContext`
-- [ ] **`GroundBrush.cpp:12`** — Same fix; replace `GLFW_MOD_ALT` with abstraction
+### Files
+- `Brushes/Enums/BrushEnums.cpp` — rewrite `parseEdgeName`, `parseTableAlign`, `parseWallType`, `parseDoorType`
+- `Brushes/Enums/BrushEnums.h` — no changes needed
 
-### 3.3 Deduplicate DrawContext construction in brushes
+### Steps
+1. Add `#include <algorithm>` and `#include <array>` to `.cpp`, remove `#include <unordered_map>`
+2. Replace each map with `static constexpr std::array<std::pair<std::string_view, T>, N> kMap = {{...}}` sorted alphabetically
+3. Replace `map.find(name)` with `std::lower_bound(kMap.begin(), kMap.end(), name, ...)`
+4. Add `spdlog::warn` for unknown values before returning sentinel
+5. Change `doorTypeToString` default from `""` → `"undefined"`
 
-- [ ] **`CarpetBrush.cpp:158-160, 169-171`** — Extract repeated `DrawContext` init into inline helper or factory
-- [ ] **`TableBrush.cpp:157-160`** — Use same helper
-- [ ] **`BrushController.cpp:1698-1743`** — Replace manual `DrawContext` construction with `createDrawContext()`
-
-### 3.4 GroundBrush — clean up border struct definitions
-
-- [ ] Move `NeighborState`, `BorderCluster`, `ResolvedBorderRule` from inside `updateBorderItems()` to anonymous namespace or private nested types
-- [ ] Fix `addEdgeItems` return value — the `false` return at line 653 is dead since call path only goes through `addEdgeWithFallback`
-
-### Smoke test — Phase 3
-
-- [ ] `build_ninja.bat` compiles with zero errors
-- [ ] Alt+click ground replacement works identically to before
-- [ ] All modifier-key-dependent brush behaviors work (DoorBrush alt-placement, GroundBrush alt-replace)
-- [ ] All complex brush types still draw correctly
+### Verification
+- `build_ninja.bat` compiles + passes
+- All parse/toString round-trips are identity:
+  - `parseEdgeName(edgeTypeToString(x)) == x` for all `EdgeType` values
+  - Same for `TableAlign`, `WallAlign`, `DoorType`
 
 ---
 
-## Phase 4 — Refactors (file/function size limits)
+## Item 2 — `WallDecorationBrush` own `.cpp`
 
-### 4.1 Split BrushController.cpp (2084 lines → target <500)
+**Priority**: Medium | **Effort**: 1 hr | **Risk**: Medium
 
-- [ ] Extract `BrushStroke.cpp` — `beginStroke()`, `continueStroke()`, `endStroke()`, stroke tracking
-- [ ] Extract `BrushDoorOps.cpp` — all 8 door brush management functions + door brush activators
-- [ ] Extract `BrushDoodadOps.cpp` — `paintDoodadRecordedPosition()`, `eraseDoodadRecordedPosition()`, doodad placement helpers
-- [ ] Extract `BrushEraseOps.cpp` — erase-specific methods
-- [ ] Keep `BrushController.cpp` with core orchestration only (`setBrush()`, `applyBrush()`, `createDrawContext()`, `resolveBrush()`)
+### Problem
+`WallDecorationBrush::draw()` and `WallDecorationBrush::undraw()` are implemented in `WallBrush.cpp` (lines 1023-1075) but the class has its own header. Violates "one class per file."
 
-### 4.2 Split WallBrush.cpp (1077 lines)
+These methods call `resolveWallBrushForItem` — a free function in `WallBrush.cpp`'s anonymous namespace, invisible to other TUs.
 
-- [ ] Move `WallDecorationBrush::draw()` and `WallDecorationBrush::undraw()` to `WallDecorationBrush.cpp` (already done in Phase 2.6)
-- [ ] Extract `WallBrushPreview.cpp` — `buildPreviewTiles()` (195 lines) and its helpers
-- [ ] Keep `WallBrush.cpp` under ~500 lines
+### Solution
+1. Promote `resolveWallBrushForItem` to a `static` public method on `WallBrush`
+2. Create `Types/WallDecorationBrush.cpp`
+3. Move `draw()` and `undraw()` implementations to the new file
+4. Replace `brushRegistry()` calls (previously removed) — verify `getBrushRegistry()` is used
 
-### 4.3 Split GroundBrush.cpp (898 lines)
+### Files
+| Action | File |
+|--------|------|
+| Modify | `Types/WallBrush.h` — add `static const WallBrush* resolveWallBrushForItem(const Item&, BrushRegistry&)` |
+| Modify | `Types/WallBrush.cpp` — promote function from anon namespace, remove `draw`/`undraw` |
+| Create | `Types/WallDecorationBrush.cpp` — move `draw()` and `undraw()` |
+| Verify | CMake glob picks up new `.cpp` |
 
-- [ ] Extract `GroundBorderUpdater.cpp` — `updateBorderItems()`, `addEdgeItems()`, `addEdgeWithFallback()`, border resolution helpers
-- [ ] Keep `GroundBrush.cpp` under ~500 lines
+### Dependencies
+- `WallBrush.h` already includes needed headers (`BrushRegistry.h` via forward decls, `WallNode.h`, etc.)
+- `WallDecorationBrush.cpp` needs: `WallDecorationBrush.h`, `WallBrush.h`, `BrushUtils.h`, `Domain/Tile.h`, `Services/ClientDataService.h`
 
-### 4.4 Split BrushController.h (475 lines, approaching limit)
-
-- [ ] Extract `BrushDoorManager.h` — 8x `unique_ptr<DoorBrush>` + getter/activator + `PositionHash`
-- [ ] Include in `BrushController.h`
-
-### 4.5 Split WallBrush::buildPreviewTiles (195 lines)
-
-- [ ] Extract door selection logic (~50 lines) into `resolveDoorPlacement()`
-- [ ] Extract alignment resolution (~40 lines) into `resolveWallAlignment()`
-- [ ] Keep main flow in `buildPreviewTiles()` under 100 lines
-
-### Smoke test — Phase 4
-
-- [ ] `build_ninja.bat` compiles with zero errors
-- [ ] Full brush regression: every brush type paints correctly
-- [ ] Stroke operations (click-drag) work for all brushes
-- [ ] Door brush auto-detects wall brushes
-- [ ] Undo/redo for complex brush strokes works
-- [ ] No new warnings introduced
+### Verification
+- `build_ninja.bat` compiles
+- Paint with WallDecorationBrush on a wall tile — decoration appears correctly
+- Undraw removes only decoration, not the wall
 
 ---
 
-## Verification Plan (run after each phase)
+## Item 3 — `const_cast` lazy-rebuild in 8 preview providers
 
-| Check | Command / Action |
-|-------|-----------------|
-| Build | `build_ninja.bat` — must succeed with 0 errors, 0 new warnings |
-| Lint | Run project linter if available (check `AGENTS.md` for command) |
-| Smoke — simple brushes | Open any map, paint with RawBrush, EraserBrush, CreatureBrush, FlagBrush, HouseBrush, WaypointBrush, SpawnBrush, PlaceholderBrush |
-| Smoke — complex brushes | Paint with GroundBrush, WallBrush, DoodadBrush, CarpetBrush, TableBrush, OptionalBorderBrush, WallDecorationBrush, DoorBrush, HouseExitBrush |
-| Smoke — undo/redo | Make 5 brush strokes of different types, Ctrl+Z through all, Ctrl+Y through all |
-| Smoke — stroke tracking | Click-drag paint with each brush type that supports dragging |
-| Smoke — modifier keys | Alt+click with GroundBrush (alt-replace), Alt+click with DoorBrush |
-| Smoke — palette integration | Select brushes from palette windows, verify correct brush activates |
-| Smoke — border logic | Paint GroundBrush adjacent to different terrain types, verify border tiles appear |
+**Priority**: Medium | **Effort**: 2 hrs | **Risk**: Low
+
+### Problem
+8 preview providers in `Services/Preview/` use this anti-pattern:
+```cpp
+const std::vector<PreviewTileData>& getTiles() const {
+    const_cast<Provider*>(this)->build();  // violates const-correctness
+    return tiles_;
+}
+```
+
+Each provider has `mutable` members anyway. The `const_cast` is both unnecessary and masks the design intent.
+
+### Solution
+Replace with explicit `mutable` + `ensureBuilt()` pattern:
+```cpp
+// In header:
+mutable bool dirty_ = true;  // already exists or add
+
+// In .cpp:
+const std::vector<PreviewTileData>& getTiles() const {
+    if (dirty_) {
+        tiles_.clear();
+        bounds_ = {};
+        buildPreview(*tiles_, *bounds_);  // populate mutable members
+        dirty_ = false;
+    }
+    return tiles_;
+}
+```
+
+Remove all `const_cast<Provider*>(this)` calls. Keep existing `mutable` members.
+
+### Files (8 providers)
+- `Services/Preview/RawBrushPreviewProvider.cpp`
+- `Services/Preview/MultiItemBrushPreviewProvider.cpp`
+- `Services/Preview/DoodadBrushPreviewProvider.cpp`
+- `Services/Preview/CreaturePreviewProvider.cpp`
+- `Services/Preview/ZoneBrushPreviewProvider.cpp`
+- `Services/Preview/WallBrushPreviewProvider.cpp`
+- `Services/Preview/PastePreviewProvider.cpp`
+- `Services/Preview/SpawnPreviewProvider.cpp`
+
+### Verification
+- `build_ninja.bat` compiles
+- Each brush type shows preview overlay when selected
+- Preview updates correctly when brush size/variation changes
 
 ---
 
-## Totals
+## Item 4 — Eliminate global `thread_local AltGroundReplaceState`
 
-| Phase | Items | Effort |
-|-------|-------|--------|
-| Phase 1 — Quick Wins | 36 | ~2-3 hours |
-| Phase 2 — Medium | 12 | ~3-4 hours |
-| Phase 3 — Hard | 6 | ~3-5 hours |
-| Phase 4 — Refactors | 8 | ~6-8 hours |
-| **Total** | **62** | **~14-20 hours** |
+**Priority**: High | **Effort**: 2 hrs | **Risk**: Medium
+
+### Problem
+```cpp
+// GroundBrush.cpp:28
+thread_local AltGroundReplaceState g_altGroundReplaceState {};
+```
+This violates the **"No global state"** rule. It's per-thread-per-stroke state that tracks alt-replace mode across multiple `placeGroundTile` calls within a single `paintRecordedPositions` loop.
+
+The challenge: `BrushController::createDrawContext()` creates a fresh `DrawContext` for each tile position, but the alt-replace state must persist across all positions in the same stroke.
+
+### Solution
+Move state ownership to `BrushController` and pass via `DrawContext*`:
+
+1. Add `AltGroundReplaceState altReplaceState_` member to `BrushController` (private)
+2. Add `AltGroundReplaceState* altReplace` field to `DrawContext`
+3. In `BrushController::createDrawContext()`, set `ctx.altReplace = &altReplaceState_`
+4. In `BrushController::beginStroke()`, reset `altReplaceState_ = {}`
+5. In `GroundBrush::shouldSkipAltGroundPlacement()`, use `ctx.altReplace` instead of global
+6. Remove `thread_local g_altGroundReplaceState`, remove `resetAltGroundReplaceState()` free function
+7. Rename `GroundBrush::resetAltReplaceState()` → it becomes a no-op or is removed (caller resets via `beginStroke`)
+
+### Files
+| Action | File |
+|--------|------|
+| Modify | `Core/IBrush.h` — add `AltGroundReplaceState* altReplace = nullptr` to `DrawContext` |
+| Modify | `BrushController.h` — add `AltGroundReplaceState altReplaceState_` member |
+| Modify | `BrushController.cpp` — wire in `createDrawContext` and `beginStroke` |
+| Modify | `Types/GroundBrush.cpp` — use `ctx.altReplace` instead of `g_altGroundReplaceState` |
+| Modify | `Types/GroundBrush.h` — remove `resetAltReplaceState()` static method |
+
+### Data flow (after fix)
+```
+BrushController::beginStroke()
+  → altReplaceState_ = {}
+
+BrushController::paintRecordedPositions()  [loop over tile positions]
+  → ctx = createDrawContext(modifiers)
+      ctx.altReplace = &altReplaceState_
+  → brush->draw(map, tile, ctx)
+      → shouldSkipAltGroundPlacement(registry, tile, ctx)
+          reads/writes ctx.altReplace->active, ->emptyOnly, ->replaceBrush
+```
+
+### Verification
+- `build_ninja.bat` compiles
+- Alt+click first tile with GroundBrush → places ground on empty tile (emptyOnly mode)
+- Alt+click on tile with different ground → replaces it (replaceBrush mode)
+- Normal click (no Alt) → standard place, no alt-replace active
+- Drag-paint with Alt held → alt-replace persists across stroke
+
+---
+
+## Item 5 — Deduplicate `DrawContext` construction
+
+**Priority**: Low | **Effort**: 30 min | **Risk**: Zero
+
+### Problem
+`CarpetBrush::updateBorderItems` and `TableBrush::rebuildTile` construct identical `DrawContext` values 3-5 times each:
+```cpp
+DrawContext borderCtx;
+borderCtx.clientData = registry_.getClientDataService();
+borderCtx.brushRegistry = &registry_;
+borderCtx.ownerBrushId = registry_.getBrushId(ownerBrush);
+```
+
+### Solution
+Add a private inline helper to each brush (the pattern varies slightly — `ownerBrush` differs):
+```cpp
+// In CarpetBrush/TableBrush .cpp (anonymous namespace or private method)
+DrawContext makeBrushContext(const BrushRegistry& registry, const IBrush* owner) {
+    DrawContext ctx;
+    ctx.clientData = registry.getClientDataService();
+    ctx.brushRegistry = &registry;
+    ctx.ownerBrushId = registry.getBrushId(owner);
+    return ctx;
+}
+```
+Replace 5 manual constructions with calls to this helper.
+
+### Files
+- `Types/CarpetBrush.cpp`
+- `Types/TableBrush.cpp`
+
+### Verification
+- `build_ninja.bat` compiles
+- CarpetBrush and TableBrush paint correctly with border alignment
+
+---
+
+## Item 6 — GroundBrush border struct cleanup
+
+**Priority**: Low | **Effort**: 20 min | **Risk**: Zero
+
+### Problem
+Three local structs (`NeighborState`, `BorderCluster`, `ResolvedBorderRule`) are defined inside `updateBorderItems()`. The function is ~400 lines. Lifting them out reduces noise.
+
+Also, `addEdgeItems` returns `bool` but its return value is only checked in `addEdgeWithFallback`, where the `false` path inside `updateBorderItems`'s direct call is dead.
+
+### Solution
+1. Move `NeighborState`, `BorderCluster`, `ResolvedBorderRule` from inside `updateBorderItems` → anonymous namespace at top of file
+2. Change `addEdgeItems` return type from `bool` → `void`; remove the dead `if (!addEdgeItems(...)) return;` path
+
+### Files
+- `Types/GroundBrush.cpp`
+
+### Verification
+- `build_ninja.bat` compiles
+- GroundBrush borders render identically
+
+---
+
+## Item 7 — File size refactors
+
+**Priority**: High (per AGENTS.md limits) | **Effort**: 4 hrs | **Risk**: Medium
+
+### Files exceeding 500-line limit
+
+| File | Lines | Over by |
+|------|-------|---------|
+| `BrushController.cpp` | 2083 | 4× |
+| `WallBrush.cpp` | 1077 | 2× |
+| `GroundBrush.cpp` | 870 | 1.7× |
+
+### Functions exceeding 150-line limit
+
+| Function | Lines | File |
+|----------|-------|------|
+| `buildPreviewTiles` | ~195 | `WallBrush.cpp` |
+| `updateBorderItems` | ~400 | `GroundBrush.cpp` |
+
+### Split plan
+
+#### 7a. Split `BrushController.cpp` → 4 files
+
+| New File | Contains | Approx lines |
+|----------|----------|--------------|
+| `BrushController.cpp` | Core: `initialize`, `setBrush`, `clearBrush`, `createDrawContext`, `resolveBrushFromTile`, `resolveBrushSelection`, `captureCurrentSelection`, plumbing | ~400 |
+| `BrushStroke.cpp` | `beginStroke`, `continueStroke`, `endStroke`, `getLinePositions`, `getPaintedStrokePositions`, `paintRecordedPosition*`, `eraseRecordedPosition`, `paintExpandedCenter`, `eraseExpandedCenter`, 5 `continue*LikeStroke` methods, `finalizeAutoborderStroke` | ~600 |
+| `BrushDoorOps.cpp` | `activate*DoorBrush` (8 methods), `getDoorBrushForType`, `canSwitchDoorAt`, `switchDoorAt`, `getDoorOpenStateAt`, `canRotateItemAt`, `rotateItemAt` | ~350 |
+| `BrushVariationOps.cpp` | `applyBrush`, `eraseBrush`, `refreshCurrentBrush`, `cycleBrushVariation`, `setBrushVariation`, `setBrushThickness`, `getBrushThickness`, `adjustBrushSize`, `storeBrushSlot`, `recallBrushSlot`, `usesPreciseMutationNotifications` | ~450 |
+
+Internal helpers stay as methods on `BrushController`; new files `#include "BrushController.h"` and implement methods via `BrushController::methodName`.
+
+#### 7b. Split `WallBrush.cpp` → 3 files
+
+| New File | Contains | Approx lines |
+|----------|----------|--------------|
+| `WallBrush.cpp` | Core: constructor, `draw`, `undraw`, `ownsItem`, `addWallItem`, `addDoorItem`, `addRedirectName`, etc. | ~350 |
+| `WallBrushPreview.cpp` | `buildPreviewTiles` + helpers (`resolveWallBrushForItem`, `resolveDoorItem`, `updateConsecutiveDecorations`) | ~250 |
+| `WallDecorationBrush.cpp` | `WallDecorationBrush::draw`, `WallDecorationBrush::undraw` (from Item 2 above) | ~60 |
+
+`resolveWallBrushForItem` becomes a `static` public method on `WallBrush` so both `WallBrush.cpp` and `WallBrushPreview.cpp` can use it.
+
+#### 7c. Split `GroundBrush.cpp` → 2 files
+
+| New File | Contains | Approx lines |
+|----------|----------|--------------|
+| `GroundBrush.cpp` | Core: constructor, `draw`, `undraw`, `ownsItem`, `addGroundItem`, friend/enemy, border rules, `placeGroundTile`, `eraseFromTile`, `rebuildAround`, `rebuildTile`, `selectWeightedItem`, `isBorderItem` | ~380 |
+| `GroundBorderUpdater.cpp` | `updateBorderItems` + border lambdas + border helper functions | ~490 |
+
+`updateBorderItems` stays as `GroundBrush::updateBorderItems` (declared in header), just implemented in the new file. The helper lambdas (`addEdgeItems`, `addEdgeWithFallback`, etc.) move too.
+
+### Shared dependencies
+
+The new `.cpp` files include the same headers as the originals. CMake glob picks up all `.cpp` files, so no build system changes needed.
+
+### Verification
+- `build_ninja.bat` compiles
+- All brush types paint correctly
+- Undo/redo works for complex strokes
+- No new files exceed 500 lines
+
+---
+
+## Execution Order
+
+```
+Item 1 (parse perf)      — 30 min, independent, zero risk
+    ↓
+Item 5 (DrawContext dedup) — 30 min, independent, zero risk
+Item 6 (border structs)    — 20 min, independent, zero risk
+    ↓
+Item 4 (global state)      — 2 hr, touches DrawContext, blocks nothing
+    ↓
+Item 2 (WallDecorationBrush) — 1 hr, clean separation
+    ↓
+Item 3 (const_cast)       — 2 hr, mechanical, 8 files
+    ↓
+Item 7 (file splits)      — 4 hr, depends on Item 2 for WallDecorationBrush
+```
+
+Items 1+5+6 can be done in parallel. Item 4 is the most important architecturally (violates "no global state") but also the highest risk — do it after low-risk items and before the larger refactors.
+
+---
+
+## Summary
+
+| Item | Description | Effort | Risk |
+|------|-------------|--------|------|
+| 1 | Parse efficiency (sorted array) | 30 min | Zero |
+| 2 | WallDecorationBrush own .cpp | 1 hr | Medium |
+| 3 | const_cast → mutable pattern | 2 hr | Low |
+| 4 | Eliminate global alt-replace state | 2 hr | Medium |
+| 5 | Deduplicate DrawContext construction | 30 min | Zero |
+| 6 | Border struct cleanup | 20 min | Zero |
+| 7 | File size refactors (7 new files) | 4 hr | Medium |
+| | **Total** | **~10.5 hr** | |

@@ -13,10 +13,7 @@
 #include "../Brushes/Types/WallDecorationBrush.h"
 #include "../Brushes/Types/TableBrush.h"
 #include "../Brushes/Types/WallBrush.h"
-#include "../Services/Brushes/BorderLookupService.h"
-#include "../Services/Brushes/CarpetLookupService.h"
-#include "../Services/Brushes/TableLookupService.h"
-#include "../Services/Brushes/WallLookupService.h"
+
 #include "XmlUtils.h"
 #include <algorithm>
 #include <charconv>

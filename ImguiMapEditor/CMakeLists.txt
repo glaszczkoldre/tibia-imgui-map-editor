@@ -244,7 +244,6 @@ set(SERVICES_SOURCES
     Services/Preview/SpawnPreviewProvider.cpp
     Services/Preview/ZoneBrushPreviewProvider.cpp
     Services/Preview/MultiItemBrushPreviewProvider.cpp
-    Services/Preview/WallBrushPreviewProvider.cpp
     Services/Map/MapLoadingService.cpp
     Services/Map/MapSavingService.cpp
     Services/Map/MapCleanupService.cpp
@@ -368,7 +367,6 @@ set(BRUSHES_SOURCES
     Brushes/BrushDoorOps.cpp
     Brushes/BrushStroke.cpp
     Brushes/BrushVariationOps.cpp
-    Brushes/Behaviors/ItemPlacement.cpp
     Brushes/Behaviors/WeightedSelection.cpp
     Brushes/Types/RawBrush.cpp
     Brushes/Types/BrushUtils.cpp

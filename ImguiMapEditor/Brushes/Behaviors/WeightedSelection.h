@@ -41,11 +41,6 @@ public:
      */
     static uint32_t randomRange(uint32_t min, uint32_t max);
     
-    /**
-     * Get a random float in the range [0.0, 1.0).
-     */
-    static float randomFloat();
-    
 private:
     static thread_local std::mt19937 rng_;
     static thread_local bool initialized_;

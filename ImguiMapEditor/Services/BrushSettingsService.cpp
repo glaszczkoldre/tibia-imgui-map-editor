@@ -299,7 +299,6 @@ std::vector<std::pair<int, int>> BrushSettingsService::getBrushOffsets() const {
   case BrushType::Custom:
     return calculateCustomOffsets();
   }
-  return {{0, 0}}; // Fallback: single tile
 }
 
 // ========================

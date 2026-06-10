@@ -7,7 +7,6 @@
 
 namespace MapEditor::Domain {
 class ChunkedMap;
-class Tile;
 } // namespace MapEditor::Domain
 
 namespace MapEditor::Domain::History {

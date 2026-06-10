@@ -1,5 +1,7 @@
 #include "BrushSystem.h"
 #include "Services/ConfigService.h"
+#include "UI/Panels/BrushSizePanel.h"
+#include "UI/Widgets/TilesetWidget.h"
 #include <filesystem>
 #include <spdlog/spdlog.h>
 
@@ -8,8 +10,10 @@ namespace Brushes {
 
 BrushSystem::BrushSystem()
     : tileset_service_(registry_),
-      brush_size_panel_(&settings_service_, &controller_,
-                        [this]() { saveBrushes(); }) {
+      tileset_widget_(std::make_unique<UI::TilesetWidget>()),
+      brush_size_panel_(std::make_unique<UI::Panels::BrushSizePanel>(
+          &settings_service_, &controller_,
+          [this]() { saveBrushes(); })) {
   // Wire the settings service to the controller for multi-tile painting
   controller_.setBrushSettingsService(&settings_service_);
   controller_.setBrushRegistry(&registry_);
@@ -28,7 +32,7 @@ void BrushSystem::setConfigService(Services::ConfigService *configService) {
   // Get brush file path from config directory
   // ConfigService stores at: %APPDATA%/TibiaMapEditor/config.json
   // We store brushes at: %APPDATA%/TibiaMapEditor/custom_brushes.json
-  auto configPath = std::filesystem::path("."); // Will be overridden
+  auto configPath = std::filesystem::path("."); // Fallback when iniPath is empty
 
   // Try to get path from getImGuiIniPath (same directory)
   const auto &iniPath = configService->getImGuiIniPath();

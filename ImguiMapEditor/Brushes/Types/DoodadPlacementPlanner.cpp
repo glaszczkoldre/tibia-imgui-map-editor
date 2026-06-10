@@ -8,6 +8,8 @@
 #include "Domain/Tile.h"
 #include "Services/BrushSettingsService.h"
 #include "Services/ClientDataService.h"
+#include "Utils/HashUtils.h"
+#include "Utils/PositionUtils.h"
 #include <algorithm>
 #include <cstdint>
 #include <numeric>
@@ -17,24 +19,6 @@
 namespace MapEditor::Brushes {
 
 namespace {
-
-constexpr uint32_t FnvOffsetBasis = 2166136261u;
-constexpr uint32_t FnvPrime = 16777619u;
-
-void mixSeed(uint32_t &seed, uint32_t value) {
-  seed ^= value;
-  seed *= FnvPrime;
-}
-
-void mixSignedSeed(uint32_t &seed, int32_t value) {
-  mixSeed(seed, static_cast<uint32_t>(value));
-}
-
-void mixStringSeed(uint32_t &seed, const std::string &value) {
-  for (const auto character : value) {
-    mixSeed(seed, static_cast<uint8_t>(character));
-  }
-}
 
 uint32_t normalizedChance(uint32_t chance) { return chance == 0 ? 1u : chance; }
 
@@ -169,7 +153,7 @@ void appendSkip(std::vector<DoodadBrush::PlacementSkip> &skipped,
 
 std::vector<Domain::Position>
 dedupeAndSort(std::vector<Domain::Position> positions) {
-  return dedupeAndSortPositions(std::move(positions));
+  return Utils::dedupeAndSortPositions(std::move(positions));
 }
 
 } // namespace
@@ -193,19 +177,19 @@ uint32_t DoodadPlacementPlanner::buildSeed(
     const DoodadBrush &brush, const Domain::Position &center,
     const Services::BrushSettingsService *brushSettings,
     size_t preferredVariation, bool forcePlace) {
-  uint32_t seed = FnvOffsetBasis;
-  mixStringSeed(seed, brush.getName());
-  mixSignedSeed(seed, center.x);
-  mixSignedSeed(seed, center.y);
-  mixSignedSeed(seed, center.z);
-  mixSeed(seed, static_cast<uint32_t>(preferredVariation));
-  mixSeed(seed, forcePlace ? 1u : 0u);
+  uint32_t seed = Utils::kFnvOffsetBasis;
+  Utils::mixSeed(seed, brush.getName());
+  Utils::mixSeed(seed, static_cast<uint32_t>(center.x));
+  Utils::mixSeed(seed, static_cast<uint32_t>(center.y));
+  Utils::mixSeed(seed, static_cast<uint32_t>(center.z));
+  Utils::mixSeed(seed, static_cast<uint32_t>(preferredVariation));
+  Utils::mixSeed(seed, forcePlace ? 1u : 0u);
 
   const auto anchors = getAnchors(brush.oneSize_, brushSettings);
-  mixSeed(seed, static_cast<uint32_t>(anchors.size()));
+  Utils::mixSeed(seed, static_cast<uint32_t>(anchors.size()));
   for (const auto &[x, y] : anchors) {
-    mixSignedSeed(seed, x);
-    mixSignedSeed(seed, y);
+    Utils::mixSeed(seed, static_cast<uint32_t>(x));
+    Utils::mixSeed(seed, static_cast<uint32_t>(y));
   }
 
   return seed;

@@ -114,8 +114,7 @@ void MaterialsXmlReader::processBrushesNode(const pugi::xml_node &node,
                                             const fs::path &basePath) {
   spdlog::debug("[MaterialsXmlReader] Processing brushes section");
 
-  BrushXmlReader reader({&brushRegistry_, borderLookup_, wallLookup_, tableLookup_,
-                         carpetLookup_, clientData_});
+  BrushXmlReader reader({&brushRegistry_, clientData_});
 
   processIncludes(node, basePath,
                   [&reader](const fs::path &file) { reader.loadFile(file); });

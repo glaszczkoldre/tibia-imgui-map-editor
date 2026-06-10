@@ -63,11 +63,10 @@ struct CustomBrushShape {
     }
   }
 
-  bool isEmpty() const {
+  [[nodiscard]] bool isEmpty() const {
     for (const auto &row : grid) {
       for (bool cell : row) {
-        if (cell)
-          return false;
+        if (cell) return false;
       }
     }
     return true;

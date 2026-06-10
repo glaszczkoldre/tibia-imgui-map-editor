@@ -13,6 +13,7 @@
 #include "Domain/Item.h"
 #include "Domain/ItemType.h"
 #include "Domain/Tile.h"
+#include "Utils/PositionUtils.h"
 #include <algorithm>
 #include <cstdint>
 #include <unordered_map>
@@ -77,11 +78,6 @@ void recordRedoBorderTouch(
   } else if (itemType && itemType->is_wall) {
     touch.placedWall = true;
   }
-}
-
-std::vector<Domain::Position>
-dedupeSorted(std::vector<Domain::Position> positions) {
-  return dedupeAndSortPositions(std::move(positions));
 }
 
 } // namespace
@@ -300,7 +296,7 @@ DoodadBrush::buildErasePlan(const Domain::Position &center,
   if (positions.empty()) {
     positions.push_back(center);
   }
-  positions = dedupeSorted(std::move(positions));
+  positions = Utils::dedupeAndSortPositions(std::move(positions));
 
   for (const auto &position : positions) {
     const auto *tile = map->getTile(position);
@@ -347,7 +343,7 @@ DoodadBrush::buildErasePlan(const Domain::Position &center,
       plan.affectedPositions.push_back(position);
     }
   }
-  plan.affectedPositions = dedupeSorted(std::move(plan.affectedPositions));
+  plan.affectedPositions = Utils::dedupeAndSortPositions(std::move(plan.affectedPositions));
   return plan;
 }
 

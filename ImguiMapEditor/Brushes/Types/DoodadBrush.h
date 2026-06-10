@@ -4,9 +4,9 @@
 #include "Brushes/Data/DoodadAlternative.h"
 #include "Brushes/Types/DoodadRedoBorderPlanner.h"
 #include "Services/Preview/PreviewTypes.h"
+#include "Utils/PositionUtils.h"
 #include <cstdint>
 #include <optional>
-#include <unordered_set>
 #include <vector>
 
 namespace MapEditor::Brushes {
@@ -136,22 +136,6 @@ inline int64_t encodeDoodadPosition(const Domain::Position &position) {
   return (static_cast<int64_t>(position.x) << 32) |
          (static_cast<int64_t>(position.y) << 16) |
          static_cast<uint16_t>(position.z);
-}
-
-inline std::vector<Domain::Position>
-dedupeAndSortPositions(std::vector<Domain::Position> positions) {
-  std::unordered_set<Domain::Position> seen;
-  std::vector<Domain::Position> result;
-  result.reserve(positions.size());
-
-  for (const auto &position : positions) {
-    if (seen.insert(position).second) {
-      result.push_back(position);
-    }
-  }
-
-  std::sort(result.begin(), result.end());
-  return result;
 }
 
 } // namespace MapEditor::Brushes

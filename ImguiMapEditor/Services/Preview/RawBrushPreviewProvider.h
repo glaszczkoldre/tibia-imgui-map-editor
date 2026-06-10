@@ -31,15 +31,6 @@ public:
       uint32_t itemId, uint16_t subtype = 0,
       BrushSettingsService *brushSettings = nullptr);
 
-  /**
-   * Set brush settings service for size/shape.
-   * Called if settings weren't available at construction.
-   */
-  void setBrushSettingsService(BrushSettingsService *service) {
-    brushSettings_ = service;
-    needsRegen_ = true;
-  }
-
   // IPreviewProvider interface
   bool isActive() const override;
   Domain::Position getAnchorPosition() const override;
@@ -51,22 +42,6 @@ public:
   // Regeneration support for brush size changes
   bool needsRegeneration() const override { return needsRegen_; }
   void regenerate() override;
-
-  /**
-   * Get the item ID being previewed.
-   */
-  uint32_t getItemId() const { return itemId_; }
-
-  /**
-   * Get the subtype being previewed.
-   */
-  uint16_t getSubtype() const { return subtype_; }
-
-  /**
-   * Mark preview as needing regeneration.
-   * Called by BrushSettingsService when settings change.
-   */
-  void markNeedsRegeneration() { needsRegen_ = true; }
 
 private:
   uint32_t itemId_;
