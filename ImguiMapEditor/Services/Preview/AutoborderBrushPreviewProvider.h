@@ -3,23 +3,23 @@
 #include "IPreviewProvider.h"
 #include "Services/Autoborder/AutoborderEngine.h"
 
-namespace MapEditor {
-namespace Brushes {
+namespace MapEditor::Brushes {
 class IBrush;
 }
-namespace Domain {
+
+namespace MapEditor::Domain {
 class ChunkedMap;
 }
-namespace Services {
+
+namespace MapEditor::Services {
 class BrushSettingsService;
 }
-} // namespace MapEditor
 
 namespace MapEditor::Services::Preview {
 
 class AutoborderBrushPreviewProvider final : public IPreviewProvider {
 public:
-  AutoborderBrushPreviewProvider(const Brushes::IBrush *brush,
+  AutoborderBrushPreviewProvider(const ::MapEditor::Brushes::IBrush *brush,
                                  BrushSettingsService *brushSettings,
                                  const Domain::ChunkedMap *map);
 
@@ -37,7 +37,7 @@ private:
   void buildPreview() const;
   std::vector<Domain::Position> getPlacementPositions() const;
 
-  const Brushes::IBrush *brush_ = nullptr;
+  const ::MapEditor::Brushes::IBrush *brush_ = nullptr;
   BrushSettingsService *brushSettings_ = nullptr;
   const Domain::ChunkedMap *map_ = nullptr;
   Autoborder::AutoborderEngine engine_;

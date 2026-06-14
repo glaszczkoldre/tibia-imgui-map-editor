@@ -11,6 +11,15 @@ namespace MapEditor::Brushes {
 
 class BrushRegistry;
 
+/**
+ * Table brush.
+ *
+ * Mirrors `CarpetBrush`: paints a single "alone" item, then re-aligns the
+ * 3x3 area based on the 8-neighbour bitmask of owned tiles. The lookup is
+ * delegated to `TableLookupService`; item selection and ownership
+ * bookkeeping are shared with `CarpetBrush` via
+ * `Brushes::Helpers::AlignedBrushHelpers`.
+ */
 class TableBrush : public BrushBase {
 public:
   TableBrush(std::string name, uint32_t lookId, BrushRegistry &registry);
@@ -25,10 +34,13 @@ public:
 
   void addAlignedItem(TableAlign align, uint16_t itemId, uint32_t chance);
   uint16_t getPreviewItemId() const;
-  void rebuildAround(Domain::ChunkedMap &map, const Domain::Position &center) const;
-  void rebuildTile(Domain::ChunkedMap &map, const Domain::Position &pos) const;
+
   void placeAloneTile(Domain::Tile &tile, const DrawContext &ctx) const;
   void eraseFromTile(Domain::Tile &tile) const;
+  void rebuildAround(Domain::ChunkedMap &map,
+                     const Domain::Position &center) const;
+  void rebuildTile(Domain::ChunkedMap &map,
+                   const Domain::Position &pos) const;
 
 private:
   static constexpr size_t kTableAlignCount = 7;

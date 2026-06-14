@@ -239,14 +239,17 @@ public:
   }
 
   void resolve(Domain::ChunkedMap &scratchMap, const PlacementIntent &intent,
-               const std::vector<Domain::Position> &) const override {
+               const std::vector<Domain::Position> &affected) const override {
     const auto *carpetBrush =
         dynamic_cast<const MapEditor::Brushes::CarpetBrush *>(intent.brush);
     if (!carpetBrush) {
       return;
     }
-    for (const auto &pos : intent.positions) {
-      carpetBrush->rebuildAround(scratchMap, pos);
+    // `affected` is the 3x3 expansion around every painted position.
+    // Walking it once guarantees that adjacent carpet tiles re-align
+    // themselves the same way they do in RME's `Map::doCarpets()` pass.
+    for (const auto &pos : affected) {
+      carpetBrush->rebuildTile(scratchMap, pos);
     }
   }
 };
@@ -290,14 +293,14 @@ public:
   }
 
   void resolve(Domain::ChunkedMap &scratchMap, const PlacementIntent &intent,
-               const std::vector<Domain::Position> &) const override {
+               const std::vector<Domain::Position> &affected) const override {
     const auto *tableBrush =
         dynamic_cast<const MapEditor::Brushes::TableBrush *>(intent.brush);
     if (!tableBrush) {
       return;
     }
-    for (const auto &pos : intent.positions) {
-      tableBrush->rebuildAround(scratchMap, pos);
+    for (const auto &pos : affected) {
+      tableBrush->rebuildTile(scratchMap, pos);
     }
   }
 };

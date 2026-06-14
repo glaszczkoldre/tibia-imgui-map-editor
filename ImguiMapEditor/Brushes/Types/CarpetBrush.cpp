@@ -1,49 +1,25 @@
 #include "CarpetBrush.h"
 
 #include "Brushes/BrushRegistry.h"
-#include "BrushUtils.h"
-#include "Brushes/Behaviors/WeightedSelection.h"
+#include "Brushes/Helpers/AlignedBrushHelpers.h"
+#include "Brushes/Types/BrushUtils.h"
 #include "Domain/ChunkedMap.h"
 #include "Domain/Item.h"
 #include "Domain/Tile.h"
 #include "Services/Brushes/CarpetLookupService.h"
+#include <algorithm>
 #include <array>
 
 namespace MapEditor::Brushes {
 
 namespace {
 
-DrawContext makeBorderContext(BrushRegistry& registry, const IBrush* owner) {
-    DrawContext ctx;
-    ctx.clientData = registry.getClientDataService();
-    ctx.brushRegistry = &registry;
-    ctx.ownerBrushId = registry.getBrushId(owner);
-    return ctx;
-}
-
-constexpr std::array<std::tuple<int, int, TileNeighbor>, 8> kNeighborOffsets{{
-    {-1, -1, TileNeighbor::Northwest},
-    {0, -1, TileNeighbor::North},
-    {1, -1, TileNeighbor::Northeast},
-    {-1, 0, TileNeighbor::West},
-    {1, 0, TileNeighbor::East},
-    {-1, 1, TileNeighbor::Southwest},
-    {0, 1, TileNeighbor::South},
-    {1, 1, TileNeighbor::Southeast},
-}};
-
-std::vector<Domain::Item *> getOwnedItems(Domain::Tile &tile,
-                                          const CarpetBrush &brush) {
-  std::vector<Domain::Item *> items;
-  items.reserve(tile.getItemCount());
-
-  for (const auto &item : tile.getItems()) {
-    if (item && brush.ownsItem(item.get())) {
-      items.push_back(item.get());
-    }
-  }
-
-  return items;
+DrawContext makeBorderContext(BrushRegistry &registry, const IBrush *owner) {
+  DrawContext ctx;
+  ctx.clientData = registry.getClientDataService();
+  ctx.brushRegistry = &registry;
+  ctx.ownerBrushId = registry.getBrushId(owner);
+  return ctx;
 }
 
 } // namespace
@@ -113,17 +89,78 @@ void CarpetBrush::rebuildAround(Domain::ChunkedMap &map,
 }
 
 uint16_t CarpetBrush::selectItem(EdgeType align) const {
-  const auto &items = itemsByEdge_[static_cast<size_t>(align)];
-  if (items.empty()) {
-    return 0;
+  return Helpers::selectWeightedItem(
+      itemsByEdge_[static_cast<size_t>(align)]);
+}
+
+std::vector<CarpetBrush::PlannedItem>
+CarpetBrush::planTile(const Domain::ChunkedMap &map,
+                      const Domain::Position &pos) const {
+  const auto *tile = map.getTile(pos);
+  if (!tile || !tileHasBrush(tile)) {
+    return {};
   }
-  std::vector<uint32_t> weights;
-  weights.reserve(items.size());
-  for (const auto &[_, weight] : items) {
-    weights.push_back(weight == 0 ? 1u : weight);
+
+  const auto neighborMask =
+      Helpers::computeOwnedNeighborMask(map, *this, pos);
+  static const Services::Brushes::CarpetLookupService carpetLookupService;
+  const auto packed = carpetLookupService.getCarpetTypes(neighborMask);
+  auto types = Services::Brushes::CarpetLookupService::unpack(packed);
+  if (types.empty()) {
+    types.push_back(EdgeType::Center);
   }
-  const auto index = WeightedSelection::select(weights);
-  return index ? items[*index].first : items.front().first;
+
+  std::vector<PlannedItem> plan;
+  plan.reserve(types.size());
+  for (const auto edge : types) {
+    const auto id = selectItem(edge);
+    if (id == 0) {
+      continue;
+    }
+    plan.push_back(PlannedItem{.itemId = id, .alignment = edge});
+  }
+
+  // RME's fallback: if the lookup produced nothing useful, default to a
+  // center item so the tile is never empty when it should hold carpet.
+  if (plan.empty()) {
+    if (const auto id = selectItem(EdgeType::Center); id != 0) {
+      plan.push_back(PlannedItem{.itemId = id, .alignment = EdgeType::Center});
+    }
+  }
+
+  return plan;
+}
+
+void CarpetBrush::applyTilePlan(Domain::Tile &tile,
+                                const std::vector<PlannedItem> &plan) const {
+  auto ownedItems = Helpers::collectOwnedItems(tile, *this);
+  const auto ownerBrushId = registry_.getBrushId(this);
+
+  for (size_t i = 0; i < plan.size(); ++i) {
+    if (i < ownedItems.size()) {
+      Types::updateItemVisuals(*ownedItems[i], registry_, plan[i].itemId,
+                               ownerBrushId);
+    } else {
+      tile.addItem(Types::createTypedItem(makeBorderContext(registry_, this),
+                                         plan[i].itemId));
+    }
+  }
+
+  if (plan.size() < ownedItems.size()) {
+    const auto keep = plan.size();
+    tile.removeItemsIf([this, &ownedItems, keep](const Domain::Item *item) {
+      if (!ownsItem(item)) {
+        return false;
+      }
+      // remove any owned item that wasn't kept in plan
+      auto it = std::find(ownedItems.begin(), ownedItems.end(), item);
+      if (it == ownedItems.end()) {
+        return true;
+      }
+      const auto index = static_cast<size_t>(std::distance(ownedItems.begin(), it));
+      return index >= keep;
+    });
+  }
 }
 
 void CarpetBrush::rebuildTile(Domain::ChunkedMap &map,
@@ -133,68 +170,13 @@ void CarpetBrush::rebuildTile(Domain::ChunkedMap &map,
     return;
   }
 
-  TileNeighbor neighbors = TileNeighbor::None;
-  for (const auto &[dx, dy, bit] : kNeighborOffsets) {
-    const auto *neighborTile = map.getTile(pos.x + dx, pos.y + dy, pos.z);
-    if (tileHasBrush(neighborTile)) {
-      neighbors |= bit;
-    }
-  }
-
-  static const Services::Brushes::CarpetLookupService carpetLookupService;
-  const auto packed =
-      carpetLookupService.getCarpetTypes(neighbors);
-  auto types = Services::Brushes::CarpetLookupService::unpack(packed);
-  if (types.empty()) {
-    types.push_back(EdgeType::Center);
-  }
-
-  const auto ownerBrushId = registry_.getBrushId(this);
-  auto ownedItems = getOwnedItems(*tile, *this);
-  size_t itemIndex = 0;
-
-  for (const auto edge : types) {
-    const auto itemId = selectItem(edge);
-    if (itemId == 0) {
-      continue;
-    }
-
-    if (itemIndex < ownedItems.size()) {
-      Types::updateItemVisuals(*ownedItems[itemIndex], registry_, itemId,
-                               ownerBrushId);
-    } else {
-      tile->addItem(Types::createTypedItem(makeBorderContext(registry_, this), itemId));
-    }
-
-    ++itemIndex;
-  }
-
-  if (itemIndex == 0) {
-    if (const auto centerId = selectItem(EdgeType::Center); centerId != 0) {
-      tile->addItem(Types::createTypedItem(makeBorderContext(registry_, this), centerId));
-      itemIndex = 1;
-    }
-  }
-
-  if (itemIndex < ownedItems.size()) {
-    size_t seen = 0;
-    tile->removeItemsIf([this, &seen, itemIndex](const Domain::Item *item) mutable {
-      if (!ownsItem(item)) {
-        return false;
-      }
-
-      const bool remove = seen >= itemIndex;
-      ++seen;
-      return remove;
-    });
-  }
+  applyTilePlan(*tile, planTile(map, pos));
 }
 
 bool CarpetBrush::tileHasBrush(const Domain::Tile *tile) const {
   if (!tile) {
     return false;
   }
-
   for (const auto &item : tile->getItems()) {
     if (item && ownsItem(item.get())) {
       return true;

@@ -1,49 +1,25 @@
 #include "TableBrush.h"
 
 #include "Brushes/BrushRegistry.h"
-#include "BrushUtils.h"
-#include "Brushes/Behaviors/WeightedSelection.h"
+#include "Brushes/Helpers/AlignedBrushHelpers.h"
+#include "Brushes/Types/BrushUtils.h"
 #include "Domain/ChunkedMap.h"
 #include "Domain/Item.h"
 #include "Domain/Tile.h"
 #include "Services/Brushes/TableLookupService.h"
 #include <array>
+#include <algorithm>
 
 namespace MapEditor::Brushes {
 
 namespace {
 
-DrawContext makeBorderContext(BrushRegistry& registry, const IBrush* owner) {
-    DrawContext ctx;
-    ctx.clientData = registry.getClientDataService();
-    ctx.brushRegistry = &registry;
-    ctx.ownerBrushId = registry.getBrushId(owner);
-    return ctx;
-}
-
-constexpr std::array<std::tuple<int, int, TileNeighbor>, 8> kNeighborOffsets{{
-    {-1, -1, TileNeighbor::Northwest},
-    {0, -1, TileNeighbor::North},
-    {1, -1, TileNeighbor::Northeast},
-    {-1, 0, TileNeighbor::West},
-    {1, 0, TileNeighbor::East},
-    {-1, 1, TileNeighbor::Southwest},
-    {0, 1, TileNeighbor::South},
-    {1, 1, TileNeighbor::Southeast},
-}};
-
-std::vector<Domain::Item *> getOwnedItems(Domain::Tile &tile,
-                                          const TableBrush &brush) {
-  std::vector<Domain::Item *> items;
-  items.reserve(tile.getItemCount());
-
-  for (const auto &item : tile.getItems()) {
-    if (item && brush.ownsItem(item.get())) {
-      items.push_back(item.get());
-    }
-  }
-
-  return items;
+DrawContext makeBorderContext(BrushRegistry &registry, const IBrush *owner) {
+  DrawContext ctx;
+  ctx.clientData = registry.getClientDataService();
+  ctx.brushRegistry = &registry;
+  ctx.ownerBrushId = registry.getBrushId(owner);
+  return ctx;
 }
 
 } // namespace
@@ -114,17 +90,8 @@ void TableBrush::rebuildAround(Domain::ChunkedMap &map,
 }
 
 uint16_t TableBrush::selectItem(TableAlign align) const {
-  const auto &items = itemsByAlign_[static_cast<size_t>(align)];
-  if (items.empty()) {
-    return 0;
-  }
-  std::vector<uint32_t> weights;
-  weights.reserve(items.size());
-  for (const auto &[_, weight] : items) {
-    weights.push_back(weight == 0 ? 1u : weight);
-  }
-  const auto index = WeightedSelection::select(weights);
-  return index ? items[*index].first : items.front().first;
+  return Helpers::selectWeightedItem(
+      itemsByAlign_[static_cast<size_t>(align)]);
 }
 
 void TableBrush::rebuildTile(Domain::ChunkedMap &map,
@@ -134,16 +101,10 @@ void TableBrush::rebuildTile(Domain::ChunkedMap &map,
     return;
   }
 
-  TileNeighbor neighbors = TileNeighbor::None;
-  for (const auto &[dx, dy, bit] : kNeighborOffsets) {
-    const auto *neighborTile = map.getTile(pos.x + dx, pos.y + dy, pos.z);
-    if (tileHasBrush(neighborTile)) {
-      neighbors |= bit;
-    }
-  }
-
+  const auto neighborMask =
+      Helpers::computeOwnedNeighborMask(map, *this, pos);
   static const Services::Brushes::TableLookupService tableLookupService;
-  const auto align = tableLookupService.getTableType(neighbors);
+  const auto align = tableLookupService.getTableType(neighborMask);
   auto itemId = selectItem(align);
   if (itemId == 0) {
     itemId = selectItem(TableAlign::Alone);
@@ -153,7 +114,7 @@ void TableBrush::rebuildTile(Domain::ChunkedMap &map,
   }
 
   const auto ownerBrushId = registry_.getBrushId(this);
-  auto ownedItems = getOwnedItems(*tile, *this);
+  auto ownedItems = Helpers::collectOwnedItems(*tile, *this);
   if (!ownedItems.empty()) {
     Types::updateItemVisuals(*ownedItems.front(), registry_, itemId,
                              ownerBrushId);
