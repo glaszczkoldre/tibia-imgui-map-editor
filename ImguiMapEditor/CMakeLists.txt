@@ -508,6 +508,23 @@ add_executable(CarpetSmoke
     ${IMGUI_SOURCES}
 )
 
+add_executable(WallBrushSmoke
+    ${DOMAIN_SOURCES}
+    ${RENDERING_SOURCES}
+    ${IO_SOURCES}
+    ${SERVICES_SOURCES}
+    ${UI_SOURCES}
+    ${PLATFORM_SOURCES}
+    ${APPLICATION_SOURCES}
+    ${CONTROLLER_SOURCES}
+    ${PRESENTATION_SOURCES}
+    ${RIBBON_SOURCES}
+    ${BRUSHES_SOURCES}
+    Application.cpp
+    Tests/WallBrushSmoke.cpp
+    ${IMGUI_SOURCES}
+)
+
 function(configure_tme_target target_name)
     target_include_directories(${target_name} PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
@@ -556,6 +573,7 @@ configure_tme_target(BrushSmoke)
 configure_tme_target(AutoborderSmoke)
 configure_tme_target(DoodadPreviewSmoke)
 configure_tme_target(CarpetSmoke)
+configure_tme_target(WallBrushSmoke)
 target_compile_definitions(BrushSmoke PRIVATE
     BRUSH_SMOKE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
 )
@@ -567,6 +585,9 @@ target_compile_definitions(DoodadPreviewSmoke PRIVATE
 )
 target_compile_definitions(CarpetSmoke PRIVATE
     CARPET_SMOKE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+)
+target_compile_definitions(WallBrushSmoke PRIVATE
+    WALL_SMOKE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
 )
 
 if(TME_ENABLE_PCH)

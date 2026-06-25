@@ -9,7 +9,6 @@ namespace MapEditor::Services::Autoborder {
 enum class PlacementMode {
   Draw,
   Erase,
-  ResolveOnly,
 };
 
 struct PlacementIntent {

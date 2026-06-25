@@ -316,7 +316,7 @@ void requireUndoRedoRoundTrip(
                                std::string(label).append(" redo"));
 }
 
-void requireWallStrokeDefersRebuild(
+void requireWallStrokeAlignsRealTime(
     MapEditor::Domain::ChunkedMap &map,
     MapEditor::Domain::History::HistoryManager &history,
     MapEditor::Brushes::BrushController &controller,
@@ -352,8 +352,8 @@ void requireWallStrokeDefersRebuild(
   controller.endStroke();
 
   const auto afterFinalize = snapshotRegion(map, snapshotCenter, 3);
-  require(!snapshotsEqual(beforeFinalize, afterFinalize),
-          std::string(label).append(" did not defer wall rebuild to endStroke"));
+  require(snapshotsEqual(beforeFinalize, afterFinalize),
+          std::string(label).append(" wall rebuild was deferred instead of real-time"));
   require(history.canUndo(),
           std::string(label).append(" did not record undo"));
   require(!history.undo(&map).empty(),
@@ -368,7 +368,7 @@ void requireWallStrokeDefersRebuild(
                                std::string(label).append(" redo"));
 }
 
-void requireWallDragPlanSkipsNeighborResolve(
+void requireWallDragPlanIncludesNeighborResolve(
     MapEditor::Domain::ChunkedMap &map,
     MapEditor::Brushes::BrushController &controller,
     MapEditor::Brushes::BrushRegistry &registry,
@@ -399,26 +399,18 @@ void requireWallDragPlanSkipsNeighborResolve(
   require(!dragDiffs.empty(),
           std::string(label).append(" active drag produced no diffs"));
 
+  bool hasNeighborDiff = false;
   for (const auto &diff : dragDiffs) {
     const auto isStrokeTile =
         std::find(strokePositions.begin(), strokePositions.end(),
                   diff.position) != strokePositions.end();
-    require(isStrokeTile,
-            std::string(label).append(" active drag emitted neighbor diff"));
+    if (!isStrokeTile) {
+      hasNeighborDiff = true;
+      break;
+    }
   }
-
-  auto afterDrag = map.clone();
-  MapEditor::Services::Autoborder::applyTileDiffs(*afterDrag, std::move(dragDiffs));
-
-  auto resolveIntent = makeIntent(
-      wallBrush, registry, settings, strokePositions.front(),
-      MapEditor::Services::Autoborder::PlacementMode::ResolveOnly);
-  resolveIntent.positions.assign(strokePositions.begin(), strokePositions.end());
-  resolveIntent.context.isDragging = true;
-
-  const auto resolveDiffs = engine.plan(*afterDrag, resolveIntent);
-  require(!resolveDiffs.empty(),
-          std::string(label).append(" final resolve produced no diffs"));
+  require(hasNeighborDiff,
+          std::string(label).append(" active drag failed to emit neighbor diff"));
 }
 
 void requireBatchedVsSequentialPlanParity(
@@ -638,10 +630,10 @@ int main() {
                              {119, 20, 7}, "carpet autoborder undo/redo");
     requireUndoRedoRoundTrip(map, history, controller, logBrush, {122, 20, 7},
                              "table autoborder undo/redo");
-    requireWallStrokeDefersRebuild(map, history, controller, caveBrush,
-                                   stoneWallBrush,
-                                   "wall drag deferred autoborder");
-    requireWallDragPlanSkipsNeighborResolve(
+    requireWallStrokeAlignsRealTime(map, history, controller, caveBrush,
+                                    stoneWallBrush,
+                                    "wall drag real-time autoborder");
+    requireWallDragPlanIncludesNeighborResolve(
         map, controller, registry, settings, caveBrush, stoneWallBrush,
         "wall drag planner");
 

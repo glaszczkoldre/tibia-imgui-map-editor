@@ -30,7 +30,8 @@ using namespace Brushes;
 namespace {
 
 uint32_t parseChance(const pugi::xml_node &node) {
-  return node.attribute("chance").as_uint(1);
+  int32_t chanceVal = node.attribute("chance").as_int(1);
+  return static_cast<uint32_t>(std::max(0, chanceVal));
 }
 
 uint16_t parseItemId(const pugi::xml_node &node) {
@@ -295,7 +296,12 @@ void parseWallLikeBrush(const pugi::xml_node &node, const std::string &name,
         addDoor(DoorType::Window);
         addDoor(DoorType::HatchWindow);
       } else {
-        addDoor(parseDoorType(typeStr));
+        const auto doorType = parseDoorType(typeStr);
+        if (doorType != DoorType::Undefined) {
+          addDoor(doorType);
+        } else {
+          spdlog::warn("[BrushXmlReader] Skipping unknown door type '{}' in wall brush '{}'", typeStr, name);
+        }
       }
     }
   }

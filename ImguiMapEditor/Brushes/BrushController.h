@@ -401,7 +401,6 @@ private:
   // Simple flag for stroke tracking (HistoryManager handles actual undo)
   bool strokeActive_ = false;
   bool strokeEraseMode_ = false;
-  bool strokeNeedsAutoborderFinalize_ = false;
   int variation_ = -1;
   uint32_t strokeModifiers_ = 0;
 
@@ -444,7 +443,6 @@ private:
   bool paintRecordedPositions(std::span<const Domain::Position> positions,
                               uint32_t modifiers, bool specialAction = false);
   void eraseRecordedPosition(const Domain::Position &pos);
-  void finalizeAutoborderStroke();
   void paintExpandedCenter(const Domain::Position &center, uint32_t modifiers);
   void eraseExpandedCenter(const Domain::Position &center);
   void continueGroundLikeStroke(const Domain::Position &pos);

@@ -111,10 +111,6 @@ public:
       return;
     }
 
-    if (intent.mode == PlacementMode::ResolveOnly) {
-      return;
-    }
-
     for (const auto &pos : intent.positions) {
       if (intent.mode == PlacementMode::Draw) {
         if (!wallBrush->canDraw(sourceMap, pos)) {
@@ -140,13 +136,9 @@ public:
     if (!wallBrush) {
       return;
     }
-    const bool skipsLiveWallResolve =
-        intent.context.isDragging &&
-        intent.brush->getType() == MapEditor::Brushes::BrushType::Wall;
     const bool skipsVariantResolve =
         intent.mode == PlacementMode::Draw && intent.context.specialAction;
-    if (intent.mode != PlacementMode::ResolveOnly &&
-        (skipsVariantResolve || skipsLiveWallResolve)) {
+    if (skipsVariantResolve) {
       return;
     }
     wallBrush->rebuildTiles(scratchMap, affected);
@@ -166,10 +158,6 @@ public:
     const auto *groundBrush =
         dynamic_cast<const MapEditor::Brushes::GroundBrush *>(intent.brush);
     if (!groundBrush) {
-      return;
-    }
-
-    if (intent.mode == PlacementMode::ResolveOnly) {
       return;
     }
 
@@ -220,10 +208,6 @@ public:
       return;
     }
 
-    if (intent.mode == PlacementMode::ResolveOnly) {
-      return;
-    }
-
     for (const auto &pos : intent.positions) {
       if (intent.mode == PlacementMode::Draw) {
         if (!carpetBrush->canDraw(sourceMap, pos)) {
@@ -271,10 +255,6 @@ public:
     const auto *tableBrush =
         dynamic_cast<const MapEditor::Brushes::TableBrush *>(intent.brush);
     if (!tableBrush) {
-      return;
-    }
-
-    if (intent.mode == PlacementMode::ResolveOnly) {
       return;
     }
 

@@ -634,12 +634,8 @@ BrushController::resolveBrushFromTile(const Domain::Tile &tile,
     return selection;
   }
 
-  if (auto selection = selectDoorBrush(tile, preferredItem)) {
-    return selection;
-  }
-
   if (preferredItem) {
-    for (const auto candidate : {BrushType::Doodad, BrushType::Wall,
+    for (const auto candidate : {BrushType::Wall, BrushType::Doodad,
                                  BrushType::Table, BrushType::Carpet}) {
       if (auto selection =
               selectPreferredBrushByType(candidate, BrushPickMode::Smart, preferredItem)) {
@@ -648,7 +644,7 @@ BrushController::resolveBrushFromTile(const Domain::Tile &tile,
     }
   }
 
-  for (const auto candidate : {BrushType::Doodad, BrushType::Wall,
+  for (const auto candidate : {BrushType::Wall, BrushType::Doodad,
                                BrushType::Table, BrushType::Carpet}) {
     if (auto *brush = findOwnedItemBrushByType(tile, registry_, candidate)) {
       return makeSelection(brush, BrushPickMode::Smart);
@@ -656,6 +652,10 @@ BrushController::resolveBrushFromTile(const Domain::Tile &tile,
     if (auto *brush = findItemBrushByType(tile, registry_, candidate)) {
       return makeSelection(brush, BrushPickMode::Smart);
     }
+  }
+
+  if (auto selection = selectDoorBrush(tile, preferredItem)) {
+    return selection;
   }
 
   if (registry_) {
