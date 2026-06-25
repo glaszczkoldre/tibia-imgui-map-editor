@@ -7,6 +7,7 @@
 #include "Brushes/Enums/BrushEnums.h"
 #include <cstdint>
 #include <vector>
+#include <random>
 
 
 namespace MapEditor::Brushes {
@@ -28,8 +29,9 @@ public:
 
   /**
    * Get a random item using weighted selection.
+   * @param rng The random number generator
    */
-  uint32_t getRandomItem() const;
+  uint32_t getRandomItem(std::mt19937 &rng) const;
 
   /**
    * Get all items.

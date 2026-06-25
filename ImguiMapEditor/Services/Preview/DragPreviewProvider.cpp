@@ -10,7 +10,7 @@ namespace MapEditor::Services::Preview {
 
 DragPreviewProvider::DragPreviewProvider(
     const Selection::SelectionService &selectionService,
-    Domain::ChunkedMap *map, const Domain::Position &dragStartPos)
+    const Domain::ChunkedMap *map, const Domain::Position &dragStartPos)
     : selection_service_(&selectionService), map_(map),
       dragStartPos_(dragStartPos), currentPos_(dragStartPos) {
   buildPreview();

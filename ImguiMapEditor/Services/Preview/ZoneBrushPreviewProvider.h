@@ -23,7 +23,7 @@ public:
    * @param brushSettings Brush settings service for size/shape
    */
   explicit ZoneBrushPreviewProvider(uint32_t color,
-                                    BrushSettingsService *brushSettings);
+                                    const BrushSettingsService *brushSettings);
 
   // IPreviewProvider interface
   bool isActive() const override;
@@ -32,12 +32,11 @@ public:
   PreviewBounds getBounds() const override;
   void updateCursorPosition(const Domain::Position &cursor) override;
 
-  bool needsRegeneration() const override { return needsRegen_; }
   void regenerate() override;
 
 private:
   uint32_t color_;
-  BrushSettingsService *brushSettings_ = nullptr;
+  const BrushSettingsService *brushSettings_ = nullptr;
   Domain::Position anchor_{0, 0, 0};
   mutable std::vector<PreviewTileData> tiles_;
   mutable PreviewBounds bounds_;

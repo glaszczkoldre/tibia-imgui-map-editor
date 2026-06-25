@@ -493,8 +493,7 @@ int main() {
     stableProvider->updateCursorPosition(seededPreviewPosition);
     const auto stableFirstPreview = stableProvider->getTiles();
     stableProvider->updateCursorPosition(seededPreviewPosition);
-    require(!stableProvider->needsRegeneration(),
-            "doodad preview marked same cursor tile dirty");
+
     const auto stableSecondPreview = stableProvider->getTiles();
     require(layoutsEqual(stableFirstPreview, stableSecondPreview),
             "doodad preview changed while cursor stayed on same tile");

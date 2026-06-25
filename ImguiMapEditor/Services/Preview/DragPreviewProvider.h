@@ -25,7 +25,7 @@ public:
    * @param dragStartPos Position where drag started
    */
   DragPreviewProvider(const Selection::SelectionService &selectionService,
-                      Domain::ChunkedMap *map,
+                      const Domain::ChunkedMap *map,
                       const Domain::Position &dragStartPos);
 
   // IPreviewProvider interface
@@ -37,7 +37,7 @@ public:
 
 private:
   const Selection::SelectionService *selection_service_;
-  Domain::ChunkedMap *map_;
+  const Domain::ChunkedMap *map_;
   Domain::Position dragStartPos_;
   Domain::Position currentPos_{0, 0, 0};
 

@@ -5,8 +5,8 @@
 #include "Brushes/Types/TableBrush.h"
 #include "Brushes/Types/WallBrush.h"
 #include "Brushes/Behaviors/WeightedSelection.h"
+#include "Brushes/BrushRegistry.h"
 #include "Domain/ChunkedMap.h"
-#include "Domain/History/TileSnapshot.h"
 #include "Domain/Tile.h"
 #include "Utils/HashUtils.h"
 #include "Utils/PositionUtils.h"
@@ -33,10 +33,14 @@ expandByOne(std::span<const Domain::Position> centers) {
 }
 
 bool sameTileState(const Domain::Tile *lhs, const Domain::Tile *rhs,
-                   const Domain::Position &pos) {
-  auto leftSnap = Domain::History::TileSnapshot::capture(lhs, pos);
-  auto rightSnap = Domain::History::TileSnapshot::capture(rhs, pos);
-  return leftSnap.data() == rightSnap.data();
+                   const Domain::Position &/*pos*/) {
+  if (lhs == rhs) {
+    return true;
+  }
+  if (!lhs || !rhs) {
+    return false;
+  }
+  return lhs->hasSameState(rhs);
 }
 
 uint32_t deterministicSeed(const PlacementIntent &intent) noexcept {
@@ -342,8 +346,9 @@ TileDiffList AutoborderEngine::plan(const Domain::ChunkedMap &map,
 
   Domain::ChunkedMap scratchMap;
   cloneTiles(scratchMap, map, readPositions);
-  MapEditor::Brushes::WeightedSelection::ScopedSeed scopedSeed(
-      deterministicSeed(intent));
+  if (intent.context.brushRegistry) {
+    intent.context.brushRegistry->getRng().seed(deterministicSeed(intent));
+  }
   resolver->applyIntent(scratchMap, map, intent);
   resolver->resolve(scratchMap, intent, affected);
 

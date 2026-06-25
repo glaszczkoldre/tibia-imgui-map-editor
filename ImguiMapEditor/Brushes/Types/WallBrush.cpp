@@ -31,58 +31,11 @@ constexpr std::array<std::tuple<int, int, WallNeighbor>, 4> kWallNeighbors{{
     {0, 1, WallNeighbor::South},
 }};
 
-template <typename Fn>
-bool visitWallRedirectChain(const WallBrush &root, Fn &&fn) {
-  std::vector<const WallBrush *> pending{&root};
-  std::unordered_set<const WallBrush *> visited;
+} // namespace
 
-  while (!pending.empty()) {
-    const auto *brush = pending.back();
-    pending.pop_back();
-    if (!brush || !visited.insert(brush).second) {
-      continue;
-    }
-
-    if (std::invoke(fn, *brush)) {
-      return true;
-    }
-
-    for (const auto *redirectBrush : brush->getRedirectBrushes()) {
-      if (redirectBrush && !visited.contains(redirectBrush)) {
-        pending.push_back(redirectBrush);
-      }
-    }
-  }
-
-  return false;
-}
-
-
-Domain::Item *resolveDoorItem(Domain::Tile &tile,
-                              const Domain::Item *preferredItem,
-                              const WallBrush &brush) {
-  if (preferredItem) {
-    for (const auto &item : tile.getItems()) {
-      if (item.get() == preferredItem &&
-          brush.findDoorForItem(item->getServerId()).has_value()) {
-        return item.get();
-      }
-    }
-  }
-
-  for (auto it = tile.getItems().rbegin(); it != tile.getItems().rend(); ++it) {
-    if (*it && brush.findDoorForItem((*it)->getServerId()).has_value()) {
-      return it->get();
-    }
-  }
-
-  return nullptr;
-}
-
-template <typename Resolver>
-void updateConsecutiveDecorations(Domain::Tile &tile, Domain::Item *baseItem,
-                                  BrushRegistry &registry,
-                                  Resolver &&resolveItemId) {
+void WallBrush::updateConsecutiveDecorations(
+    Domain::Tile &tile, Domain::Item *baseItem,
+    const std::function<uint16_t(const WallBrush &, const Domain::Item &)> &resolveItemId) const {
   if (!baseItem) {
     return;
   }
@@ -106,20 +59,20 @@ void updateConsecutiveDecorations(Domain::Tile &tile, Domain::Item *baseItem,
       continue;
     }
 
-    const auto *itemBrush = WallBrush::resolveWallBrushForItem(*item, registry);
+    const auto *itemBrush = WallBrush::resolveWallBrushForItem(*item, registry_);
     auto *decorationBrush = dynamic_cast<const WallBrush *>(itemBrush);
     if (!decorationBrush ||
         decorationBrush->getType() != BrushType::WallDecoration) {
       break;
     }
 
-    if (const auto itemId = std::invoke(resolveItemId, *decorationBrush, *item);
+    if (const auto itemId = resolveItemId(*decorationBrush, *item);
         itemId != 0) {
       const auto ownerBrushId =
           item->getOwnerBrushId() != InvalidBrushId
               ? item->getOwnerBrushId()
-              : registry.getBrushId(decorationBrush);
-      Types::updateItemVisuals(*item, registry, itemId, ownerBrushId);
+              : registry_.getBrushId(decorationBrush);
+      Types::updateItemVisuals(*item, registry_, itemId, ownerBrushId);
       continue;
     }
 
@@ -133,8 +86,6 @@ void updateConsecutiveDecorations(Domain::Tile &tile, Domain::Item *baseItem,
     });
   }
 }
-
-} // namespace
 
 const WallBrush *WallBrush::resolveWallBrushForItem(const Domain::Item &item,
                                                      BrushRegistry &registry) {
@@ -172,6 +123,7 @@ void WallBrush::draw(Domain::ChunkedMap &map, Domain::Tile *tile,
   if (placement.requiresRebuild) {
     rebuildAround(map, tile->getPosition());
   }
+  map.markChanged();
 }
 
 void WallBrush::undraw(Domain::ChunkedMap &map, Domain::Tile *tile) {
@@ -180,6 +132,7 @@ void WallBrush::undraw(Domain::ChunkedMap &map, Domain::Tile *tile) {
   }
   eraseFromTile(*tile);
   rebuildAround(map, tile->getPosition());
+  map.markChanged();
 }
 
 WallBrush::DirectPlacementResult
@@ -278,11 +231,6 @@ uint16_t WallBrush::getWallItemForAlign(WallAlign align) const {
   return selectWallItem(align);
 }
 
-std::optional<DoorNode> WallBrush::getDoorItemForAlign(WallAlign align,
-                                                       DoorType type, bool open,
-                                                       bool preferLocked) const {
-  return selectDoorItem(align, type, open, preferLocked);
-}
 
 void WallBrush::rebuildAround(Domain::ChunkedMap &map,
                               const Domain::Position &center) const {
@@ -311,191 +259,6 @@ void WallBrush::rebuildNeighbors(Domain::ChunkedMap &map,
       rebuildTile(map, {center.x + dx, center.y + dy, center.z});
     }
   }
-}
-
-bool WallBrush::canApplyDoor(const Domain::Tile &tile, DoorType type, bool open,
-                             bool preferLocked) const {
-  for (const auto &item : tile.getItems()) {
-    if (!item) {
-      continue;
-    }
-
-    const auto *itemBrush = resolveWallBrushForItem(*item, registry_);
-    if (!itemBrush || itemBrush->getType() == BrushType::WallDecoration ||
-        !connectsTo(itemBrush)) {
-      continue;
-    }
-
-    const auto alignment = findAlignmentForItem(item->getServerId());
-    if (!alignment.has_value()) {
-      continue;
-    }
-
-    if (selectDoorItem(*alignment, type, open, preferLocked).has_value()) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
-bool WallBrush::applyDoor(Domain::ChunkedMap &map, Domain::Tile &tile,
-                          DoorType type, bool open, bool preferLocked,
-                          BrushId ownerBrushId) const {
-  const auto pos = tile.getPosition();
-  const auto resolvedOwnerBrushId =
-      ownerBrushId != InvalidBrushId ? ownerBrushId : registry_.getBrushId(this);
-  auto *baseWallItem = [&]() -> Domain::Item * {
-    for (const auto &item : tile.getItems()) {
-      if (!item) {
-        continue;
-      }
-
-      const auto *itemBrush = resolveWallBrushForItem(*item, registry_);
-      if (!itemBrush || itemBrush->getType() == BrushType::WallDecoration ||
-          !connectsTo(itemBrush)) {
-        continue;
-      }
-
-      if (const auto alignment = findAlignmentForItem(item->getServerId());
-          alignment && selectDoorItem(*alignment, type, open, preferLocked).has_value()) {
-        return item.get();
-      }
-    }
-
-    return nullptr;
-  }();
-
-  if (!baseWallItem) {
-    return false;
-  }
-
-  const auto alignment = findAlignmentForItem(baseWallItem->getServerId());
-  if (!alignment.has_value()) {
-    return false;
-  }
-
-  const auto baseDoor = selectDoorItem(*alignment, type, open, preferLocked);
-  if (!baseDoor.has_value()) {
-    return false;
-  }
-
-  Types::updateItemVisuals(*baseWallItem, registry_,
-                           static_cast<uint16_t>(baseDoor->getItem()),
-                           resolvedOwnerBrushId);
-
-  updateConsecutiveDecorations(
-      tile, baseWallItem, registry_,
-      [alignment = *alignment, type, open, preferLocked](
-          const WallBrush &decorationBrush, const Domain::Item &) -> uint16_t {
-        if (const auto decorationDoor =
-                decorationBrush.getDoorItemForAlign(alignment, type, open,
-                                                    preferLocked);
-            decorationDoor.has_value()) {
-          return static_cast<uint16_t>(decorationDoor->getItem());
-        }
-
-        return 0;
-      });
-
-  tile.markDirty();
-  rebuildAround(map, pos);
-  return true;
-}
-
-bool WallBrush::removeDoor(Domain::ChunkedMap &map, Domain::Tile &tile,
-                           const Domain::Item *preferredItem) const {
-  auto *targetItem = resolveDoorItem(tile, preferredItem, *this);
-  if (!targetItem) {
-    return false;
-  }
-
-  const auto currentDoor = findDoorForItem(targetItem->getServerId());
-  if (!currentDoor) {
-    return false;
-  }
-
-  const auto alignment =
-      findAlignmentForItem(targetItem->getServerId()).value_or(currentDoor->alignment);
-  const auto replacementId = selectWallItem(alignment);
-  if (replacementId == 0) {
-    return false;
-  }
-
-  const auto ownerBrushId = targetItem->getOwnerBrushId() != InvalidBrushId
-                                ? targetItem->getOwnerBrushId()
-                                : registry_.getBrushId(this);
-  Types::updateItemVisuals(*targetItem, registry_, replacementId, ownerBrushId);
-
-  updateConsecutiveDecorations(
-      tile, targetItem, registry_,
-      [alignment](const WallBrush &decorationBrush,
-                  const Domain::Item &) -> uint16_t {
-        return decorationBrush.getWallItemForAlign(alignment);
-      });
-
-  tile.markDirty();
-  rebuildAround(map, tile.getPosition());
-  return true;
-}
-
-bool WallBrush::switchDoor(Domain::ChunkedMap &map, Domain::Tile &tile,
-                           const Domain::Item *preferredItem,
-                           bool preferLocked) const {
-  auto *targetItem = resolveDoorItem(tile, preferredItem, *this);
-
-  if (!targetItem) {
-    return false;
-  }
-
-  const auto currentDoor = findDoorForItem(targetItem->getServerId());
-  if (!currentDoor) {
-    return false;
-  }
-
-  const auto alignment =
-      findAlignmentForItem(targetItem->getServerId()).value_or(currentDoor->alignment);
-  const auto replacement =
-      selectDoorItem(alignment, currentDoor->type, !currentDoor->isOpen, preferLocked);
-  if (!replacement || replacement->getItem() == 0) {
-    return false;
-  }
-
-  const auto replacementId = static_cast<uint16_t>(replacement->getItem());
-  Types::updateItemVisuals(*targetItem, registry_, replacementId,
-                           targetItem->getOwnerBrushId());
-
-  updateConsecutiveDecorations(
-      tile, targetItem, registry_,
-      [alignment, replacement, preferLocked](const WallBrush &decorationBrush,
-                                             const Domain::Item &) -> uint16_t {
-        if (const auto replacementDoor =
-                decorationBrush.getDoorItemForAlign(alignment, replacement->type,
-                                                    replacement->isOpen,
-                                                    preferLocked);
-            replacementDoor.has_value()) {
-          return static_cast<uint16_t>(replacementDoor->getItem());
-        }
-
-        return 0;
-      });
-
-  tile.markDirty();
-  rebuildAround(map, tile.getPosition());
-  return true;
-}
-
-std::optional<DoorNode> WallBrush::findDoorForItem(uint16_t itemId) const {
-  std::optional<DoorNode> foundDoor;
-  visitWallRedirectChain(*this, [&](const WallBrush &brush) {
-    if (const auto it = brush.doorNodesByItemId_.find(itemId);
-        it != brush.doorNodesByItemId_.end()) {
-      foundDoor = it->second;
-      return true;
-    }
-    return false;
-  });
-  return foundDoor;
 }
 
 const std::vector<const WallBrush *> &WallBrush::getRedirectBrushes() const {
@@ -535,7 +298,7 @@ bool WallBrush::isWallGroupItem(uint16_t itemId) const {
 
 std::optional<WallAlign> WallBrush::findAlignmentForItem(uint16_t itemId) const {
   std::optional<WallAlign> alignment;
-  visitWallRedirectChain(*this, [&](const WallBrush &brush) {
+  visitWallRedirectChain([&](const WallBrush &brush) {
     if (const auto it = brush.itemAlignments_.find(itemId);
         it != brush.itemAlignments_.end()) {
       alignment = it->second;
@@ -553,7 +316,7 @@ std::optional<uint16_t> WallBrush::findNextWallVariant(uint16_t currentItemId) c
   }
 
   std::vector<uint16_t> candidates;
-  visitWallRedirectChain(*this, [&](const WallBrush &brush) {
+  visitWallRedirectChain([&](const WallBrush &brush) {
     for (const auto &[candidateId, _] :
          brush.wallNodes_[static_cast<size_t>(*alignment)].getItems()) {
       if (candidateId == 0 ||
@@ -601,44 +364,14 @@ WallBrush::findTileAlignment(const Domain::Tile &tile) const {
 
 uint16_t WallBrush::selectWallItem(WallAlign align) const {
   uint16_t itemId = 0;
-  visitWallRedirectChain(*this, [&](const WallBrush &brush) {
-    itemId = brush.wallNodes_[static_cast<size_t>(align)].getRandomItem();
+  visitWallRedirectChain([&](const WallBrush &brush) {
+    itemId = brush.wallNodes_[static_cast<size_t>(align)].getRandomItem(registry_.getRng());
     return itemId != 0;
   });
   return itemId;
 }
 
-std::optional<DoorNode> WallBrush::selectDoorItem(WallAlign align,
-                                                  DoorType type, bool open,
-                                                  bool preferLocked) const {
-  std::optional<DoorNode> bestMatch;
-  int bestRank = -1;
 
-  visitWallRedirectChain(*this, [&](const WallBrush &brush) {
-    const auto &doors = brush.doorNodes_[static_cast<size_t>(align)];
-
-    for (const auto &door : doors) {
-      if (door.type != type) {
-        continue;
-      }
-
-      const int rank = (door.isOpen == open)
-                           ? ((!preferLocked || door.isLocked) ? 3 : 2)
-                           : 1;
-      if (rank > bestRank) {
-        bestMatch = door;
-        bestRank = rank;
-        if (bestRank == 3) {
-          return true;
-        }
-      }
-    }
-
-    return false;
-  });
-
-  return bestMatch;
-}
 
 void WallBrush::rebuildTile(Domain::ChunkedMap &map,
                             const Domain::Position &pos) const {
@@ -753,7 +486,7 @@ void WallBrush::rebuildTile(Domain::ChunkedMap &map,
                            currentOwnerBrushId);
 
   updateConsecutiveDecorations(
-      *tile, baseItem, registry_,
+      *tile, baseItem,
       [resolvedAlignment, currentDoorType, isOpen, isLocked](
           const WallBrush &decorationBrush, const Domain::Item &) -> uint16_t {
         if (currentDoorType != DoorType::Undefined) {

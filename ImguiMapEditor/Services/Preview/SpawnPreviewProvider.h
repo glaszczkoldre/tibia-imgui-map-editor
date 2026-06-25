@@ -21,7 +21,7 @@ public:
    * Create spawn brush preview.
    * @param brushSettings Brush settings service for spawn radius
    */
-  explicit SpawnPreviewProvider(BrushSettingsService *brushSettings = nullptr);
+  explicit SpawnPreviewProvider(const BrushSettingsService *brushSettings = nullptr);
 
   // IPreviewProvider interface
   bool isActive() const override;
@@ -32,11 +32,10 @@ public:
   PreviewStyle getStyle() const override { return PreviewStyle::Outline; }
 
   // Regeneration support
-  bool needsRegeneration() const override { return needsRegen_; }
   void regenerate() override;
 
 private:
-  BrushSettingsService *brushSettings_ = nullptr;
+  const BrushSettingsService *brushSettings_ = nullptr;
   Domain::Position anchor_{0, 0, 0};
   mutable std::vector<PreviewTileData> tiles_;
   mutable PreviewBounds bounds_;

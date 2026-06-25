@@ -6,6 +6,7 @@
 
 #include <cstdint>
 #include <vector>
+#include <random>
 
 
 namespace MapEditor::Brushes {
@@ -66,15 +67,17 @@ public:
 
   /**
    * Select a random single item using weighted selection.
+   * @param rng The random number generator
    * @return The selected item, or a default SingleItem if empty
    */
-  SingleItem selectRandomSingle() const;
+  SingleItem selectRandomSingle(std::mt19937 &rng) const;
 
   /**
    * Select a random composite using weighted selection.
+   * @param rng The random number generator
    * @return Pointer to the selected composite, or nullptr if empty
    */
-  const CompositeItem *selectRandomComposite() const;
+  const CompositeItem *selectRandomComposite(std::mt19937 &rng) const;
 
   const std::vector<SingleItem> &getSingleItems() const { return singles_; }
   const std::vector<CompositeItem> &getComposites() const {

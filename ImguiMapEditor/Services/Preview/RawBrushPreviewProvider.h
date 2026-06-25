@@ -29,7 +29,7 @@ public:
    */
   explicit RawBrushPreviewProvider(
       uint32_t itemId, uint16_t subtype = 0,
-      BrushSettingsService *brushSettings = nullptr);
+      const BrushSettingsService *brushSettings = nullptr);
 
   // IPreviewProvider interface
   bool isActive() const override;
@@ -40,13 +40,12 @@ public:
   PreviewStyle getStyle() const override;
 
   // Regeneration support for brush size changes
-  bool needsRegeneration() const override { return needsRegen_; }
   void regenerate() override;
 
 private:
   uint32_t itemId_;
   uint16_t subtype_;
-  BrushSettingsService *brushSettings_ = nullptr;
+  const BrushSettingsService *brushSettings_ = nullptr;
   Domain::Position anchor_{0, 0, 0};
   mutable std::vector<PreviewTileData> tiles_;
   mutable PreviewBounds bounds_;

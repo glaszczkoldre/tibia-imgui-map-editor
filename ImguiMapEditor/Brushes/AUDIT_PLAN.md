@@ -3,7 +3,8 @@
 > Previous phases (dead code, noexcept, includes, magic numbers, GLFW layering, dedup,
 > `map.markChanged()` consistency, preview/styling fixes) are **complete and LGTM**.
 >
-> This plan covers the 7 remaining items, re-evaluated against `AGENTS.md` rules.
+> This plan covers the initial 7 remaining items, plus new findings (Items 8–15) from the June 2026 comprehensive audit of Brushes, Preview Services, Autoborder, and settings.
+
 
 ---
 
@@ -314,24 +315,199 @@ The new `.cpp` files include the same headers as the originals. CMake glob picks
 
 ---
 
+## Item 8 — `PositionHash` sign-extension bug
+
+**Priority**: High | **Effort**: 15 min | **Risk**: Low
+
+### Problem
+In `BrushController.h:411`, coordinate elements `x` (`int32_t`), `y` (`int32_t`), and `z` (`int16_t`) are cast to `int64_t` and ORed. Casting negative coordinates to `int64_t` sign-extends them, filling upper bits with `1`s. This corrupts the other coordinate bits in the bitwise OR, causing severe hash collisions and key corruption when working at negative positions.
+
+### Solution
+Cast each coordinate to `uint64_t` and mask each element before ORing:
+```cpp
+struct PositionHash {
+  size_t operator()(const std::tuple<int32_t, int32_t, int16_t> &p) const {
+    const uint64_t x = static_cast<uint64_t>(std::get<0>(p)) & 0xFFFFF; // 20 bits
+    const uint64_t y = static_cast<uint64_t>(std::get<1>(p)) & 0xFFFFF; // 20 bits
+    const uint64_t z = static_cast<uint64_t>(std::get<2>(p)) & 0xFFFF;  // 16 bits
+    return std::hash<uint64_t>()(x | (y << 20) | (z << 40));
+  }
+};
+```
+
+### Files
+- `Brushes/BrushController.h`
+
+---
+
+## Item 9 — Thread-local / static mutable state violations
+
+**Priority**: High | **Effort**: 1 hr | **Risk**: Low
+
+### Problem
+`WeightedSelection` (`WeightedSelection.h:50`) and `DoodadBrushPreviewProvider.cpp` contain `static thread_local` mutable RNG generators. This directly violates the project's rule against global/thread-local mutable state.
+
+### Solution
+- For `WeightedSelection`, pass `std::mt19937&` as a parameter to selection/seed methods, or inject it via constructor/service.
+- For `DoodadBrushPreviewProvider.cpp`, replace the thread-local engine with a simple non-thread-local call to `std::random_device` or pass the RNG.
+
+### Files
+- `Brushes/Behaviors/WeightedSelection.h` / `WeightedSelection.cpp`
+- `Services/Preview/DoodadBrushPreviewProvider.cpp`
+
+---
+
+## Item 10 — Layering violations
+
+**Priority**: Medium | **Effort**: 1.5 hr | **Risk**: Low
+
+### Problem
+- `BrushSystem.h` includes ImGui UI widgets (`UI::TilesetWidget`, `UI::Panels::BrushSizePanel`) directly, coupling core brushes to UI panels.
+- Lookup service headers (`BorderLookupService.h`, etc.) use relative includes like `../../Brushes/Enums/BrushEnums.h`.
+
+### Solution
+- Forward-declare UI widgets in `BrushSystem.h` or decouple widgets using callbacks/interfaces.
+- Convert relative includes in lookup services to root-relative paths (e.g. `#include "Brushes/Enums/BrushEnums.h"`).
+
+### Files
+- `Brushes/BrushSystem.h`
+- `Services/Brushes/BorderLookupService.h`
+- `Services/Brushes/CarpetLookupService.h`
+- `Services/Brushes/TableLookupService.h`
+- `Services/Brushes/WallLookupService.h`
+
+---
+
+## Item 11 — Overly complex functions & file size violations
+
+**Priority**: High | **Effort**: 3 hr | **Risk**: Medium
+
+### Problem
+- `BrushController::resolveBrushFromTile` is 570 lines (limit 150 lines).
+- `GroundBrush::updateBorderItems` is 398 lines (limit 150 lines).
+- `Services/BrushSettingsService.cpp` is 535 lines (limit 500 lines).
+
+### Solution
+- Extract nested lambdas in `resolveBrushFromTile` and `updateBorderItems` into private helper functions.
+- Split `BrushSettingsService.cpp` by moving `CustomBrushShape` definition and file serialization/persistence helper classes into dedicated files (`Services/CustomBrushShape.h`/`.cpp` and `Services/BrushSettingsSerializer.h`/`.cpp`).
+
+### Files
+- `Brushes/BrushController.cpp`
+- `Brushes/Types/GroundBorderUpdater.cpp`
+- `Services/BrushSettingsService.h` / `.cpp`
+- [NEW] `Services/CustomBrushShape.h` / `.cpp`
+- [NEW] `Services/BrushSettingsSerializer.h` / `.cpp`
+
+---
+
+## Item 12 — Const correctness & observer leaks
+
+**Priority**: Medium | **Effort**: 2 hr | **Risk**: Low
+
+### Problem
+- `resolveDoorTarget` takes `const Tile*` but returns mutable `Item*`, leaking mutable access to tile objects.
+- Preview providers and factory pass `BrushSettingsService*` as mutable pointer when they only read config.
+- `DragPreviewProvider` accepts mutable `ChunkedMap*` but only queries read-only tiles.
+- `resolveBrushFromTile` and `canSelectBrushFromTile` do not mutate `BrushController` state and should be `const`.
+- `IPreviewProvider` declares an unused virtual method `needsRegeneration()`.
+
+### Solution
+- Overload `resolveDoorTarget` for const/non-const variants.
+- Update preview providers/factory to accept `const BrushSettingsService*`.
+- Update `DragPreviewProvider` to accept `const ChunkedMap*`.
+- Mark `resolveBrushFromTile` and `canSelectBrushFromTile` `const`.
+- Remove `needsRegeneration()` from `IPreviewProvider` and its implementation classes.
+
+### Files
+- `Brushes/Helpers/DoorResolveUtils.h`
+- `Brushes/BrushController.h` / `.cpp`
+- `Services/Preview/IPreviewProvider.h`
+- All 8+ Preview Providers and `BrushPreviewFactory`
+
+---
+
+## Item 13 — Duplicate code / DRY violations
+
+**Priority**: Medium | **Effort**: 1.5 hr | **Risk**: Low
+
+### Problem
+- Exact duplication of wall alignment and door resolving logic between `WallBrush::rebuildTile` and `WallBrushPreview::buildPreviewTiles`.
+- Duplication between `resolveMutableTileItem` and `resolveTileItem` in `DoorResolveUtils.h`.
+
+### Solution
+- Extract wall resolution logic to a shared private helper method on `WallBrush` (`resolveWallItem`).
+- Deduplicate `resolveMutableTileItem` by calling `resolveTileItem` with const_cast.
+
+### Files
+- `Brushes/Types/WallBrush.h` / `.cpp`
+- `Brushes/Types/WallBrushPreview.cpp`
+- `Brushes/Helpers/DoorResolveUtils.h`
+
+---
+
+## Item 14 — Missing `map.markChanged()` calls in brushes
+
+**Priority**: High | **Effort**: 1.5 hr | **Risk**: Low
+
+### Problem
+- `RawBrush`, `TableBrush`, `WallBrush`, and `WallDecorationBrush` modify tiles but omit calling `map.markChanged()`, causing rendering cache invalidation to fail.
+- `OptionalBorderBrush::undraw` does not rebuild surrounding borders.
+- `WaypointBrush` missing `isDraggable() const override { return false; }`, causing drag operations to corrupt waypoint names.
+
+### Solution
+- Call `map.markChanged()` in all mutation methods of these brushes.
+- Update `OptionalBorderBrush::undraw` to trigger border rebuild on neighboring tiles.
+- Override `isDraggable()` to return `false` in `WaypointBrush`.
+
+### Files
+- `Brushes/Types/RawBrush.cpp`
+- `Brushes/Types/TableBrush.cpp`
+- `Brushes/Types/WallBrush.cpp`
+- `Brushes/Types/WallDecorationBrush.cpp`
+- `Brushes/Types/OptionalBorderBrush.cpp`
+- `Brushes/Types/WaypointBrush.h`
+
+---
+
+## Item 15 — Performance bottlenecks in Autoborder & Diffs
+
+**Priority**: High | **Effort**: 2.5 hr | **Risk**: Medium
+
+### Problem
+- `applyTileDiffs` takes `TileDiffList` by const reference and performs deep clones of tiles (`after->clone()`), even though the original tiles are immediately discarded.
+- `sameTileState` does expensive binary serialization (`TileSnapshot::capture`) to compare tile equality on every frame during brush drag.
+- Lookup tables in lookup services (`BorderLookupService`, etc.) are initialized dynamically at runtime.
+
+### Solution
+- Change `applyTileDiffs` to accept by value or rvalue-reference and `std::move` the tiles, avoiding deep-cloning.
+- Implement a lightweight equality operator/comparison method on `Domain::Tile` that compares fields directly.
+- Modify Python code generator to output tables as static `constexpr std::array`.
+
+### Files
+- `Services/Autoborder/TileDiff.h` / `.cpp`
+- `Services/Autoborder/AutoborderEngine.cpp`
+- `Domain/Tile.h` / `.cpp`
+- `Services/Brushes/*LookupTable.inc` / `BorderLookupService.cpp` / Carpet / Table / Wall
+
+---
+
 ## Execution Order
 
 ```
-Item 1 (parse perf)      — 30 min, independent, zero risk
+Items 1, 5, 6, 8, 10      — Independent, low risk
     ↓
-Item 5 (DrawContext dedup) — 30 min, independent, zero risk
-Item 6 (border structs)    — 20 min, independent, zero risk
+Items 12, 13, 14          — Const-correctness, DRY, and markChanged fixes
     ↓
-Item 4 (global state)      — 2 hr, touches DrawContext, blocks nothing
+Item 9 (global state)     — Random number generator updates
+Item 4 (alt-replace)      — Alt-replace global state refactor
     ↓
-Item 2 (WallDecorationBrush) — 1 hr, clean separation
+Item 2 (WallDeco)         — Wall decoration separate file
+Item 3 (const_cast)       — Preview provider mutable updates
     ↓
-Item 3 (const_cast)       — 2 hr, mechanical, 8 files
+Item 15 (Performance)     — Autoborder diff & serialization optimizations
     ↓
-Item 7 (file splits)      — 4 hr, depends on Item 2 for WallDecorationBrush
+Items 7, 11 (Splits)      — Large file splits & lambda extractions
 ```
-
-Items 1+5+6 can be done in parallel. Item 4 is the most important architecturally (violates "no global state") but also the highest risk — do it after low-risk items and before the larger refactors.
 
 ---
 
@@ -346,4 +522,13 @@ Items 1+5+6 can be done in parallel. Item 4 is the most important architecturall
 | 5 | Deduplicate DrawContext construction | 30 min | Zero |
 | 6 | Border struct cleanup | 20 min | Zero |
 | 7 | File size refactors (7 new files) | 4 hr | Medium |
-| | **Total** | **~10.5 hr** | |
+| 8 | PositionHash sign-extension bug | 15 min | Low |
+| 9 | Thread-local / static RNG violations | 1 hr | Low |
+| 10 | Layering & relative include violations | 1.5 hr | Low |
+| 11 | Overly complex functions & settings splits | 3 hr | Medium |
+| 12 | Const correctness & observer leaks | 2 hr | Low |
+| 13 | Duplicate wall & door resolution logic | 1.5 hr | Low |
+| 14 | Missing map.markChanged() & waypoint drag | 1.5 hr | Low |
+| 15 | Performance bottlenecks (diffs & equality) | 2.5 hr | Medium |
+| | **Total** | **~25.25 hr** | |
+

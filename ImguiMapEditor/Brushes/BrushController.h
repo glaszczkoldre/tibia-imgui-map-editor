@@ -190,12 +190,12 @@ public:
   std::optional<ResolvedBrushSelection>
   resolveBrushFromTile(const Domain::Tile &tile,
                        BrushPickMode mode = BrushPickMode::Smart,
-                       const Domain::Item *preferredItem = nullptr);
+                       const Domain::Item *preferredItem = nullptr) const;
 
   [[nodiscard]] bool
   canSelectBrushFromTile(const Domain::Tile &tile,
                          BrushPickMode mode = BrushPickMode::Smart,
-                         const Domain::Item *preferredItem = nullptr) {
+                         const Domain::Item *preferredItem = nullptr) const {
     return resolveBrushFromTile(tile, mode, preferredItem).has_value();
   }
 
@@ -410,9 +410,10 @@ private:
   // Track positions painted in current stroke (to avoid duplicates)
   struct PositionHash {
     size_t operator()(const std::tuple<int32_t, int32_t, int16_t> &p) const {
-      return std::hash<int64_t>()(static_cast<int64_t>(std::get<0>(p)) |
-                                  (static_cast<int64_t>(std::get<1>(p)) << 20) |
-                                  (static_cast<int64_t>(std::get<2>(p)) << 40));
+      const uint64_t x = static_cast<uint64_t>(std::get<0>(p)) & 0xFFFFF; // 20 bits
+      const uint64_t y = static_cast<uint64_t>(std::get<1>(p)) & 0xFFFFF; // 20 bits
+      const uint64_t z = static_cast<uint64_t>(std::get<2>(p)) & 0xFFFF;  // 16 bits
+      return std::hash<uint64_t>()(x | (y << 20) | (z << 40));
     }
   };
   std::unordered_set<std::tuple<int32_t, int32_t, int16_t>, PositionHash>
@@ -468,8 +469,22 @@ private:
   DoorBrush *getDoorBrushForType(DoorType type) const;
   std::optional<ResolvedBrushSelection> lastBrushSelection_;
 
+  // Brush resolution helper methods
+  std::optional<ResolvedBrushSelection> makeSelection(const IBrush *brush, BrushPickMode selectionMode, std::string displayName = {}) const;
+  std::optional<ResolvedBrushSelection> selectFlagBrush(Domain::TileFlag flag) const;
+  std::optional<ResolvedBrushSelection> selectBrushById(BrushId brushId, BrushPickMode selectionMode) const;
+  std::optional<ResolvedBrushSelection> selectPreferredBrushByType(BrushType type, BrushPickMode selectionMode, const Domain::Item *preferredItem) const;
+  std::optional<ResolvedBrushSelection> selectDoorBrush(const Domain::Tile &tile, const Domain::Item *preferredItem) const;
+  std::optional<ResolvedBrushSelection> selectGroundBrush(const Domain::Tile &tile) const;
+  std::optional<ResolvedBrushSelection> selectRawBrush(const Domain::Tile &tile, const Domain::Item *preferredItem) const;
+  std::optional<ResolvedBrushSelection> selectHouseExitBrush(const Domain::Tile &tile) const;
+  std::optional<ResolvedBrushSelection> selectWaypointBrush(const Domain::Tile &tile) const;
+  std::optional<ResolvedBrushSelection> selectOptionalBorderBrush(const Domain::Tile &tile) const;
+  std::optional<ResolvedBrushSelection> selectCollectionBrush(const Domain::Tile &tile, const Domain::Item *preferredItem) const;
+  std::optional<ResolvedBrushSelection> selectSpecificMode(const Domain::Tile &tile, BrushPickMode pickMode, const Domain::Item *preferredItem) const;
+
   // Alt-replace state for GroundBrush (per-stroke, replaces global)
-  DrawContext::AltGroundReplaceState altReplaceState_;
+  mutable DrawContext::AltGroundReplaceState altReplaceState_;
 };
 
 } // namespace MapEditor::Brushes

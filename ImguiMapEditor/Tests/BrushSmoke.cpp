@@ -1337,7 +1337,7 @@ void requireGroundSequentialVsBatchedParity(const fs::path &tempDir) {
     intent.positions.assign(positions.begin(), positions.end());
     auto diffs = engine.plan(map, intent);
     require(!diffs.empty(), "batched parity plan produced no diffs");
-    MapEditor::Services::Autoborder::applyTileDiffs(map, diffs);
+    MapEditor::Services::Autoborder::applyTileDiffs(map, std::move(diffs));
   };
 
   paintBatched(batchedMap, *dirtBrush, sequentialPositions);

@@ -184,6 +184,7 @@ public:
     }
     
     std::unique_ptr<Item> clone() const;
+    bool hasSameState(const Item* other) const;
 
 private:
     void ensureExtended();  // Allocate extended attributes if needed

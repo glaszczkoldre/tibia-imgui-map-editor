@@ -22,7 +22,7 @@ bool DoodadAlternative::hasContent() const {
   return !singles_.empty() || !composites_.empty();
 }
 
-SingleItem DoodadAlternative::selectRandomSingle() const {
+SingleItem DoodadAlternative::selectRandomSingle(std::mt19937 &rng) const {
   if (singles_.empty()) {
     return SingleItem{};
   }
@@ -33,11 +33,11 @@ SingleItem DoodadAlternative::selectRandomSingle() const {
     weights.push_back(item.chance);
   }
 
-  const auto selected = WeightedSelection::select(weights);
+  const auto selected = WeightedSelection::select(rng, weights);
   return selected ? singles_[*selected] : singles_.front();
 }
 
-const CompositeItem *DoodadAlternative::selectRandomComposite() const {
+const CompositeItem *DoodadAlternative::selectRandomComposite(std::mt19937 &rng) const {
   if (composites_.empty()) {
     return nullptr;
   }
@@ -48,7 +48,7 @@ const CompositeItem *DoodadAlternative::selectRandomComposite() const {
     weights.push_back(comp.chance);
   }
 
-  const auto selected = WeightedSelection::select(weights);
+  const auto selected = WeightedSelection::select(rng, weights);
   return selected ? &composites_[*selected] : &composites_.front();
 }
 

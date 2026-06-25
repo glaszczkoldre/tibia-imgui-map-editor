@@ -21,7 +21,7 @@ bool BorderBlock::hasItemsFor(EdgeType edge) const {
   return idx < kEdgeTypeCount && !items_[idx].empty();
 }
 
-uint32_t BorderBlock::getRandomItem(EdgeType edge) const {
+uint32_t BorderBlock::getRandomItem(EdgeType edge, std::mt19937 &rng) const {
   auto idx = static_cast<size_t>(edge);
   if (idx >= kEdgeTypeCount || items_[idx].empty()) {
     return 0;
@@ -45,7 +45,7 @@ uint32_t BorderBlock::getRandomItem(EdgeType edge) const {
     weights.push_back(chance);
   }
 
-  const auto selected = WeightedSelection::select(weights);
+  const auto selected = WeightedSelection::select(rng, weights);
   return selected ? edgeItems[*selected].first : edgeItems.front().first;
 }
 

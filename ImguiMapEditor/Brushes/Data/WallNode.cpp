@@ -12,7 +12,7 @@ void WallNode::addItem(uint32_t itemId, uint32_t chance) {
   items_.emplace_back(itemId, chance);
 }
 
-uint32_t WallNode::getRandomItem() const {
+uint32_t WallNode::getRandomItem(std::mt19937 &rng) const {
   if (items_.empty()) {
     return 0;
   }
@@ -23,7 +23,7 @@ uint32_t WallNode::getRandomItem() const {
     weights.push_back(chance);
   }
 
-  const auto selected = WeightedSelection::select(weights);
+  const auto selected = WeightedSelection::select(rng, weights);
   return selected ? items_[*selected].first : items_.front().first;
 }
 

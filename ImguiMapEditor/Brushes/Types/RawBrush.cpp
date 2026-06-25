@@ -6,7 +6,7 @@
 #include "Domain/ItemType.h"
 namespace MapEditor::Brushes {
 
-RawBrush::RawBrush(uint32_t itemId, const Domain::ItemType* type)
+RawBrush::RawBrush(uint16_t itemId, const Domain::ItemType* type)
     : BrushBase("RAW:" + std::to_string(itemId), itemId, true)
     , itemId_(itemId)
     , cachedType_(type) 
@@ -14,7 +14,7 @@ RawBrush::RawBrush(uint32_t itemId, const Domain::ItemType* type)
     // For raw brushes, lookId is the same as itemId
 }
 
-void RawBrush::draw(Domain::ChunkedMap& /*map*/, 
+void RawBrush::draw(Domain::ChunkedMap& map, 
                     Domain::Tile* tile,
                     const DrawContext& ctx) 
 {
@@ -32,9 +32,10 @@ void RawBrush::draw(Domain::ChunkedMap& /*map*/,
 
     // Add to tile (sorting is handled by Tile::addItem)
     tile->addItem(std::move(item));
+    map.markChanged();
 }
 
-void RawBrush::undraw(Domain::ChunkedMap& /*map*/, 
+void RawBrush::undraw(Domain::ChunkedMap& map, 
                       Domain::Tile* tile) 
 {
     if (!tile) {
@@ -46,6 +47,7 @@ void RawBrush::undraw(Domain::ChunkedMap& /*map*/,
     tile->removeItemsIf([this](const Domain::Item* item) {
         return ownsItem(item);
     });
+    map.markChanged();
 }
 
 bool RawBrush::ownsItem(const Domain::Item* item) const {

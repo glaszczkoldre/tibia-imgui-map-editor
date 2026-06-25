@@ -20,7 +20,7 @@ namespace MapEditor::Services::Preview {
 class DoodadBrushPreviewProvider : public IPreviewProvider {
 public:
   DoodadBrushPreviewProvider(const Brushes::DoodadBrush &brush,
-                             BrushSettingsService *brushSettings = nullptr,
+                             const BrushSettingsService *brushSettings = nullptr,
                              const Domain::ChunkedMap *map = nullptr);
 
   bool isActive() const override;
@@ -29,7 +29,6 @@ public:
   PreviewBounds getBounds() const override;
   PreviewStyle getStyle() const override;
   void updateCursorPosition(const Domain::Position &cursor) override;
-  bool needsRegeneration() const override { return needsRegen_; }
   void regenerate() override;
   std::optional<uint32_t> getCurrentSeed() const override;
 
@@ -39,7 +38,7 @@ private:
   uint32_t buildStableSeed() const;
 
   const Brushes::DoodadBrush &brush_;
-  BrushSettingsService *brushSettings_ = nullptr;
+  const BrushSettingsService *brushSettings_ = nullptr;
   const Domain::ChunkedMap *map_ = nullptr;
   Domain::Position anchor_{0, 0, 0};
   mutable std::vector<PreviewTileData> tiles_;

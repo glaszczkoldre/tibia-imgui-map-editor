@@ -195,6 +195,7 @@ public:
 
   // Clone the tile
   std::unique_ptr<Tile> clone() const;
+  bool hasSameState(const Tile* other) const;
 
   // Hangable hook support (for doors/pictures)
   // Checks if any item on this tile provides HOOK_SOUTH or HOOK_EAST support

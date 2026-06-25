@@ -1,7 +1,5 @@
 #include "BrushSystem.h"
 #include "Services/ConfigService.h"
-#include "UI/Panels/BrushSizePanel.h"
-#include "UI/Widgets/TilesetWidget.h"
 #include <filesystem>
 #include <spdlog/spdlog.h>
 
@@ -9,11 +7,7 @@ namespace MapEditor {
 namespace Brushes {
 
 BrushSystem::BrushSystem()
-    : tileset_service_(registry_),
-      tileset_widget_(std::make_unique<UI::TilesetWidget>()),
-      brush_size_panel_(std::make_unique<UI::Panels::BrushSizePanel>(
-          &settings_service_, &controller_,
-          [this]() { saveBrushes(); })) {
+    : tileset_service_(registry_) {
   // Wire the settings service to the controller for multi-tile painting
   controller_.setBrushSettingsService(&settings_service_);
   controller_.setBrushRegistry(&registry_);

@@ -2,10 +2,11 @@
 #include "BrushUtils.h"
 #include "Domain/Tile.h"
 #include "Domain/Item.h"
+#include "Domain/ChunkedMap.h"
 
 namespace MapEditor::Brushes {
 
-void WallDecorationBrush::draw(Domain::ChunkedMap &, Domain::Tile *tile,
+void WallDecorationBrush::draw(Domain::ChunkedMap &map, Domain::Tile *tile,
                                const DrawContext &ctx) {
   if (!tile) {
     return;
@@ -49,14 +50,16 @@ void WallDecorationBrush::draw(Domain::ChunkedMap &, Domain::Tile *tile,
     tile->insertItem(index + 1, Types::createTypedItem(ctx, decorationId));
     ++index;
   }
+  map.markChanged();
 }
 
-void WallDecorationBrush::undraw(Domain::ChunkedMap &, Domain::Tile *tile) {
+void WallDecorationBrush::undraw(Domain::ChunkedMap &map, Domain::Tile *tile) {
   if (!tile) {
     return;
   }
 
   tile->removeItemsIf([this](const Domain::Item *item) { return ownsItem(item); });
+  map.markChanged();
 }
 
 } // namespace MapEditor::Brushes

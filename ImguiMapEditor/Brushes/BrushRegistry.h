@@ -7,6 +7,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <random>
 
 namespace MapEditor::Domain {
 class Item;
@@ -35,12 +36,14 @@ public:
     uint16_t groundEquivalent = 0;
   };
 
-  BrushRegistry() noexcept = default;
+  BrushRegistry() noexcept;
   ~BrushRegistry() noexcept = default;
 
   // Non-copyable
   BrushRegistry(const BrushRegistry &) = delete;
   BrushRegistry &operator=(const BrushRegistry &) = delete;
+
+  std::mt19937 &getRng() noexcept { return rng_; }
 
   // ========== Brush Management ==========
 
@@ -112,6 +115,7 @@ private:
   std::unordered_map<std::string, BrushId> brush_ids_by_name_;
   BrushId nextBrushId_ = 1;
   Services::ClientDataService *clientData_ = nullptr;
+  std::mt19937 rng_;
 };
 
 } // namespace MapEditor::Brushes

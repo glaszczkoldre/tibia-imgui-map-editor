@@ -47,7 +47,7 @@ buildPreviewOffsets(const BrushSettingsService *brushSettings) {
 } // namespace
 
 RawBrushPreviewProvider::RawBrushPreviewProvider(
-    uint32_t itemId, uint16_t subtype, BrushSettingsService *brushSettings)
+    uint32_t itemId, uint16_t subtype, const BrushSettingsService *brushSettings)
     : itemId_(itemId), subtype_(subtype), brushSettings_(brushSettings) {
   buildPreview();
 }

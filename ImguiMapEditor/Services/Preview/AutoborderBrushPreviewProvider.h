@@ -20,7 +20,7 @@ namespace MapEditor::Services::Preview {
 class AutoborderBrushPreviewProvider final : public IPreviewProvider {
 public:
   AutoborderBrushPreviewProvider(const ::MapEditor::Brushes::IBrush *brush,
-                                 BrushSettingsService *brushSettings,
+                                 const BrushSettingsService *brushSettings,
                                  const Domain::ChunkedMap *map);
 
   bool isActive() const override;
@@ -30,7 +30,6 @@ public:
   void updateCursorPosition(const Domain::Position &cursor) override;
   PreviewStyle getStyle() const override;
 
-  bool needsRegeneration() const override { return needsRegen_; }
   void regenerate() override { needsRegen_ = true; }
 
 private:
@@ -38,7 +37,7 @@ private:
   std::vector<Domain::Position> getPlacementPositions() const;
 
   const ::MapEditor::Brushes::IBrush *brush_ = nullptr;
-  BrushSettingsService *brushSettings_ = nullptr;
+  const BrushSettingsService *brushSettings_ = nullptr;
   const Domain::ChunkedMap *map_ = nullptr;
   Autoborder::AutoborderEngine engine_;
 

@@ -53,7 +53,7 @@ DrawContext BrushController::createDrawContext(uint32_t modifiers,
   ctx.brushRegistry = registry_;
   ctx.ownerBrushId =
       registry_ ? registry_->getBrushId(currentBrush_) : InvalidBrushId;
-  ctx.altReplace = altReplaceState_;
+  ctx.altReplace = &altReplaceState_;
   return ctx;
 }
 

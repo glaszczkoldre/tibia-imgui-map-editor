@@ -13,7 +13,7 @@ namespace MapEditor::Services::Preview {
 class MultiItemBrushPreviewProvider : public IPreviewProvider {
 public:
   MultiItemBrushPreviewProvider(std::vector<PreviewTileData> prototypeTiles,
-                                BrushSettingsService *brushSettings = nullptr,
+                                const BrushSettingsService *brushSettings = nullptr,
                                 bool repeatByBrushShape = true);
 
   bool isActive() const override { return !prototypeTiles_.empty(); }
@@ -24,7 +24,6 @@ public:
   void updateCursorPosition(const Domain::Position &cursor) override {
     anchor_ = cursor;
   }
-  bool needsRegeneration() const override { return needsRegen_; }
   void regenerate() override;
 
 private:
@@ -32,7 +31,7 @@ private:
   void buildPreview() const;
 
   std::vector<PreviewTileData> prototypeTiles_;
-  BrushSettingsService *brushSettings_ = nullptr;
+  const BrushSettingsService *brushSettings_ = nullptr;
   bool repeatByBrushShape_ = true;
   Domain::Position anchor_{0, 0, 0};
   mutable std::vector<PreviewTileData> tiles_;

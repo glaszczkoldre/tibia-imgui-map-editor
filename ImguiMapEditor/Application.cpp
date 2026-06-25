@@ -35,6 +35,8 @@
 
 // UI Factory
 #include "Application/UIFactory.h"
+#include "UI/Widgets/TilesetWidget.h"
+#include "UI/Panels/BrushSizePanel.h"
 // Utilities
 #include "Presentation/NotificationHelper.h"
 namespace MapEditor {
@@ -126,7 +128,7 @@ void Application::initializeUIComponents() {
       .otbm_settings = settings_registry_->getOtbmSettings(),
       .tab_manager = tab_manager_,
       .state_manager = state_manager_,
-      .tileset_widget = brush_system_->getTilesetWidget(),
+      .brush_system = *brush_system_,
       .brush_controller = brush_system_->getController(),
       .brush_registry = brush_system_->getRegistry(),
       .tileset_service = brush_system_->getTilesetService()};
@@ -377,7 +379,7 @@ void Application::render() {
       .advanced_search_dialog =
           ui_.search_controller->getAdvancedSearchDialog(),
       .search_results_widget = ui_.search_controller->getSearchResultsWidget(),
-      .tileset_widget = &brush_system_->getTilesetWidget(),
+      .tileset_widget = ui_.tileset_widget.get(),
       .palette_window_manager = ui_.palette_window_manager.get(),
       .startup_dialog = ui_.startup_dialog.get(),
       .startup_controller = ui_.startup_controller.get(),
@@ -385,7 +387,7 @@ void Application::render() {
       .dialogs = &dialogs_,
       // Brush system (for preview rendering)
       .brush_controller = &brush_system_->getController(),
-      .brush_size_panel = &brush_system_->getBrushSizePanel(),
+      .brush_size_panel = ui_.brush_size_panel.get(),
       // Map operations (for compatibility popup)
       .map_operations = ui_.map_operations.get(),
       // Callbacks

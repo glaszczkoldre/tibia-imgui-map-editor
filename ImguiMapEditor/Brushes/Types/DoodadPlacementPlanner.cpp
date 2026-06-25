@@ -84,10 +84,10 @@ getAnchors(bool oneSize,
 }
 
 DoodadBrush::DoodadLayout
-buildSingleCandidate(const DoodadAlternative &alternative, int anchorX,
+buildSingleCandidate(const DoodadAlternative &alternative, std::mt19937 &rng, int anchorX,
                      int anchorY) {
   DoodadBrush::DoodadLayout candidate;
-  const auto item = alternative.selectRandomSingle();
+  const auto item = alternative.selectRandomSingle(rng);
   if (item.itemId == 0) {
     return candidate;
   }
@@ -99,10 +99,10 @@ buildSingleCandidate(const DoodadAlternative &alternative, int anchorX,
 }
 
 DoodadBrush::DoodadLayout
-buildCompositeCandidate(const DoodadAlternative &alternative, int anchorX,
+buildCompositeCandidate(const DoodadAlternative &alternative, std::mt19937 &rng, int anchorX,
                         int anchorY) {
   DoodadBrush::DoodadLayout candidate;
-  const auto *composite = alternative.selectRandomComposite();
+  const auto *composite = alternative.selectRandomComposite(rng);
   if (!composite) {
     return candidate;
   }
@@ -122,24 +122,24 @@ buildCompositeCandidate(const DoodadAlternative &alternative, int anchorX,
 }
 
 DoodadBrush::DoodadLayout
-buildRandomCandidate(const DoodadAlternative &alternative, uint32_t singleChance,
+buildRandomCandidate(const DoodadAlternative &alternative, std::mt19937 &rng, uint32_t singleChance,
                      uint32_t compositeChance, int anchorX, int anchorY) {
   const auto totalChance = singleChance + compositeChance;
   const bool useComposite =
       compositeChance > 0 &&
       (singleChance == 0 ||
-       WeightedSelection::randomRange(1, totalChance) > singleChance);
-  return useComposite ? buildCompositeCandidate(alternative, anchorX, anchorY)
-                      : buildSingleCandidate(alternative, anchorX, anchorY);
+       WeightedSelection::randomRange(rng, 1, totalChance) > singleChance);
+  return useComposite ? buildCompositeCandidate(alternative, rng, anchorX, anchorY)
+                      : buildSingleCandidate(alternative, rng, anchorX, anchorY);
 }
 
-int calculateObjectCount(size_t area, float thickness) {
+int calculateObjectCount(size_t area, float thickness, std::mt19937 &rng) {
   const auto objectRange =
       static_cast<uint32_t>(static_cast<float>(std::max<size_t>(1, area)) *
                             std::max(0.0f, thickness));
   return static_cast<int>(
       std::max<uint32_t>(1, objectRange +
-                                WeightedSelection::randomRange(0, objectRange)));
+                                WeightedSelection::randomRange(rng, 0, objectRange)));
 }
 
 void appendSkip(std::vector<DoodadBrush::PlacementSkip> &skipped,
@@ -160,12 +160,14 @@ dedupeAndSort(std::vector<Domain::Position> positions) {
 
 DoodadBrush::PlacementPlan DoodadPlacementPlanner::buildPlan(
     const Request &request) {
-  if (!request.seed) {
-    return buildPlanUnseeded(request);
+  std::mt19937 rng;
+  if (request.seed) {
+    rng.seed(*request.seed);
+  } else {
+    std::random_device rd;
+    rng.seed(rd());
   }
-
-  WeightedSelection::ScopedSeed scopedSeed(*request.seed);
-  return buildPlanUnseeded(request);
+  return buildPlanUnseeded(request, rng);
 }
 
 DoodadBrush::DoodadLayout
@@ -329,8 +331,8 @@ std::vector<Domain::Position> DoodadPlacementPlanner::buildAffectedPositions(
 }
 
 DoodadBrush::PlacementPlan
-DoodadPlacementPlanner::buildPlanUnseeded(const Request &request) {
-  auto result = buildLayoutUnseeded(request);
+DoodadPlacementPlanner::buildPlanUnseeded(const Request &request, std::mt19937 &rng) {
+  auto result = buildLayoutUnseeded(request, rng);
   auto redoTouches = buildRedoTouches(request, result.layout);
   auto affectedPositions =
       buildAffectedPositions(request, result.layout, redoTouches);
@@ -385,7 +387,7 @@ buildSpecificCompositeCandidate(const DoodadAlternative &alternative,
 }
 
 DoodadPlacementPlanner::LayoutBuildResult
-DoodadPlacementPlanner::buildLayoutUnseeded(const Request &request) {
+DoodadPlacementPlanner::buildLayoutUnseeded(const Request &request, std::mt19937 &rng) {
   LayoutBuildResult result;
   const auto *alternative =
       request.brush.selectAlternative(request.preferredVariation);
@@ -409,7 +411,7 @@ DoodadPlacementPlanner::buildLayoutUnseeded(const Request &request) {
       const auto scatterMode = !request.brush.oneSize_ && anchors.size() > 1;
       const int count = scatterMode
                             ? calculateObjectCount(anchors.size(),
-                                                   request.brush.thickness_)
+                                                   request.brush.thickness_, rng)
                             : static_cast<int>(anchors.size());
 
       std::vector<size_t> order(anchors.size());
@@ -417,7 +419,7 @@ DoodadPlacementPlanner::buildLayoutUnseeded(const Request &request) {
         order[j] = j;
       }
       if (scatterMode) {
-        WeightedSelection::shuffleIndices(order);
+        WeightedSelection::shuffleIndices(rng, order);
       }
 
       size_t placed = 0;
@@ -453,15 +455,15 @@ DoodadPlacementPlanner::buildLayoutUnseeded(const Request &request) {
   std::unordered_set<uint64_t> skippedKeys;
   if (scatterMode) {
     const auto objectCount =
-        calculateObjectCount(anchors.size(), request.brush.thickness_);
+        calculateObjectCount(anchors.size(), request.brush.thickness_, rng);
 
     for (int objectIndex = 0; objectIndex < objectCount; ++objectIndex) {
       for (size_t attempt = 0; attempt < 5; ++attempt) {
         const auto anchorIndex =
-            WeightedSelection::randomRange(0,
+            WeightedSelection::randomRange(rng, 0,
                                            static_cast<uint32_t>(anchors.size() - 1));
         const auto &[anchorX, anchorY] = anchors[anchorIndex];
-        auto candidate = buildRandomCandidate(*alternative, singleChance,
+        auto candidate = buildRandomCandidate(*alternative, rng, singleChance,
                                               compositeChance, anchorX, anchorY);
         if (tryAppendCandidate(request, result.layout, result.skipped,
                                skippedKeys, occupied, candidate)) {
@@ -475,7 +477,7 @@ DoodadPlacementPlanner::buildLayoutUnseeded(const Request &request) {
 
   for (const auto &[anchorX, anchorY] : anchors) {
     for (size_t attempt = 0; attempt < maxAttempts; ++attempt) {
-      auto candidate = buildRandomCandidate(*alternative, singleChance,
+      auto candidate = buildRandomCandidate(*alternative, rng, singleChance,
                                             compositeChance, anchorX, anchorY);
       if (tryAppendCandidate(request, result.layout, result.skipped,
                              skippedKeys, occupied, candidate)) {
@@ -484,8 +486,8 @@ DoodadPlacementPlanner::buildLayoutUnseeded(const Request &request) {
 
       if (attempt + 1 == maxAttempts) {
         candidate = singleChance > 0
-                        ? buildSingleCandidate(*alternative, anchorX, anchorY)
-                        : buildCompositeCandidate(*alternative, anchorX,
+                        ? buildSingleCandidate(*alternative, rng, anchorX, anchorY)
+                        : buildCompositeCandidate(*alternative, rng, anchorX,
                                                   anchorY);
         tryAppendCandidate(request, result.layout, result.skipped, skippedKeys,
                            occupied, candidate);

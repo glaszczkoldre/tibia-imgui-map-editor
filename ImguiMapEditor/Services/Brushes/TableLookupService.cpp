@@ -9,14 +9,13 @@ namespace MapEditor {
 namespace Services {
 namespace Brushes {
 
-TableLookupService::TableLookupService() { initializeTable(); }
+#include "TableLookupTable.inc"
+
+TableLookupService::TableLookupService() = default;
 
 TableAlign TableLookupService::getTableType(TileNeighbor neighbors) const noexcept {
-  return table_[static_cast<uint8_t>(neighbors)];
+  return kTableLookupTable[static_cast<uint8_t>(neighbors)];
 }
-
-// Include the auto-generated lookup table
-#include "TableLookupTable.inc"
 
 } // namespace Brushes
 } // namespace Services

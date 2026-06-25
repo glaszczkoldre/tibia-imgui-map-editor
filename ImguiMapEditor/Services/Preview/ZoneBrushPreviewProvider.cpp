@@ -4,7 +4,7 @@
 namespace MapEditor::Services::Preview {
 
 ZoneBrushPreviewProvider::ZoneBrushPreviewProvider(
-    uint32_t color, BrushSettingsService *brushSettings)
+    uint32_t color, const BrushSettingsService *brushSettings)
     : color_(color), brushSettings_(brushSettings) {
   buildPreview();
 }

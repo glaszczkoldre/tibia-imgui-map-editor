@@ -6,7 +6,7 @@ namespace MapEditor::Services::Preview {
 
 MultiItemBrushPreviewProvider::MultiItemBrushPreviewProvider(
     std::vector<PreviewTileData> prototypeTiles,
-    BrushSettingsService *brushSettings, bool repeatByBrushShape)
+    const BrushSettingsService *brushSettings, bool repeatByBrushShape)
     : prototypeTiles_(std::move(prototypeTiles)),
       brushSettings_(brushSettings), repeatByBrushShape_(repeatByBrushShape) {
   buildPreview();

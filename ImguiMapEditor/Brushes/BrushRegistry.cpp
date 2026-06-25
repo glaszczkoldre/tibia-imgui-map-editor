@@ -13,6 +13,11 @@
 
 namespace MapEditor::Brushes {
 
+BrushRegistry::BrushRegistry() noexcept {
+    std::random_device rd;
+    rng_.seed(rd());
+}
+
 std::string BrushRegistry::normalizeKey(const std::string &value) {
     std::string normalized = value;
     std::transform(normalized.begin(), normalized.end(), normalized.begin(),

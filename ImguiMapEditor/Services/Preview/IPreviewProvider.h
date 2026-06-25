@@ -68,11 +68,7 @@ public:
      */
     virtual PreviewStyle getStyle() const { return PreviewStyle::Ghost; }
     
-    /**
-     * Check if preview needs regeneration after parameter change.
-     * Default returns false (static preview data).
-     */
-    virtual bool needsRegeneration() const { return false; }
+
     
     /**
      * Regenerate preview tiles if content depends on parameters.

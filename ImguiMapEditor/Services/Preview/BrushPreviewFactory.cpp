@@ -40,7 +40,7 @@ namespace MapEditor::Services::Preview {
 
 std::unique_ptr<IPreviewProvider>
 BrushPreviewFactory::createProvider(const Brushes::IBrush *brush,
-                                    BrushSettingsService *settings,
+                                    const BrushSettingsService *settings,
                                     const Domain::ChunkedMap *map) {
   if (!brush) {
     return nullptr;

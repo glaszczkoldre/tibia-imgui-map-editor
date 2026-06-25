@@ -242,6 +242,57 @@ std::unique_ptr<Tile> Tile::clone() const {
   return tile;
 }
 
+bool Tile::hasSameState(const Tile* other) const {
+  if (!other) return false;
+  if (this == other) return true;
+
+  if (position_ != other->position_ ||
+      flags_ != other->flags_ ||
+      house_id_ != other->house_id_ ||
+      optional_border_ != other->optional_border_ ||
+      ground_brush_id_ != other->ground_brush_id_ ||
+      optional_border_brush_id_ != other->optional_border_brush_id_ ||
+      spawn_brush_id_ != other->spawn_brush_id_ ||
+      creature_brush_id_ != other->creature_brush_id_ ||
+      house_brush_id_ != other->house_brush_id_ ||
+      house_exit_brush_id_ != other->house_exit_brush_id_ ||
+      house_exit_house_id_ != other->house_exit_house_id_ ||
+      waypoint_brush_id_ != other->waypoint_brush_id_ ||
+      protection_zone_brush_id_ != other->protection_zone_brush_id_ ||
+      no_pvp_brush_id_ != other->no_pvp_brush_id_ ||
+      no_logout_brush_id_ != other->no_logout_brush_id_ ||
+      pvp_zone_brush_id_ != other->pvp_zone_brush_id_ ||
+      refresh_brush_id_ != other->refresh_brush_id_) {
+    return false;
+  }
+
+  // Ground item comparison
+  if (ground_ || other->ground_) {
+    if (!ground_ || !other->ground_) return false;
+    if (!ground_->hasSameState(other->ground_.get())) return false;
+  }
+
+  // Stacked items comparison
+  if (items_.size() != other->items_.size()) return false;
+  for (size_t i = 0; i < items_.size(); ++i) {
+    if (!items_[i]->hasSameState(other->items_[i].get())) return false;
+  }
+
+  // Spawn comparison
+  if (spawn_ || other->spawn_) {
+    if (!spawn_ || !other->spawn_) return false;
+    if (spawn_->radius != other->spawn_->radius) return false;
+  }
+
+  // Creature comparison
+  if (creature_ || other->creature_) {
+    if (!creature_ || !other->creature_) return false;
+    if (creature_->name != other->creature_->name) return false;
+  }
+
+  return true;
+}
+
 bool Tile::hasHookSouth() const {
   // Check all items (including ground) for hook_south property
   if (ground_) {

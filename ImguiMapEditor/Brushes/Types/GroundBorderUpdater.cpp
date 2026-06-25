@@ -205,7 +205,7 @@ void GroundBrush::updateBorderItems(Domain::ChunkedMap &map,
       return false;
     }
 
-    const auto itemId = static_cast<uint16_t>(block.getRandomItem(edge));
+    const auto itemId = static_cast<uint16_t>(block.getRandomItem(edge, registry_.getRng()));
     if (itemId == 0) {
       return false;
     }

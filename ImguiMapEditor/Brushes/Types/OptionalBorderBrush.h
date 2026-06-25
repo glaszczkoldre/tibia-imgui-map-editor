@@ -13,6 +13,11 @@ public:
   void draw(Domain::ChunkedMap &map, Domain::Tile *tile,
             const DrawContext &ctx) override;
   void undraw(Domain::ChunkedMap &map, Domain::Tile *tile) override;
+
+  void setBrushRegistry(const BrushRegistry *registry) { registry_ = registry; }
+
+private:
+  const BrushRegistry *registry_ = nullptr;
 };
 
 } // namespace MapEditor::Brushes

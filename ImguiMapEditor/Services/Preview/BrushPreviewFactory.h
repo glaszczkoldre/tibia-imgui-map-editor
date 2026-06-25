@@ -30,7 +30,7 @@ public:
    */
   std::unique_ptr<IPreviewProvider>
   createProvider(const ::MapEditor::Brushes::IBrush *brush,
-                 BrushSettingsService *settings,
+                 const BrushSettingsService *settings,
                  const ::MapEditor::Domain::ChunkedMap *map = nullptr);
 };
 

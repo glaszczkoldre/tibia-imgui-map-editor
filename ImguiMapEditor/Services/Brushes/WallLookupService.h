@@ -4,7 +4,7 @@
  * @brief Provides wall alignment lookups based on 4-neighbor configuration.
  */
 
-#include "../../Brushes/Enums/BrushEnums.h"
+#include "Brushes/Enums/BrushEnums.h"
 #include <array>
 
 namespace MapEditor {
@@ -36,10 +36,6 @@ public:
    */
   [[nodiscard]] WallAlign getHalfType(WallNeighbor neighbors) const noexcept;
 
-private:
-  void initializeTable();
-  std::array<WallAlign, 16> fullTable_;
-  std::array<WallAlign, 16> halfTable_;
 };
 
 } // namespace Brushes

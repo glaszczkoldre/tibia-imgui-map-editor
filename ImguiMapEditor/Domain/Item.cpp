@@ -193,5 +193,57 @@ std::unique_ptr<Item> Item::clone() const {
     return std::make_unique<Item>(*this);
 }
 
+bool Item::hasSameState(const Item* other) const {
+    if (!other) return false;
+    if (this == other) return true;
+
+    if (server_id_ != other->server_id_ ||
+        client_id_ != other->client_id_ ||
+        owner_brush_id_ != other->owner_brush_id_) {
+        return false;
+    }
+
+    if (data_.action_id != other->data_.action_id ||
+        data_.unique_id != other->data_.unique_id ||
+        data_.count != other->data_.count ||
+        data_.charges != other->data_.charges ||
+        data_.tier != other->data_.tier ||
+        data_.duration != other->data_.duration) {
+        return false;
+    }
+
+    // Compare extended attributes flags
+    if (data_.has_text != other->data_.has_text ||
+        data_.has_description != other->data_.has_description ||
+        data_.has_teleport != other->data_.has_teleport ||
+        data_.has_depot != other->data_.has_depot ||
+        data_.has_door != other->data_.has_door) {
+        return false;
+    }
+
+    if (extended_ || other->extended_) {
+        if (!extended_ || !other->extended_) return false;
+        if (extended_->text != other->extended_->text ||
+            extended_->description != other->extended_->description ||
+            extended_->depot_id != other->extended_->depot_id ||
+            extended_->door_id != other->extended_->door_id ||
+            extended_->teleport_dest != other->extended_->teleport_dest ||
+            extended_->generic_attributes != other->extended_->generic_attributes) {
+            return false;
+        }
+    }
+
+    if (container_items_.size() != other->container_items_.size()) {
+        return false;
+    }
+    for (size_t i = 0; i < container_items_.size(); ++i) {
+        if (!container_items_[i]->hasSameState(other->container_items_[i].get())) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 } // namespace Domain
 } // namespace MapEditor

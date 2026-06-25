@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <string>
 #include <vector>
+#include <random>
 
 
 namespace MapEditor::Brushes {
@@ -73,9 +74,11 @@ public:
 
   /**
    * Get a random item for a specific edge type using weighted selection.
+   * @param edge The edge type
+   * @param rng The random number generator
    * @return Item ID, or 0 if no items available
    */
-  uint32_t getRandomItem(EdgeType edge) const;
+  uint32_t getRandomItem(EdgeType edge, std::mt19937 &rng) const;
 
   /**
    * Get the canonical item for a specific edge type.

@@ -30,7 +30,7 @@ PlannedMutationResult applyPlannedIntentWithHistory(
     }
   }
 
-  applyTileDiffsWithHistory(map, history, diffs);
+  applyTileDiffsWithHistory(map, history, std::move(diffs));
   return PlannedMutationResult::Applied;
 }
 

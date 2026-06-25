@@ -167,7 +167,8 @@ void requirePlannedDrawMatchesController(
   require(!diffs.empty(), std::string(label).append(" produced no diffs"));
 
   auto expected = before->clone();
-  MapEditor::Services::Autoborder::applyTileDiffs(*expected, diffs);
+  auto expectedPositions = positionsFromDiffs(diffs);
+  MapEditor::Services::Autoborder::applyTileDiffs(*expected, std::move(diffs));
 
   controller.setBrush(brush);
   if (notifiedMutations) {
@@ -177,7 +178,7 @@ void requirePlannedDrawMatchesController(
           std::string(label).append(" controller draw failed"));
   requireMapsMatchInRegion(*expected, map, pos, 2, label);
   if (notifiedMutations) {
-    requireSamePositions(*notifiedMutations, positionsFromDiffs(diffs),
+    requireSamePositions(*notifiedMutations, expectedPositions,
                          std::string(label).append(" notification mismatch"));
   }
 }
@@ -202,7 +203,8 @@ void requirePlannedEraseMatchesController(
   require(!diffs.empty(), std::string(label).append(" produced no erase diffs"));
 
   auto expected = before->clone();
-  MapEditor::Services::Autoborder::applyTileDiffs(*expected, diffs);
+  auto expectedPositions = positionsFromDiffs(diffs);
+  MapEditor::Services::Autoborder::applyTileDiffs(*expected, std::move(diffs));
 
   controller.setBrush(brush);
   if (notifiedMutations) {
@@ -212,7 +214,7 @@ void requirePlannedEraseMatchesController(
           std::string(label).append(" controller erase failed"));
   requireMapsMatchInRegion(*expected, map, pos, 2, label);
   if (notifiedMutations) {
-    requireSamePositions(*notifiedMutations, positionsFromDiffs(diffs),
+    requireSamePositions(*notifiedMutations, expectedPositions,
                          std::string(label).append(" notification mismatch"));
   }
 }
@@ -406,7 +408,7 @@ void requireWallDragPlanSkipsNeighborResolve(
   }
 
   auto afterDrag = map.clone();
-  MapEditor::Services::Autoborder::applyTileDiffs(*afterDrag, dragDiffs);
+  MapEditor::Services::Autoborder::applyTileDiffs(*afterDrag, std::move(dragDiffs));
 
   auto resolveIntent = makeIntent(
       wallBrush, registry, settings, strokePositions.front(),
@@ -442,7 +444,7 @@ void requireBatchedVsSequentialPlanParity(
   require(!batchedDiffs.empty(),
           std::string(label).append(" batched plan produced no diffs"));
   auto batchedResult = before->clone();
-  MapEditor::Services::Autoborder::applyTileDiffs(*batchedResult, batchedDiffs);
+  MapEditor::Services::Autoborder::applyTileDiffs(*batchedResult, std::move(batchedDiffs));
 
   auto sequentialResult = before->clone();
   for (const auto &pos : positions) {
@@ -452,7 +454,7 @@ void requireBatchedVsSequentialPlanParity(
     require(!singleDiffs.empty(),
             std::string(label).append(" single plan produced no diffs"));
     MapEditor::Services::Autoborder::applyTileDiffs(*sequentialResult,
-                                                    singleDiffs);
+                                                    std::move(singleDiffs));
   }
 
   for (const auto &pos : positions) {

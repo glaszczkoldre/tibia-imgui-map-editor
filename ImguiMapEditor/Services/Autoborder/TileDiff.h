@@ -22,9 +22,9 @@ struct TileDiff {
 
 using TileDiffList = std::vector<TileDiff>;
 
-void applyTileDiffs(Domain::ChunkedMap &map, const TileDiffList &diffs);
+void applyTileDiffs(Domain::ChunkedMap &map, TileDiffList diffs);
 void applyTileDiffsWithHistory(Domain::ChunkedMap &map,
                                Domain::History::HistoryManager &history,
-                               const TileDiffList &diffs);
+                               TileDiffList diffs);
 
 } // namespace MapEditor::Services::Autoborder

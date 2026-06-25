@@ -26,7 +26,7 @@ void appendTileItems(PreviewTileData &previewTile, const Domain::Tile &tile) {
 } // namespace
 
 AutoborderBrushPreviewProvider::AutoborderBrushPreviewProvider(
-    const Brushes::IBrush *brush, BrushSettingsService *brushSettings,
+    const Brushes::IBrush *brush, const BrushSettingsService *brushSettings,
     const Domain::ChunkedMap *map)
     : brush_(brush), brushSettings_(brushSettings), map_(map) {
   buildPreview();

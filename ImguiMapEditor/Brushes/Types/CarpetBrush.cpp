@@ -36,6 +36,7 @@ void CarpetBrush::draw(Domain::ChunkedMap &map, Domain::Tile *tile,
 
   placeCenterTile(*tile, ctx);
   rebuildAround(map, tile->getPosition());
+  map.markChanged();
 }
 
 void CarpetBrush::undraw(Domain::ChunkedMap &map, Domain::Tile *tile) {
@@ -44,6 +45,7 @@ void CarpetBrush::undraw(Domain::ChunkedMap &map, Domain::Tile *tile) {
   }
   eraseFromTile(*tile);
   rebuildAround(map, tile->getPosition());
+  map.markChanged();
 }
 
 bool CarpetBrush::ownsItem(const Domain::Item *item) const {
@@ -90,7 +92,7 @@ void CarpetBrush::rebuildAround(Domain::ChunkedMap &map,
 
 uint16_t CarpetBrush::selectItem(EdgeType align) const {
   return Helpers::selectWeightedItem(
-      itemsByEdge_[static_cast<size_t>(align)]);
+      itemsByEdge_[static_cast<size_t>(align)], registry_.getRng());
 }
 
 std::vector<CarpetBrush::PlannedItem>

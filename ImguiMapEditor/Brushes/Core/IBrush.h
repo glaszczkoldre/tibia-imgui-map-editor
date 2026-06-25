@@ -120,7 +120,7 @@ struct DrawContext {
     bool emptyOnly = false;
     const class GroundBrush *replaceBrush = nullptr;
   };
-  mutable AltGroundReplaceState altReplace;
+  mutable AltGroundReplaceState* altReplace = nullptr;
 };
 
 // ============================================================================

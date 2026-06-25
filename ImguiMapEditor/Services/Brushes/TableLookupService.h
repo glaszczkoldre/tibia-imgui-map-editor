@@ -4,7 +4,7 @@
  * @brief Provides table alignment lookups based on 8-neighbor configuration.
  */
 
-#include "../../Brushes/Enums/BrushEnums.h"
+#include "Brushes/Enums/BrushEnums.h"
 #include <array>
 
 namespace MapEditor {
@@ -28,9 +28,6 @@ public:
    */
   [[nodiscard]] TableAlign getTableType(TileNeighbor neighbors) const noexcept;
 
-private:
-  void initializeTable();
-  std::array<TableAlign, 256> table_;
 };
 
 } // namespace Brushes

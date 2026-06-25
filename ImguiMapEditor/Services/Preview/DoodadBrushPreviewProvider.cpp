@@ -10,14 +10,13 @@ namespace MapEditor::Services::Preview {
 
 namespace {
 uint32_t randomUint32() {
-  thread_local std::mt19937 rng(std::random_device{}());
-  thread_local std::uniform_int_distribution<uint32_t> dist;
-  return dist(rng);
+  std::random_device rd;
+  return rd();
 }
 } // namespace
 
 DoodadBrushPreviewProvider::DoodadBrushPreviewProvider(
-    const Brushes::DoodadBrush &brush, BrushSettingsService *brushSettings,
+    const Brushes::DoodadBrush &brush, const BrushSettingsService *brushSettings,
     const Domain::ChunkedMap *map)
     : brush_(brush), brushSettings_(brushSettings), map_(map),
       previewNonce_(randomUint32()) {

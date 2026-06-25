@@ -121,11 +121,7 @@ private:
     // Hash for Position in unordered_map
     struct PositionHash {
         size_t operator()(const Position& p) const {
-            return std::hash<int64_t>()(
-                static_cast<int64_t>(p.x) | 
-                (static_cast<int64_t>(p.y) << 20) |
-                (static_cast<int64_t>(p.z) << 40)
-            );
+            return std::hash<uint64_t>{}(p.pack());
         }
     };
     

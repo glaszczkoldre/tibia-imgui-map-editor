@@ -35,6 +35,15 @@ void OptionalBorderBrush::undraw(Domain::ChunkedMap &map, Domain::Tile *tile) {
   }
   tile->setOptionalBorder(false);
   tile->setOptionalBorderBrushId(InvalidBrushId);
+
+  if (registry_) {
+    if (auto *brush = dynamic_cast<GroundBrush *>(
+            registry_->getBrushForItem(tile->getGround()->getServerId()));
+        brush && brush->hasOptionalBorderRule()) {
+      brush->rebuildAround(map, tile->getPosition());
+    }
+  }
+
   map.markChanged();
 }
 

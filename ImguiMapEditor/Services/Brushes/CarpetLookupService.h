@@ -4,7 +4,7 @@
  * @brief Provides carpet alignment lookups based on 8-neighbor configuration.
  */
 
-#include "../../Brushes/Enums/BrushEnums.h"
+#include "Brushes/Enums/BrushEnums.h"
 #include <array>
 #include <vector>
 
@@ -35,9 +35,6 @@ public:
    */
   static std::vector<EdgeType> unpack(uint32_t packed) noexcept;
 
-private:
-  void initializeTable();
-  std::array<uint32_t, 256> table_;
 };
 
 } // namespace Brushes

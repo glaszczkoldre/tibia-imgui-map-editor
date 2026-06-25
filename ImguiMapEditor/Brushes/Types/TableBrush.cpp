@@ -36,6 +36,7 @@ void TableBrush::draw(Domain::ChunkedMap &map, Domain::Tile *tile,
 
   placeAloneTile(*tile, ctx);
   rebuildAround(map, tile->getPosition());
+  map.markChanged();
 }
 
 void TableBrush::undraw(Domain::ChunkedMap &map, Domain::Tile *tile) {
@@ -44,6 +45,7 @@ void TableBrush::undraw(Domain::ChunkedMap &map, Domain::Tile *tile) {
   }
   eraseFromTile(*tile);
   rebuildAround(map, tile->getPosition());
+  map.markChanged();
 }
 
 bool TableBrush::ownsItem(const Domain::Item *item) const {
@@ -91,7 +93,7 @@ void TableBrush::rebuildAround(Domain::ChunkedMap &map,
 
 uint16_t TableBrush::selectItem(TableAlign align) const {
   return Helpers::selectWeightedItem(
-      itemsByAlign_[static_cast<size_t>(align)]);
+      itemsByAlign_[static_cast<size_t>(align)], registry_.getRng());
 }
 
 void TableBrush::rebuildTile(Domain::ChunkedMap &map,

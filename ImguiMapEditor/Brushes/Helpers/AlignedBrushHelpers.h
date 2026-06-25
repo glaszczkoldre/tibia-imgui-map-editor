@@ -18,6 +18,7 @@
  */
 
 #include "Brushes/Behaviors/WeightedSelection.h"
+#include <random>
 #include "Brushes/Core/IBrush.h"
 #include "Brushes/Enums/BrushEnums.h"
 #include "Domain/ChunkedMap.h"
@@ -96,7 +97,7 @@ collectOwnedItems(Domain::Tile &tile, const IBrush &brush) {
  * behaviour). Returns 0 if the list is empty.
  */
 [[nodiscard]] inline uint16_t
-selectWeightedItem(const std::vector<std::pair<uint16_t, uint32_t>> &items) {
+selectWeightedItem(const std::vector<std::pair<uint16_t, uint32_t>> &items, std::mt19937 &rng) {
   if (items.empty()) {
     return 0;
   }
@@ -105,7 +106,7 @@ selectWeightedItem(const std::vector<std::pair<uint16_t, uint32_t>> &items) {
   for (const auto &[_, w] : items) {
     weights.push_back(w == 0 ? 1u : w);
   }
-  const auto index = WeightedSelection::select(weights);
+  const auto index = WeightedSelection::select(rng, weights);
   return index ? items[*index].first : items.front().first;
 }
 

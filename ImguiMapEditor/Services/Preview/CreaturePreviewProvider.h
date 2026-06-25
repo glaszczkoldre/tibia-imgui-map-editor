@@ -24,7 +24,7 @@ public:
    */
   explicit CreaturePreviewProvider(
       const std::string &creatureName,
-      BrushSettingsService *brushSettings = nullptr);
+      const BrushSettingsService *brushSettings = nullptr);
 
   // IPreviewProvider interface
   bool isActive() const override;
@@ -34,12 +34,11 @@ public:
   void updateCursorPosition(const Domain::Position &cursor) override;
 
   // Regeneration support for brush size changes
-  bool needsRegeneration() const override { return needsRegen_; }
   void regenerate() override;
 
 private:
   std::string creatureName_;
-  BrushSettingsService *brushSettings_ = nullptr;
+  const BrushSettingsService *brushSettings_ = nullptr;
   Domain::Position anchor_{0, 0, 0};
   mutable std::vector<PreviewTileData> tiles_;
   mutable PreviewBounds bounds_;

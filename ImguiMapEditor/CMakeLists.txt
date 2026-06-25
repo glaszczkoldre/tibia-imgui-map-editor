@@ -212,6 +212,7 @@ set(SERVICES_SOURCES
     Utils/SpriteUtils.cpp
     Services/ConfigService.cpp
     Services/BrushSettingsService.cpp
+    Services/BrushSettingsSerializer.cpp
     Services/ClientVersionRegistry.cpp
     Services/ClientVersionPersistence.cpp
     Services/ClientSignatureDetector.cpp
@@ -364,6 +365,7 @@ set(BRUSHES_SOURCES
     Brushes/BrushSystem.cpp
     Brushes/BrushRegistry.cpp
     Brushes/BrushController.cpp
+    Brushes/BrushResolutionOps.cpp
     Brushes/BrushDoorOps.cpp
     Brushes/BrushStroke.cpp
     Brushes/BrushVariationOps.cpp
@@ -376,6 +378,7 @@ set(BRUSHES_SOURCES
     Brushes/Types/DoodadPlacementPlanner.cpp
     Brushes/Types/DoodadRedoBorderPlanner.cpp
     Brushes/Types/WallBrush.cpp
+    Brushes/Types/WallBrushDoor.cpp
     Brushes/Types/WallBrushPreview.cpp
     Brushes/Types/WallDecorationBrush.cpp
     Brushes/Types/TableBrush.cpp

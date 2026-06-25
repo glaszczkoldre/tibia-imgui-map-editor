@@ -9,18 +9,17 @@ namespace MapEditor {
 namespace Services {
 namespace Brushes {
 
-WallLookupService::WallLookupService() { initializeTable(); }
+#include "WallLookupTable.inc"
+
+WallLookupService::WallLookupService() = default;
 
 WallAlign WallLookupService::getFullType(WallNeighbor neighbors) const noexcept {
-  return fullTable_[static_cast<uint8_t>(neighbors) & 0x0F];
+  return kFullWallLookupTable[static_cast<uint8_t>(neighbors) & 0x0F];
 }
 
 WallAlign WallLookupService::getHalfType(WallNeighbor neighbors) const noexcept {
-  return halfTable_[static_cast<uint8_t>(neighbors) & 0x0F];
+  return kHalfWallLookupTable[static_cast<uint8_t>(neighbors) & 0x0F];
 }
-
-// Include the auto-generated lookup table
-#include "WallLookupTable.inc"
 
 } // namespace Brushes
 } // namespace Services

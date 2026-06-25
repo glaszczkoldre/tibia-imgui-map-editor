@@ -21,25 +21,31 @@ namespace {
                                                 const DrawContext &ctx) {
   const bool altPressed = (ctx.modifiers & Modifiers::Alt) != 0;
   if (!altPressed) {
-    ctx.altReplace = {};
+    if (ctx.altReplace) {
+      *ctx.altReplace = {};
+    }
     return false;
   }
 
-  if (!ctx.altReplace.active || !ctx.isDragging) {
-    ctx.altReplace.active = true;
-    ctx.altReplace.emptyOnly = !tile.hasGround();
-    ctx.altReplace.replaceBrush = nullptr;
+  if (!ctx.altReplace) {
+    return false;
+  }
 
-    if (!ctx.altReplace.emptyOnly) {
-      ctx.altReplace.replaceBrush = GroundBrush::resolveGroundBrush(registry, tile);
-      if (!ctx.altReplace.replaceBrush) {
-        ctx.altReplace = {};
+  if (!ctx.altReplace->active || !ctx.isDragging) {
+    ctx.altReplace->active = true;
+    ctx.altReplace->emptyOnly = !tile.hasGround();
+    ctx.altReplace->replaceBrush = nullptr;
+
+    if (!ctx.altReplace->emptyOnly) {
+      ctx.altReplace->replaceBrush = GroundBrush::resolveGroundBrush(registry, tile);
+      if (!ctx.altReplace->replaceBrush) {
+        *ctx.altReplace = {};
         return true;
       }
     }
   }
 
-  if (ctx.altReplace.emptyOnly) {
+  if (ctx.altReplace->emptyOnly) {
     return tile.hasGround();
   }
 
@@ -48,7 +54,7 @@ namespace {
     return true;
   }
 
-  return currentBrush != ctx.altReplace.replaceBrush;
+  return currentBrush != ctx.altReplace->replaceBrush;
 }
 
 } // namespace
@@ -411,7 +417,7 @@ uint16_t GroundBrush::selectWeightedItem(
     return 0;
   }
 
-  const auto selected = WeightedSelection::select(weights);
+  const auto selected = WeightedSelection::select(registry_.getRng(), weights);
   return selected ? ids[*selected] : ids.front();
 }
 

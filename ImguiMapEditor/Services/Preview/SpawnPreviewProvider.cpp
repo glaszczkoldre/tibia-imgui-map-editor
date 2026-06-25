@@ -8,7 +8,7 @@
 
 namespace MapEditor::Services::Preview {
 
-SpawnPreviewProvider::SpawnPreviewProvider(BrushSettingsService *brushSettings)
+SpawnPreviewProvider::SpawnPreviewProvider(const BrushSettingsService *brushSettings)
     : brushSettings_(brushSettings) {
   buildSquarePreview();
 }

@@ -450,7 +450,7 @@ const DoodadAlternative *DoodadBrush::selectAlternative(size_t preferredIndex) c
   }
 
   const auto index =
-      WeightedSelection::randomRange(0, static_cast<uint32_t>(alternatives_.size() - 1));
+      WeightedSelection::randomRange(registry_.getRng(), 0, static_cast<uint32_t>(alternatives_.size() - 1));
   return &alternatives_[index];
 }
 

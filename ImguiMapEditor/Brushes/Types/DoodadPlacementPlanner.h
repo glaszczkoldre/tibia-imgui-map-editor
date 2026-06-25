@@ -2,6 +2,7 @@
 
 #include "Brushes/Types/DoodadBrush.h"
 #include <optional>
+#include <random>
 
 namespace MapEditor::Brushes {
 
@@ -31,8 +32,8 @@ private:
     std::vector<DoodadBrush::PlacementSkip> skipped;
   };
 
-  static DoodadBrush::PlacementPlan buildPlanUnseeded(const Request &request);
-  static LayoutBuildResult buildLayoutUnseeded(const Request &request);
+  static DoodadBrush::PlacementPlan buildPlanUnseeded(const Request &request, std::mt19937 &rng);
+  static LayoutBuildResult buildLayoutUnseeded(const Request &request, std::mt19937 &rng);
   static std::vector<DoodadRedoBorderTouch>
   buildRedoTouches(const Request &request,
                    const DoodadBrush::DoodadLayout &layout);

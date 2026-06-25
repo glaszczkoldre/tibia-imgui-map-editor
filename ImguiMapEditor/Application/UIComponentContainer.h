@@ -20,6 +20,10 @@ class IngameBoxWindow;
 class MinimapWindow;
 class BrowseTileWindow;
 class PaletteWindowManager;
+class TilesetWidget;
+namespace Panels {
+class BrushSizePanel;
+} // namespace Panels
 namespace Ribbon {
 class RibbonController;
 class FilePanel;
@@ -59,6 +63,8 @@ struct UIComponentContainer {
   std::unique_ptr<UI::MinimapWindow> minimap_window;
   std::unique_ptr<UI::BrowseTileWindow> browse_tile_window;
   std::unique_ptr<UI::PaletteWindowManager> palette_window_manager;
+  std::unique_ptr<UI::TilesetWidget> tileset_widget;
+  std::unique_ptr<UI::Panels::BrushSizePanel> brush_size_panel;
 
   // Side pointers (non-owning) for wiring
   UI::Ribbon::FilePanel *file_panel_ptr = nullptr;

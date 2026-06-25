@@ -6,6 +6,7 @@
 #include "Services/Preview/PreviewTypes.h"
 #include <array>
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <span>
 #include <string>
@@ -80,6 +81,36 @@ public:
   }
 
 private:
+  template <typename Fn>
+  bool visitWallRedirectChain(Fn &&fn) const {
+    std::vector<const WallBrush *> pending{this};
+    std::unordered_set<const WallBrush *> visited;
+
+    while (!pending.empty()) {
+      const auto *brush = pending.back();
+      pending.pop_back();
+      if (!brush || !visited.insert(brush).second) {
+        continue;
+      }
+
+      if (std::invoke(fn, *brush)) {
+        return true;
+      }
+
+      for (const auto *redirectBrush : brush->getRedirectBrushes()) {
+        if (redirectBrush && !visited.contains(redirectBrush)) {
+          pending.push_back(redirectBrush);
+        }
+      }
+    }
+
+    return false;
+  }
+
+  void updateConsecutiveDecorations(
+      Domain::Tile &tile, Domain::Item *baseItem,
+      const std::function<uint16_t(const WallBrush &, const Domain::Item &)> &resolveItemId) const;
+
   static constexpr size_t kWallAlignCount = 17;
   bool isWallGroupItem(uint16_t itemId) const;
   std::optional<WallAlign> findAlignmentForItem(uint16_t itemId) const;

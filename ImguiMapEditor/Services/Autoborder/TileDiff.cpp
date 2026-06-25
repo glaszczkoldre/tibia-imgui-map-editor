@@ -6,9 +6,9 @@
 
 namespace MapEditor::Services::Autoborder {
 
-void applyTileDiffs(Domain::ChunkedMap &map, const TileDiffList &diffs) {
-  for (const auto &diff : diffs) {
-    map.setTile(diff.position, diff.after ? diff.after->clone() : nullptr);
+void applyTileDiffs(Domain::ChunkedMap &map, TileDiffList diffs) {
+  for (auto &diff : diffs) {
+    map.setTile(diff.position, std::move(diff.after));
   }
   if (!diffs.empty()) {
     map.markChanged();
@@ -17,11 +17,11 @@ void applyTileDiffs(Domain::ChunkedMap &map, const TileDiffList &diffs) {
 
 void applyTileDiffsWithHistory(Domain::ChunkedMap &map,
                                Domain::History::HistoryManager &history,
-                               const TileDiffList &diffs) {
+                               TileDiffList diffs) {
   for (const auto &diff : diffs) {
     history.recordTileBefore(diff.position, map.getTile(diff.position));
   }
-  applyTileDiffs(map, diffs);
+  applyTileDiffs(map, std::move(diffs));
 }
 
 } // namespace MapEditor::Services::Autoborder

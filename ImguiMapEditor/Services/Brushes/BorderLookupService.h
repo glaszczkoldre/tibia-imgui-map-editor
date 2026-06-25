@@ -7,7 +7,7 @@
  * Up to 4 border types can be packed into a single uint32_t value.
  */
 
-#include "../../Brushes/Enums/BrushEnums.h"
+#include "Brushes/Enums/BrushEnums.h"
 #include <array>
 #include <vector>
 
@@ -43,9 +43,6 @@ public:
    */
   static std::vector<EdgeType> unpack(uint32_t packed) noexcept;
 
-private:
-  void initializeTable();
-  std::array<uint32_t, 256> table_;
 };
 
 } // namespace Brushes

@@ -32,6 +32,9 @@
 #include "UI/Windows/IngameBoxWindow.h"
 #include "UI/Windows/MinimapWindow.h"
 #include "UI/Windows/PaletteWindowManager.h"
+#include "UI/Widgets/TilesetWidget.h"
+#include "UI/Panels/BrushSizePanel.h"
+#include "Brushes/BrushSystem.h"
 
 
 namespace MapEditor {
@@ -50,6 +53,11 @@ UIComponentContainer UIFactory::create(const UIFactoryContext &ctx) {
   components.ingame_box_window = std::make_unique<UI::IngameBoxWindow>();
   components.minimap_window = std::make_unique<UI::MinimapWindow>();
   components.browse_tile_window = std::make_unique<UI::BrowseTileWindow>();
+
+  components.tileset_widget = std::make_unique<UI::TilesetWidget>();
+  components.brush_size_panel = std::make_unique<UI::Panels::BrushSizePanel>(
+      &ctx.brush_system.getSettingsService(), &ctx.brush_controller,
+      [&ctx]() { ctx.brush_system.saveBrushes(); });
 
   components.hotkey_controller = std::make_unique<AppLogic::HotkeyController>(
       ctx.hotkey_registry, ctx.view_settings, components.map_panel.get(),
@@ -139,7 +147,7 @@ UIComponentContainer UIFactory::create(const UIFactoryContext &ctx) {
   components.workspace_controller =
       std::make_unique<Presentation::WorkspaceController>(
           *components.map_panel, *components.minimap_window,
-          *components.browse_tile_window, ctx.tileset_widget,
+          *components.browse_tile_window, *components.tileset_widget,
           components.palette_window_manager.get(), ctx.brush_controller,
           *components.search_controller, *components.input_controller);
 

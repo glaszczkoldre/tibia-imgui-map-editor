@@ -5,7 +5,7 @@
 namespace MapEditor::Services::Preview {
 
 CreaturePreviewProvider::CreaturePreviewProvider(
-    const std::string &creatureName, BrushSettingsService *brushSettings)
+    const std::string &creatureName, const BrushSettingsService *brushSettings)
     : creatureName_(creatureName), brushSettings_(brushSettings) {
   buildPreview();
   spdlog::debug("[CreaturePreviewProvider] Created for creature: {}",
