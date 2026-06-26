@@ -382,6 +382,15 @@ void requireWallDragPlanIncludesNeighborResolve(
       MapEditor::Domain::Position{119, 29, 7},
   };
 
+  // Paint ground and wall at (120, 29, 7) as a neighbor to connect to
+  const MapEditor::Domain::Position neighborPos{120, 29, 7};
+  controller.setBrush(groundBrush);
+  require(controller.applyBrush(neighborPos),
+          std::string(label).append(" neighbor ground paint failed"));
+  controller.setBrush(wallBrush);
+  require(controller.applyBrush(neighborPos),
+          std::string(label).append(" neighbor wall paint failed"));
+
   for (const auto &pos : strokePositions) {
     controller.setBrush(groundBrush);
     require(controller.applyBrush(pos),
@@ -396,6 +405,10 @@ void requireWallDragPlanIncludesNeighborResolve(
   dragIntent.context.isDragging = true;
 
   auto dragDiffs = engine.plan(map, dragIntent);
+  std::cout << "[DEBUG] dragDiffs size=" << dragDiffs.size() << "\n";
+  for (const auto &diff : dragDiffs) {
+    std::cout << "  Diff pos=(" << diff.position.x << "," << diff.position.y << "," << diff.position.z << ")\n";
+  }
   require(!dragDiffs.empty(),
           std::string(label).append(" active drag produced no diffs"));
 

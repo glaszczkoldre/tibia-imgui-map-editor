@@ -12,6 +12,7 @@
 #include <cctype>
 #include <functional>
 #include <unordered_set>
+#include <iostream>
 
 namespace MapEditor::Brushes {
 
@@ -419,11 +420,19 @@ void WallBrush::rebuildTile(Domain::ChunkedMap &map,
     return;
   }
 
+  if (pos == Domain::Position{118, 27, 7}) {
+    std::cout << "[DEBUG] rebuildTile called on (118, 27, 7)\n";
+  }
+
   // Compute neighbor bitmask (same encoding as RME: N=1, W=2, E=4, S=8)
   WallNeighbor neighbors = WallNeighbor::None;
   for (const auto &[dx, dy, bit] : kWallNeighbors) {
     const auto *neighborTile = map.getTile(pos.x + dx, pos.y + dy, pos.z);
-    if (tileHasWallGroup(neighborTile)) {
+    const bool hasWall = tileHasWallGroup(neighborTile);
+    if (pos == Domain::Position{118, 27, 7}) {
+      std::cout << "  Neighbor dx=" << dx << " dy=" << dy << " hasWall=" << hasWall << "\n";
+    }
+    if (hasWall) {
       neighbors |= bit;
     }
   }
@@ -432,6 +441,8 @@ void WallBrush::rebuildTile(Domain::ChunkedMap &map,
   static const Services::Brushes::WallLookupService lookupService;
   const auto fullAlign = lookupService.getFullType(neighbors);
   const auto halfAlign = lookupService.getHalfType(neighbors);
+
+
 
   auto resolvedAlignment = fullAlign;
   uint16_t replacementId = 0;
@@ -522,6 +533,11 @@ bool WallBrush::connectsTo(const IBrush *brush) const {
   const auto *wallBrush = dynamic_cast<const WallBrush *>(brush);
   if (!wallBrush) {
     return false;
+  }
+
+  // Wall decoration brushes connect to any wall brush
+  if (getType() == BrushType::WallDecoration || wallBrush->getType() == BrushType::WallDecoration) {
+    return true;
   }
 
   // Redirect friends (bidirectional)

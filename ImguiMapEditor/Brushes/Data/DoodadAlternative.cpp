@@ -34,7 +34,7 @@ SingleItem DoodadAlternative::selectRandomSingle(std::mt19937 &rng) const {
   }
 
   const auto selected = WeightedSelection::select(rng, weights);
-  return selected ? singles_[*selected] : singles_.front();
+  return selected ? singles_[*selected] : SingleItem{};
 }
 
 const CompositeItem *DoodadAlternative::selectRandomComposite(std::mt19937 &rng) const {
@@ -49,7 +49,7 @@ const CompositeItem *DoodadAlternative::selectRandomComposite(std::mt19937 &rng)
   }
 
   const auto selected = WeightedSelection::select(rng, weights);
-  return selected ? &composites_[*selected] : &composites_.front();
+  return selected ? &composites_[*selected] : nullptr;
 }
 
 } // namespace MapEditor::Brushes

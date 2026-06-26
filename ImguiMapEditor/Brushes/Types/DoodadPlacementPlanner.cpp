@@ -20,13 +20,11 @@ namespace MapEditor::Brushes {
 
 namespace {
 
-uint32_t normalizedChance(uint32_t chance) { return chance == 0 ? 1u : chance; }
-
 uint32_t totalSingleChance(const DoodadAlternative &alternative) {
   return std::accumulate(alternative.getSingleItems().begin(),
                          alternative.getSingleItems().end(), 0u,
                          [](uint32_t sum, const SingleItem &item) {
-                           return sum + normalizedChance(item.chance);
+                           return sum + item.chance;
                          });
 }
 
@@ -34,7 +32,7 @@ uint32_t totalCompositeChance(const DoodadAlternative &alternative) {
   return std::accumulate(alternative.getComposites().begin(),
                          alternative.getComposites().end(), 0u,
                          [](uint32_t sum, const CompositeItem &item) {
-                           return sum + normalizedChance(item.chance);
+                           return sum + item.chance;
                          });
 }
 
@@ -160,14 +158,106 @@ dedupeAndSort(std::vector<Domain::Position> positions) {
 
 DoodadBrush::PlacementPlan DoodadPlacementPlanner::buildPlan(
     const Request &request) {
+  uint32_t seedVal = request.seed ? *request.seed : buildSeed(request.brush, request.center, request.brushSettings, request.preferredVariation, request.forcePlace);
+  auto rawStamp = generateRawStamp(request.brush, request.brushSettings, request.preferredVariation, seedVal);
+
+  DoodadBrush::PlacementPlan plan;
+  std::unordered_set<int64_t> occupiedAbs;
+
+  for (const auto &tile : rawStamp) {
+    const auto absPos = absolutePosition(request.center, tile.relativePosition);
+
+    if (request.map && !request.forcePlace) {
+      const auto *targetTile = request.map->getTile(absPos);
+      if (!request.brush.onBlocking_ && Types::tileHasBlockingContents(targetTile)) {
+        plan.skipped.push_back({.position = absPos, .reason = DoodadBrush::PlacementSkipReason::BlockingTile});
+        continue;
+      }
+      if (!request.brush.onDuplicate_ && request.brush.tileHasOwnItem(targetTile)) {
+        plan.skipped.push_back({.position = absPos, .reason = DoodadBrush::PlacementSkipReason::DuplicateOwnItem});
+        continue;
+      }
+    }
+
+    if (occupiedAbs.insert(encodeDoodadPosition(absPos)).second) {
+      plan.layout.push_back(tile);
+    } else {
+      plan.skipped.push_back({.position = absPos, .reason = DoodadBrush::PlacementSkipReason::OccupiedInPlan});
+    }
+  }
+
+  plan.redoTouches = buildRedoTouches(request, plan.layout);
+  plan.affectedPositions = buildAffectedPositions(request, plan.layout, plan.redoTouches);
+  return plan;
+}
+
+DoodadBrush::DoodadLayout
+DoodadPlacementPlanner::generateRawStamp(
+    const DoodadBrush &brush,
+    const Services::BrushSettingsService *brushSettings,
+    size_t preferredVariation,
+    std::optional<uint32_t> seed) {
   std::mt19937 rng;
-  if (request.seed) {
-    rng.seed(*request.seed);
+  if (seed) {
+    rng.seed(*seed);
   } else {
     std::random_device rd;
     rng.seed(rd());
   }
-  return buildPlanUnseeded(request, rng);
+
+  const auto *alternative = brush.selectAlternative(preferredVariation);
+  if (!alternative) {
+    return {};
+  }
+
+  const auto anchors = getAnchors(brush.isOneSize(), brushSettings);
+  const auto singleChance = totalSingleChance(*alternative);
+  const auto compositeChance = totalCompositeChance(*alternative);
+  const auto scatterMode = !brush.isOneSize() && anchors.size() > 1;
+
+  DoodadBrush::DoodadLayout rawStamp;
+  std::unordered_set<int64_t> occupied;
+
+  if (scatterMode) {
+    const auto objectCount = calculateObjectCount(anchors.size(), brush.getThickness(), rng);
+    for (int objectIndex = 0; objectIndex < objectCount; ++objectIndex) {
+      const auto anchorIndex = WeightedSelection::randomRange(rng, 0, static_cast<uint32_t>(anchors.size() - 1));
+      const auto &[anchorX, anchorY] = anchors[anchorIndex];
+      auto candidate = buildRandomCandidate(*alternative, rng, singleChance, compositeChance, anchorX, anchorY);
+      
+      bool overlap = false;
+      for (const auto &tile : candidate) {
+        if (occupied.contains(encodeDoodadPosition(tile.relativePosition))) {
+          overlap = true;
+          break;
+        }
+      }
+      if (!overlap) {
+        for (const auto &tile : candidate) {
+          occupied.insert(encodeDoodadPosition(tile.relativePosition));
+          appendLayoutTile(rawStamp, tile);
+        }
+      }
+    }
+  } else {
+    for (const auto &[anchorX, anchorY] : anchors) {
+      auto candidate = buildRandomCandidate(*alternative, rng, singleChance, compositeChance, anchorX, anchorY);
+      bool overlap = false;
+      for (const auto &tile : candidate) {
+        if (occupied.contains(encodeDoodadPosition(tile.relativePosition))) {
+          overlap = true;
+          break;
+        }
+      }
+      if (!overlap) {
+        for (const auto &tile : candidate) {
+          occupied.insert(encodeDoodadPosition(tile.relativePosition));
+          appendLayoutTile(rawStamp, tile);
+        }
+      }
+    }
+  }
+  return rawStamp;
 }
 
 DoodadBrush::DoodadLayout
@@ -187,7 +277,7 @@ uint32_t DoodadPlacementPlanner::buildSeed(
   Utils::mixSeed(seed, static_cast<uint32_t>(preferredVariation));
   Utils::mixSeed(seed, forcePlace ? 1u : 0u);
 
-  const auto anchors = getAnchors(brush.oneSize_, brushSettings);
+  const auto anchors = getAnchors(brush.isOneSize(), brushSettings);
   Utils::mixSeed(seed, static_cast<uint32_t>(anchors.size()));
   for (const auto &[x, y] : anchors) {
     Utils::mixSeed(seed, static_cast<uint32_t>(x));
@@ -195,80 +285,6 @@ uint32_t DoodadPlacementPlanner::buildSeed(
   }
 
   return seed;
-}
-
-std::optional<DoodadBrush::PlacementSkipReason>
-DoodadPlacementPlanner::getSkipReason(
-    const Request &request, const DoodadBrush::DoodadLayout &layout,
-    const Services::Preview::PreviewTileData &tile) {
-  const auto alreadyPlanned =
-      std::ranges::any_of(layout, [&tile](const auto &existing) {
-        return existing.relativePosition == tile.relativePosition;
-      });
-  if (alreadyPlanned) {
-    return DoodadBrush::PlacementSkipReason::OccupiedInPlan;
-  }
-
-  if (!request.map || request.forcePlace) {
-    return std::nullopt;
-  }
-
-  const auto targetPosition =
-      absolutePosition(request.center, tile.relativePosition);
-  const auto *targetTile = request.map->getTile(targetPosition);
-  if (!request.brush.onBlocking_ &&
-      Types::tileHasBlockingContents(targetTile)) {
-    return DoodadBrush::PlacementSkipReason::BlockingTile;
-  }
-  if (!request.brush.onDuplicate_ &&
-      request.brush.tileHasOwnItem(targetTile)) {
-    return DoodadBrush::PlacementSkipReason::DuplicateOwnItem;
-  }
-
-  return std::nullopt;
-}
-
-bool DoodadPlacementPlanner::tryAppendCandidate(
-    const Request &request, DoodadBrush::DoodadLayout &layout,
-    std::vector<DoodadBrush::PlacementSkip> &skipped,
-    std::unordered_set<uint64_t> &skippedKeys,
-    std::unordered_set<int64_t> &occupied,
-    const DoodadBrush::DoodadLayout &candidate) {
-  if (candidate.empty()) {
-    return false;
-  }
-
-  std::vector<DoodadBrush::PlacementSkip> candidateSkips;
-  for (const auto &candidateTile : candidate) {
-    if (occupied.contains(encodeDoodadPosition(candidateTile.relativePosition))) {
-      candidateSkips.push_back(
-          {.position = absolutePosition(request.center,
-                                        candidateTile.relativePosition),
-           .reason = DoodadBrush::PlacementSkipReason::OccupiedInPlan});
-      continue;
-    }
-
-    if (const auto reason = getSkipReason(request, layout, candidateTile)) {
-      candidateSkips.push_back(
-          {.position = absolutePosition(request.center,
-                                        candidateTile.relativePosition),
-           .reason = *reason});
-    }
-  }
-
-  if (!candidateSkips.empty()) {
-    for (const auto &skip : candidateSkips) {
-      appendSkip(skipped, skippedKeys, skip.position, skip.reason);
-    }
-    return false;
-  }
-
-  for (const auto &candidateTile : candidate) {
-    occupied.insert(encodeDoodadPosition(candidateTile.relativePosition));
-    appendLayoutTile(layout, candidateTile);
-  }
-
-  return true;
 }
 
 std::vector<DoodadRedoBorderTouch> DoodadPlacementPlanner::buildRedoTouches(
@@ -328,174 +344,6 @@ std::vector<Domain::Position> DoodadPlacementPlanner::buildAffectedPositions(
   }
 
   return dedupeAndSort(std::move(positions));
-}
-
-DoodadBrush::PlacementPlan
-DoodadPlacementPlanner::buildPlanUnseeded(const Request &request, std::mt19937 &rng) {
-  auto result = buildLayoutUnseeded(request, rng);
-  auto redoTouches = buildRedoTouches(request, result.layout);
-  auto affectedPositions =
-      buildAffectedPositions(request, result.layout, redoTouches);
-  return {.layout = std::move(result.layout),
-          .redoTouches = std::move(redoTouches),
-          .skipped = std::move(result.skipped),
-          .affectedPositions = std::move(affectedPositions)};
-}
-
-DoodadBrush::DoodadLayout
-buildSpecificSingleCandidate(const DoodadAlternative &alternative,
-                             size_t itemIndex, int anchorX, int anchorY) {
-  DoodadBrush::DoodadLayout candidate;
-  const auto &singles = alternative.getSingleItems();
-  if (itemIndex >= singles.size()) {
-    return candidate;
-  }
-  const auto &item = singles[itemIndex];
-  if (item.itemId == 0) {
-    return candidate;
-  }
-
-  Services::Preview::PreviewTileData tile(anchorX, anchorY, 0);
-  tile.addItem(item.itemId, static_cast<uint16_t>(item.subtype));
-  candidate.push_back(std::move(tile));
-  return candidate;
-}
-
-DoodadBrush::DoodadLayout
-buildSpecificCompositeCandidate(const DoodadAlternative &alternative,
-                                size_t compositeIndex, int anchorX,
-                                int anchorY) {
-  DoodadBrush::DoodadLayout candidate;
-  const auto &composites = alternative.getComposites();
-  if (compositeIndex >= composites.size()) {
-    return candidate;
-  }
-  const auto &composite = composites[compositeIndex];
-
-  for (const auto &offset : composite.tiles) {
-    Services::Preview::PreviewTileData tile(anchorX + offset.dx,
-                                            anchorY + offset.dy, offset.dz);
-    for (const auto &item : offset.items) {
-      if (item.itemId != 0) {
-        tile.addItem(item.itemId, static_cast<uint16_t>(item.subtype));
-      }
-    }
-    appendLayoutTile(candidate, std::move(tile));
-  }
-
-  return candidate;
-}
-
-DoodadPlacementPlanner::LayoutBuildResult
-DoodadPlacementPlanner::buildLayoutUnseeded(const Request &request, std::mt19937 &rng) {
-  LayoutBuildResult result;
-  const auto *alternative =
-      request.brush.selectAlternative(request.preferredVariation);
-  if (!alternative) {
-    return result;
-  }
-
-  const auto anchors = getAnchors(request.brush.oneSize_, request.brushSettings);
-
-  if (request.specificVariant) {
-    const auto &v = *request.specificVariant;
-    const auto *alt = request.brush.getAlternative(v.alternativeIndex);
-    if (!alt) {
-      return result;
-    }
-
-    std::unordered_set<int64_t> occupied;
-    std::unordered_set<uint64_t> skippedKeys;
-
-    if (v.isSingle) {
-      const auto scatterMode = !request.brush.oneSize_ && anchors.size() > 1;
-      const int count = scatterMode
-                            ? calculateObjectCount(anchors.size(),
-                                                   request.brush.thickness_, rng)
-                            : static_cast<int>(anchors.size());
-
-      std::vector<size_t> order(anchors.size());
-      for (size_t j = 0; j < anchors.size(); ++j) {
-        order[j] = j;
-      }
-      if (scatterMode) {
-        WeightedSelection::shuffleIndices(rng, order);
-      }
-
-      size_t placed = 0;
-      for (size_t si = 0;
-           si < order.size() && placed < static_cast<size_t>(count); ++si) {
-        const auto &[anchorX, anchorY] = anchors[order[si]];
-        auto candidate = buildSpecificSingleCandidate(*alt, v.itemIndex,
-                                                      anchorX, anchorY);
-        if (tryAppendCandidate(request, result.layout, result.skipped,
-                               skippedKeys, occupied, candidate)) {
-          ++placed;
-        }
-      }
-    } else {
-      auto candidate =
-          buildSpecificCompositeCandidate(*alt, v.itemIndex, 0, 0);
-      tryAppendCandidate(request, result.layout, result.skipped, skippedKeys,
-                         occupied, candidate);
-    }
-
-    return result;
-  }
-
-  const auto singleChance = totalSingleChance(*alternative);
-  const auto compositeChance = totalCompositeChance(*alternative);
-  const auto scatterMode = !request.brush.oneSize_ && anchors.size() > 1;
-  const auto maxAttempts =
-      std::max<size_t>(1, alternative->getSingleItems().size() +
-                              alternative->getComposites().size()) *
-      2;
-
-  std::unordered_set<int64_t> occupied;
-  std::unordered_set<uint64_t> skippedKeys;
-  if (scatterMode) {
-    const auto objectCount =
-        calculateObjectCount(anchors.size(), request.brush.thickness_, rng);
-
-    for (int objectIndex = 0; objectIndex < objectCount; ++objectIndex) {
-      for (size_t attempt = 0; attempt < 5; ++attempt) {
-        const auto anchorIndex =
-            WeightedSelection::randomRange(rng, 0,
-                                           static_cast<uint32_t>(anchors.size() - 1));
-        const auto &[anchorX, anchorY] = anchors[anchorIndex];
-        auto candidate = buildRandomCandidate(*alternative, rng, singleChance,
-                                              compositeChance, anchorX, anchorY);
-        if (tryAppendCandidate(request, result.layout, result.skipped,
-                               skippedKeys, occupied, candidate)) {
-          break;
-        }
-      }
-    }
-
-    return result;
-  }
-
-  for (const auto &[anchorX, anchorY] : anchors) {
-    for (size_t attempt = 0; attempt < maxAttempts; ++attempt) {
-      auto candidate = buildRandomCandidate(*alternative, rng, singleChance,
-                                            compositeChance, anchorX, anchorY);
-      if (tryAppendCandidate(request, result.layout, result.skipped,
-                             skippedKeys, occupied, candidate)) {
-        break;
-      }
-
-      if (attempt + 1 == maxAttempts) {
-        candidate = singleChance > 0
-                        ? buildSingleCandidate(*alternative, rng, anchorX, anchorY)
-                        : buildCompositeCandidate(*alternative, rng, anchorX,
-                                                  anchorY);
-        tryAppendCandidate(request, result.layout, result.skipped, skippedKeys,
-                           occupied, candidate);
-      }
-    }
-  }
-
-  return result;
 }
 
 } // namespace MapEditor::Brushes

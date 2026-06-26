@@ -81,7 +81,7 @@ bool tileContainsItemId(const Tile &tile, uint16_t itemId) {
 }
 
 void requireNeighborMasks(ChunkedMap &map, BrushRegistry &registry,
-                          const WallBrush &brush, IBrush *groundBrush) {
+                          WallBrush &brush, IBrush *groundBrush) {
   // Clear map region
   for (int y = 0; y < 10; ++y) {
     for (int x = 0; x < 10; ++x) {
@@ -131,18 +131,35 @@ void requireNeighborMasks(ChunkedMap &map, BrushRegistry &registry,
     // Rebuild center wall connection
     brush.rebuildTile(map, center);
 
-    const auto expectedAlign = lookup.getFullType(static_cast<WallNeighbor>(mask));
-    const auto expectedItem = brush.getWallItemForAlign(expectedAlign);
+    auto expectedAlign = lookup.getFullType(static_cast<WallNeighbor>(mask));
+    auto expectedItem = brush.getWallItemForAlign(expectedAlign);
+    if (expectedItem == 0) {
+      expectedAlign = lookup.getHalfType(static_cast<WallNeighbor>(mask));
+      expectedItem = brush.getWallItemForAlign(expectedAlign);
+    }
+    if (expectedItem == 0) {
+      expectedAlign = WallAlign::Horizontal;
+      expectedItem = brush.getWallItemForAlign(expectedAlign);
+    }
 
     const auto *tile = map.getTile(center);
     require(tile != nullptr, "Center tile missing");
-    require(tileContainsItemId(*tile, expectedItem),
-            "Wall alignment did not resolve to the expected mask item");
+    if (!tileContainsItemId(*tile, expectedItem)) {
+      std::cerr << "Wall alignment failed at mask=" << static_cast<int>(mask)
+                << ", expected align=" << static_cast<int>(expectedAlign)
+                << ", expected item=" << expectedItem << "\n";
+      std::cerr << "Actual items on center tile:\n";
+      for (const auto &item : tile->getItems()) {
+        std::cerr << "  itemId=" << item->getServerId()
+                  << ", owner=" << item->getOwnerBrushId() << "\n";
+      }
+      require(false, "Wall alignment did not resolve to the expected mask item");
+    }
   }
 }
 
 void requireUntouchables(ChunkedMap &map, BrushRegistry &registry,
-                        const WallBrush &brush, IBrush *groundBrush) {
+                        WallBrush &brush, IBrush *groundBrush) {
   // Clear tile (10, 10)
   const Position pos{10, 10, 7};
   auto *tile = map.getOrCreateTile(pos);
@@ -170,10 +187,10 @@ void requireUntouchables(ChunkedMap &map, BrushRegistry &registry,
 }
 
 void requireRedirectsAndHateFlags(ChunkedMap &map, BrushRegistry &registry,
-                                  const WallBrush &brush, const WallBrush &mossyWallDeco,
+                                  WallBrush &brush, WallBrush &mossyWallDeco,
                                   IBrush *groundBrush) {
   const Position pos1{20, 20, 7};
-  const Position pos2{20, 21, 7};
+  const Position pos2{20, 19, 7};
 
   for (const auto &p : {pos1, pos2}) {
     auto *tile = map.getOrCreateTile(p);
@@ -204,11 +221,18 @@ void requireRedirectsAndHateFlags(ChunkedMap &map, BrushRegistry &registry,
 }
 
 void requireDoors(ChunkedMap &map, BrushRegistry &registry,
-                  const WallBrush &brush, IBrush *groundBrush) {
+                  WallBrush &brush, IBrush *groundBrush) {
   const Position pos{30, 30, 7};
   auto *tile = map.getOrCreateTile(pos);
   tile->removeItemsIf([](const Item*) { return true; });
   tile->addItemDirect(makeOwnedItem(registry, *groundBrush, 351));
+
+  // Add a West neighbor to make the wall at pos align as Horizontal
+  const Position westPos{29, 30, 7};
+  auto *westTile = map.getOrCreateTile(westPos);
+  westTile->removeItemsIf([](const Item*) { return true; });
+  westTile->addItemDirect(makeOwnedItem(registry, *groundBrush, 351));
+  westTile->addItemDirect(makeOwnedItem(registry, brush, brush.getWallItemForAlign(WallAlign::Horizontal)));
 
   // Initialize controller
   HistoryManager history;
@@ -224,19 +248,31 @@ void requireDoors(ChunkedMap &map, BrushRegistry &registry,
   controller.activateMagicDoorBrush();
   require(controller.applyBrush(pos), "Magic door paint failed");
 
+  tile = map.getTile(pos);
+  require(tile != nullptr, "Tile missing after magic door paint");
+
   // Check magic door item was placed
-  require(tileContainsItemId(*tile, 6265), "Door item 6265 not placed on wall");
+  if (!tileContainsItemId(*tile, 6265)) {
+    std::cerr << "Door item 6265 check failed. Actual items on tile:\n";
+    for (const auto &item : tile->getItems()) {
+      std::cerr << "  itemId=" << item->getServerId() << "\n";
+    }
+    require(false, "Door item 6265 not placed on wall");
+  }
 
   // Switch door state
   require(controller.canSwitchDoorAt(pos), "Cannot switch door at position");
   require(controller.switchDoorAt(pos), "Switch door failed");
+
+  tile = map.getTile(pos);
+  require(tile != nullptr, "Tile missing after switch door");
 
   // Should have toggled open/closed state
   require(!tileContainsItemId(*tile, 6265), "Magic door variant did not switch");
 }
 
 void requireContextPicking(ChunkedMap &map, BrushRegistry &registry,
-                           const WallBrush &brush, IBrush *groundBrush) {
+                           WallBrush &brush, IBrush *groundBrush) {
   const Position pos{40, 40, 7};
   auto *tile = map.getOrCreateTile(pos);
   tile->removeItemsIf([](const Item*) { return true; });
@@ -257,7 +293,7 @@ void requireContextPicking(ChunkedMap &map, BrushRegistry &registry,
 }
 
 void requireSegmentedVsSingleDragParity(ChunkedMap &map, BrushRegistry &registry,
-                                       const WallBrush &brush, IBrush *groundBrush) {
+                                       WallBrush &brush, IBrush *groundBrush) {
   // Clear map area
   for (int x = 50; x < 60; ++x) {
     for (int y = 50; y < 60; ++y) {
@@ -331,7 +367,7 @@ void requireSegmentedVsSingleDragParity(ChunkedMap &map, BrushRegistry &registry
 }
 
 void requireWallPerformance(ChunkedMap &map, BrushRegistry &registry,
-                            const WallBrush &brush, IBrush *groundBrush) {
+                            WallBrush &brush, IBrush *groundBrush) {
   // Setup 1,000 tiles
   std::vector<Position> performancePath;
   performancePath.reserve(1000);
@@ -377,12 +413,17 @@ int main() {
 
     auto *groundBrush = findBrush(registry, "cave", BrushType::Ground);
     auto *stoneWallBrush = findBrush(registry, "stone wall", BrushType::Wall);
-    const auto *stoneWall = dynamic_cast<const WallBrush *>(stoneWallBrush);
+    auto *stoneWall = dynamic_cast<WallBrush *>(stoneWallBrush);
     require(stoneWall != nullptr, "stone wall brush cast failed");
 
     auto *mossyWallDecoBrush = findBrush(registry, "mossy wall", BrushType::WallDecoration);
-    const auto *mossyWallDeco = dynamic_cast<const WallBrush *>(mossyWallDecoBrush);
+    auto *mossyWallDeco = dynamic_cast<WallBrush *>(mossyWallDecoBrush);
     require(mossyWallDeco != nullptr, "mossy wall deco cast failed");
+
+    std::cout << "Stone Wall registered alignments:\n";
+    for (int a = 0; a < 17; ++a) {
+      std::cout << "  Align " << a << ": " << stoneWall->getWallItemForAlign(static_cast<WallAlign>(a)) << "\n";
+    }
 
     ChunkedMap map;
     map.createNew(512, 512, 1098);

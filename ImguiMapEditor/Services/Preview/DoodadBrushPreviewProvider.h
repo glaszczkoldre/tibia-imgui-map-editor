@@ -47,6 +47,7 @@ private:
   mutable std::vector<std::pair<int, int>> cachedOffsets_;
   mutable uint32_t previewNonce_ = 0;
   mutable uint32_t currentSeed_ = 0;
+  mutable size_t lastVariation_ = 0;
 };
 
 } // namespace MapEditor::Services::Preview

@@ -65,23 +65,23 @@ TableAlign parseTableAlign(std::string_view name) {
 WallAlign parseWallType(std::string_view name) {
   static constexpr std::array<std::pair<std::string_view, WallAlign>, 18> kMap = {{
       {"corner", WallAlign::Corner},
-      {"east end", WallAlign::EastEnd},
       {"east T", WallAlign::EastT},
+      {"east end", WallAlign::EastEnd},
       {"horizontal", WallAlign::Horizontal},
       {"intersection", WallAlign::Intersection},
-      {"north end", WallAlign::NorthEnd},
       {"north T", WallAlign::NorthT},
+      {"north end", WallAlign::NorthEnd},
       {"northeast diagonal", WallAlign::NortheastDiagonal},
       {"northwest diagonal", WallAlign::NorthwestDiagonal},
       {"pole", WallAlign::Pole},
-      {"south end", WallAlign::SouthEnd},
       {"south T", WallAlign::SouthT},
+      {"south end", WallAlign::SouthEnd},
       {"southeast diagonal", WallAlign::SoutheastDiagonal},
       {"southwest diagonal", WallAlign::SouthwestDiagonal},
       {"untouchable", WallAlign::Untouchable},
       {"vertical", WallAlign::Vertical},
-      {"west end", WallAlign::WestEnd},
       {"west T", WallAlign::WestT},
+      {"west end", WallAlign::WestEnd},
   }};
   auto it = std::lower_bound(kMap.begin(), kMap.end(), name,
       [](const auto& entry, std::string_view key) { return entry.first < key; });

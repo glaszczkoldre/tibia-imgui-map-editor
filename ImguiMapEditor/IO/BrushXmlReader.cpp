@@ -13,6 +13,7 @@
 #include "../Brushes/Types/WallDecorationBrush.h"
 #include "../Brushes/Types/TableBrush.h"
 #include "../Brushes/Types/WallBrush.h"
+#include "DoodadXmlHelper.h"
 
 #include "XmlUtils.h"
 #include <algorithm>
@@ -201,35 +202,6 @@ GroundBrush::BorderRule parseInlineBorderRule(const pugi::xml_node &borderNode,
   }
 
   return rule;
-}
-
-CompositeItem parseCompositeNode(const pugi::xml_node &compositeNode) {
-  CompositeItem composite;
-  composite.chance = parseChance(compositeNode);
-
-  for (const auto tileNode : compositeNode.children("tile")) {
-    CompositeItem::TileOffset offset;
-    offset.dx = tileNode.attribute("x").as_int(0);
-    offset.dy = tileNode.attribute("y").as_int(0);
-    offset.dz = tileNode.attribute("z").as_int(0);
-
-    for (const auto itemNode : tileNode.children("item")) {
-      const auto itemId = parseItemId(itemNode);
-      if (itemId == 0) {
-        continue;
-      }
-      offset.items.push_back(
-          {.itemId = itemId,
-           .chance = parseChance(itemNode),
-           .subtype = itemNode.attribute("subtype").as_uint(0)});
-    }
-
-    if (!offset.items.empty()) {
-      composite.tiles.push_back(std::move(offset));
-    }
-  }
-
-  return composite;
 }
 
 template <typename TBrush>
@@ -496,74 +468,7 @@ void BrushXmlReader::parseDoodadBrush(const pugi::xml_node &node,
                                       const std::string &name,
                                       uint32_t lookId,
                                       const fs::path &sourceFile) {
-  auto brush = std::make_unique<DoodadBrush>(
-      name, lookId, *deps_.brushRegistry,
-      readBoolAttribute(node, "draggable", true));
-  brush->setPreviewDescriptor(parsePreviewDescriptor(node));
-  markBrushMetadata(*brush, sourceFile);
-  brush->setRedoBorders(
-      readBoolAttributeAlias(node, "redo_borders", "reborder", false));
-  brush->setOneSize(readBoolAttribute(node, "one_size", false));
-  brush->setRemoveOptionalBorder(
-      readBoolAttribute(node, "remove_optional_border", false));
-  brush->setOnBlocking(readBoolAttribute(node, "on_blocking", false));
-  brush->setOnDuplicate(readBoolAttribute(node, "on_duplicate", false));
-
-  if (brush->removesOptionalBorder() && !brush->needsBorderUpdate()) {
-    spdlog::warn(
-        "[BrushXmlReader] remove_optional_border on '{}' has no effect without redo_borders/reborder",
-        name);
-  }
-
-  if (const auto thickness = parseThicknessValue(node.attribute("thickness").as_string());
-      thickness.has_value()) {
-    brush->setThickness(*thickness);
-  }
-
-  auto appendSingles = [&](const pugi::xml_node &parent,
-                           DoodadAlternative &alternative) {
-    for (const auto itemNode : parent.children("item")) {
-      const auto itemId = parseItemId(itemNode);
-      if (itemId != 0) {
-        alternative.addSingleItem(
-            {.itemId = itemId,
-             .chance = parseChance(itemNode),
-             .subtype = itemNode.attribute("subtype").as_uint(0)});
-      }
-    }
-  };
-
-  bool addedAlternative = false;
-  for (const auto altNode : node.children("alternate")) {
-    DoodadAlternative alternative;
-    appendSingles(altNode, alternative);
-    for (const auto compositeNode : altNode.children("composite")) {
-      auto composite = parseCompositeNode(compositeNode);
-      if (!composite.tiles.empty()) {
-        alternative.addComposite(std::move(composite));
-      }
-    }
-    if (alternative.hasContent()) {
-      brush->addAlternative(std::move(alternative));
-      addedAlternative = true;
-    }
-  }
-
-  if (!addedAlternative) {
-    DoodadAlternative alternative;
-    appendSingles(node, alternative);
-    for (const auto compositeNode : node.children("composite")) {
-      auto composite = parseCompositeNode(compositeNode);
-      if (!composite.tiles.empty()) {
-        alternative.addComposite(std::move(composite));
-      }
-    }
-    if (alternative.hasContent()) {
-      brush->addAlternative(std::move(alternative));
-    }
-  }
-
-  deps_.brushRegistry->addBrush(std::move(brush));
+  IO::parseDoodadBrush(node, name, lookId, sourceFile, *deps_.brushRegistry);
 }
 
 void BrushXmlReader::parseTableBrush(const pugi::xml_node &node,

@@ -275,17 +275,11 @@ void requireBorderSelectionUsesScopedSeed() {
   block.addItem(EdgeType::N, 61001, 1);
 
   for (uint32_t seed = 1; seed <= 64; ++seed) {
-    uint32_t first = 0;
-    {
-      MapEditor::Brushes::WeightedSelection::ScopedSeed scopedSeed(seed);
-      first = block.getRandomItem(EdgeType::N);
-    }
+    std::mt19937 rng1(seed);
+    uint32_t first = block.getRandomItem(EdgeType::N, rng1);
 
-    uint32_t second = 0;
-    {
-      MapEditor::Brushes::WeightedSelection::ScopedSeed scopedSeed(seed);
-      second = block.getRandomItem(EdgeType::N);
-    }
+    std::mt19937 rng2(seed);
+    uint32_t second = block.getRandomItem(EdgeType::N, rng2);
 
     require(first == second,
             "border item selection ignored scoped deterministic seed");

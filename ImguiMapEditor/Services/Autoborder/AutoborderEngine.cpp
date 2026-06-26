@@ -98,8 +98,7 @@ public:
 class WallResolver final : public RadiusOneResolver {
 public:
   [[nodiscard]] bool canResolve(const PlacementIntent &intent) const override {
-    return dynamic_cast<const MapEditor::Brushes::WallBrush *>(intent.brush) !=
-           nullptr;
+    return intent.brush && intent.brush->getType() == MapEditor::Brushes::BrushType::Wall;
   }
 
   void applyIntent(Domain::ChunkedMap &scratchMap,

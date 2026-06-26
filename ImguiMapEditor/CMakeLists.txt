@@ -206,6 +206,8 @@ set(IO_SOURCES
     IO/Sec/SecItemParser.cpp
     # Phase 0: Brush XML Parser
     IO/BrushXmlReader.cpp
+    IO/DoodadXmlHelper.cpp
+    IO/DoodadXmlHelper.h
 )
 
 set(SERVICES_SOURCES
@@ -525,6 +527,74 @@ add_executable(WallBrushSmoke
     ${IMGUI_SOURCES}
 )
 
+add_executable(DoodadXmlSmoke
+    ${DOMAIN_SOURCES}
+    ${RENDERING_SOURCES}
+    ${IO_SOURCES}
+    ${SERVICES_SOURCES}
+    ${UI_SOURCES}
+    ${PLATFORM_SOURCES}
+    ${APPLICATION_SOURCES}
+    ${CONTROLLER_SOURCES}
+    ${PRESENTATION_SOURCES}
+    ${RIBBON_SOURCES}
+    ${BRUSHES_SOURCES}
+    Application.cpp
+    Tests/DoodadXmlSmoke.cpp
+    ${IMGUI_SOURCES}
+)
+
+add_executable(DoodadPlanningSmoke
+    ${DOMAIN_SOURCES}
+    ${RENDERING_SOURCES}
+    ${IO_SOURCES}
+    ${SERVICES_SOURCES}
+    ${UI_SOURCES}
+    ${PLATFORM_SOURCES}
+    ${APPLICATION_SOURCES}
+    ${CONTROLLER_SOURCES}
+    ${PRESENTATION_SOURCES}
+    ${RIBBON_SOURCES}
+    ${BRUSHES_SOURCES}
+    Application.cpp
+    Tests/DoodadPlanningSmoke.cpp
+    ${IMGUI_SOURCES}
+)
+
+add_executable(DoodadBorderSmoke
+    ${DOMAIN_SOURCES}
+    ${RENDERING_SOURCES}
+    ${IO_SOURCES}
+    ${SERVICES_SOURCES}
+    ${UI_SOURCES}
+    ${PLATFORM_SOURCES}
+    ${APPLICATION_SOURCES}
+    ${CONTROLLER_SOURCES}
+    ${PRESENTATION_SOURCES}
+    ${RIBBON_SOURCES}
+    ${BRUSHES_SOURCES}
+    Application.cpp
+    Tests/DoodadBorderSmoke.cpp
+    ${IMGUI_SOURCES}
+)
+
+add_executable(DoodadContextSmoke
+    ${DOMAIN_SOURCES}
+    ${RENDERING_SOURCES}
+    ${IO_SOURCES}
+    ${SERVICES_SOURCES}
+    ${UI_SOURCES}
+    ${PLATFORM_SOURCES}
+    ${APPLICATION_SOURCES}
+    ${CONTROLLER_SOURCES}
+    ${PRESENTATION_SOURCES}
+    ${RIBBON_SOURCES}
+    ${BRUSHES_SOURCES}
+    Application.cpp
+    Tests/DoodadContextSmoke.cpp
+    ${IMGUI_SOURCES}
+)
+
 function(configure_tme_target target_name)
     target_include_directories(${target_name} PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
@@ -572,6 +642,10 @@ configure_tme_target(${PROJECT_NAME})
 configure_tme_target(BrushSmoke)
 configure_tme_target(AutoborderSmoke)
 configure_tme_target(DoodadPreviewSmoke)
+configure_tme_target(DoodadXmlSmoke)
+configure_tme_target(DoodadPlanningSmoke)
+configure_tme_target(DoodadBorderSmoke)
+configure_tme_target(DoodadContextSmoke)
 configure_tme_target(CarpetSmoke)
 configure_tme_target(WallBrushSmoke)
 target_compile_definitions(BrushSmoke PRIVATE
@@ -581,6 +655,18 @@ target_compile_definitions(AutoborderSmoke PRIVATE
     AUTOBORDER_SMOKE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
 )
 target_compile_definitions(DoodadPreviewSmoke PRIVATE
+    DOODAD_SMOKE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+)
+target_compile_definitions(DoodadXmlSmoke PRIVATE
+    DOODAD_SMOKE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+)
+target_compile_definitions(DoodadPlanningSmoke PRIVATE
+    DOODAD_SMOKE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+)
+target_compile_definitions(DoodadBorderSmoke PRIVATE
+    DOODAD_SMOKE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+)
+target_compile_definitions(DoodadContextSmoke PRIVATE
     DOODAD_SMOKE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
 )
 target_compile_definitions(CarpetSmoke PRIVATE

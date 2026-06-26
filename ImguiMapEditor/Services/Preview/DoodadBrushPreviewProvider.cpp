@@ -30,6 +30,9 @@ Domain::Position DoodadBrushPreviewProvider::getAnchorPosition() const {
 }
 
 bool DoodadBrushPreviewProvider::checkSettingsChanged() const {
+  if (brush_.getVariation() != lastVariation_) {
+    return true;
+  }
   if (!brushSettings_) {
     return false;
   }
@@ -81,6 +84,7 @@ void DoodadBrushPreviewProvider::regenerate() {
 
 void DoodadBrushPreviewProvider::buildPreview() const {
   currentSeed_ = buildStableSeed();
+  lastVariation_ = brush_.getVariation();
   tiles_ = brush_.buildPreviewTiles(anchor_, brushSettings_, map_, currentSeed_);
   bounds_ = PreviewBounds();
   needsRegen_ = false;

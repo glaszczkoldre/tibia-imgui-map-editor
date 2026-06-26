@@ -29,10 +29,6 @@ void rebuildTileWithBrush(Domain::ChunkedMap &map,
     groundBrush->rebuildTile(map, position);
   } else if (auto *wallBrush = dynamic_cast<WallBrush *>(brush)) {
     wallBrush->rebuildTile(map, position);
-  } else if (auto *tableBrush = dynamic_cast<TableBrush *>(brush)) {
-    tableBrush->rebuildTile(map, position);
-  } else if (auto *carpetBrush = dynamic_cast<CarpetBrush *>(brush)) {
-    carpetBrush->rebuildTile(map, position);
   }
 }
 
@@ -49,6 +45,16 @@ void rebuildBrushesAtPosition(Domain::ChunkedMap &map, BrushRegistry &registry,
       return;
     }
 
+    // Resolve owner metadata
+    if (const auto ownerId = item->getOwnerBrushId(); ownerId != InvalidBrushId) {
+      if (auto *brush = registry.getBrushById(ownerId)) {
+        if (rebuiltBrushes.insert(brush).second) {
+          rebuildTileWithBrush(map, position, brush);
+        }
+      }
+    }
+
+    // Resolve legacy item bindings
     for (auto *brush : registry.getBrushesForItem(item->getServerId())) {
       if (!brush || !rebuiltBrushes.insert(brush).second) {
         continue;
@@ -57,6 +63,10 @@ void rebuildBrushesAtPosition(Domain::ChunkedMap &map, BrushRegistry &registry,
       rebuildTileWithBrush(map, position, brush);
     }
   };
+
+  if (tile->getGround()) {
+    rebuildBrush(tile->getGround());
+  }
 
   for (const auto &item : tile->getItems()) {
     rebuildBrush(item.get());
@@ -208,14 +218,6 @@ void DoodadBrush::addAlternative(DoodadAlternative alternative) {
   }
 
   alternatives_.push_back(std::move(alternative));
-  const auto &added = alternatives_.back();
-
-  for (size_t i = 0; i < added.getSingleItems().size(); ++i) {
-    variants_.push_back({alternatives_.size() - 1, true, i});
-  }
-  for (size_t i = 0; i < added.getComposites().size(); ++i) {
-    variants_.push_back({alternatives_.size() - 1, false, i});
-  }
 }
 
 uint16_t DoodadBrush::getPreviewItemId() const {
@@ -257,8 +259,7 @@ DoodadBrush::buildPlacementPlan(const Domain::Position &center,
        .preferredVariation = preferredVariation,
        .map = map,
        .forcePlace = forcePlace,
-       .seed = seed,
-       .specificVariant = getSpecificVariant()});
+       .seed = seed});
 }
 
 std::vector<Domain::Position>
@@ -299,13 +300,23 @@ DoodadBrush::buildErasePlan(const Domain::Position &center,
     return plan;
   }
 
-  auto positions = getPlacementPositions(center, brushSettings,
-                                         preferredVariation, map, forcePlace,
-                                         seed);
+  auto rawLayout = DoodadPlacementPlanner::generateRawStamp(
+      *this, brushSettings, preferredVariation, seed);
+  std::vector<Domain::Position> positions;
+  positions.reserve(rawLayout.size());
+  for (const auto &tile : rawLayout) {
+    positions.push_back({
+        center.x + tile.relativePosition.x,
+        center.y + tile.relativePosition.y,
+        static_cast<int16_t>(center.z + tile.relativePosition.z)
+    });
+  }
   if (positions.empty()) {
     positions.push_back(center);
   }
   positions = Utils::dedupeAndSortPositions(std::move(positions));
+
+  plan.positions = positions;
 
   for (const auto &position : positions) {
     const auto *tile = map->getTile(position);
@@ -335,12 +346,7 @@ DoodadBrush::buildErasePlan(const Domain::Position &center,
       removesAny = true;
     }
 
-    if (!removesAny) {
-      continue;
-    }
-
-    plan.positions.push_back(position);
-    if (redoBorders_) {
+    if (removesAny && redoBorders_) {
       plan.redoTouches.push_back(redoTouch);
     }
   }

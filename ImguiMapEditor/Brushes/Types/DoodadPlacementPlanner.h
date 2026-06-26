@@ -16,8 +16,13 @@ public:
     const Domain::ChunkedMap *map = nullptr;
     bool forcePlace = false;
     std::optional<uint32_t> seed;
-    std::optional<DoodadBrush::Variant> specificVariant;
   };
+
+  static DoodadBrush::DoodadLayout generateRawStamp(
+      const DoodadBrush &brush,
+      const Services::BrushSettingsService *brushSettings,
+      size_t preferredVariation,
+      std::optional<uint32_t> seed);
 
   static DoodadBrush::DoodadLayout build(const Request &request);
   static DoodadBrush::PlacementPlan buildPlan(const Request &request);
@@ -32,8 +37,7 @@ private:
     std::vector<DoodadBrush::PlacementSkip> skipped;
   };
 
-  static DoodadBrush::PlacementPlan buildPlanUnseeded(const Request &request, std::mt19937 &rng);
-  static LayoutBuildResult buildLayoutUnseeded(const Request &request, std::mt19937 &rng);
+private:
   static std::vector<DoodadRedoBorderTouch>
   buildRedoTouches(const Request &request,
                    const DoodadBrush::DoodadLayout &layout);
@@ -41,16 +45,6 @@ private:
   buildAffectedPositions(const Request &request,
                          const DoodadBrush::DoodadLayout &layout,
                          const std::vector<DoodadRedoBorderTouch> &redoTouches);
-  static std::optional<DoodadBrush::PlacementSkipReason>
-  getSkipReason(const Request &request,
-                const DoodadBrush::DoodadLayout &layout,
-                const Services::Preview::PreviewTileData &tile);
-  static bool tryAppendCandidate(const Request &request,
-                                 DoodadBrush::DoodadLayout &layout,
-                                 std::vector<DoodadBrush::PlacementSkip> &skipped,
-                                 std::unordered_set<uint64_t> &skippedKeys,
-                                 std::unordered_set<int64_t> &occupied,
-                                 const DoodadBrush::DoodadLayout &candidate);
 };
 
 } // namespace MapEditor::Brushes

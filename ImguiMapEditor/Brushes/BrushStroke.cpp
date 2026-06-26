@@ -371,14 +371,6 @@ void BrushController::paintDoodadRecordedPosition(const Domain::Position &pos,
   if (previewService_) {
     previewService_->regenerate();
   }
-
-  const auto maxVar = static_cast<int>(doodadBrush->getMaxVariation());
-  if (maxVar > 0) {
-    const auto specVar = doodadBrush->getSpecificVariant();
-    if (specVar) {
-      cycleBrushVariation(1);
-    }
-  }
 }
 
 void BrushController::eraseDoodadRecordedPosition(const Domain::Position &pos,

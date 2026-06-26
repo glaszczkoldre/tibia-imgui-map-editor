@@ -125,7 +125,7 @@ if !ERRORLEVEL! neq 0 (
 echo OK - Configuration complete.
 
 echo [5/6] Building TibiaMapEditor...
-cmake --build "%BUILD_DIR%" --target TibiaMapEditor --parallel >> "%LOG_FILE%" 2>&1
+cmake --build "%BUILD_DIR%" --parallel >> "%LOG_FILE%" 2>&1
 if !ERRORLEVEL! neq 0 (
     echo.
     echo ========================================================
