@@ -5,7 +5,8 @@
 #include "Services/SpriteManager.h"
 
 namespace MapEditor::Domain {
-class ItemType;
+class ItemDefinition;
+using ItemType = ItemDefinition;
 struct Outfit;
 } // namespace MapEditor::Domain
 

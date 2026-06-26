@@ -152,13 +152,13 @@ void ItemRenderer::queueAll(
 
     if (item_type && !item_type->sprite_ids.empty()) {
       // Calculate item color (borders inherit ground color)
-      bool is_border = item_type->is_border;
+      bool is_border = item_type->isBorder();
       TileColor item_color =
           ColorFilter::calculateItemColor(item_type, ground_color, is_border);
 
       // Locked door highlighting
       if (highlight_locked_doors && item_type->isDoor() &&
-          item_type->is_locked) {
+          item_type->isLocked()) {
         item_color.g *= 0.5f;
         item_color.b *= 0.5f;
       }
@@ -202,15 +202,15 @@ void ItemRenderer::queueAll(
 
   // PASS 1: OnBottom items — forward
   for (const auto &entry : items) {
-    if (entry.type && entry.type->is_on_bottom) {
+    if (entry.type && entry.type->isOnBottom()) {
       renderItem(entry);
     }
   }
 
   // PASS 2: Common items — forward (painter's algorithm: draw bottom first)
   for (const auto &entry : items) {
-    if (entry.type && entry.type->is_on_bottom) continue;
-    if (entry.type && entry.type->is_on_top) continue;
+    if (entry.type && entry.type->isOnBottom()) continue;
+    if (entry.type && entry.type->isOnTop()) continue;
     renderItem(entry);
   }
 

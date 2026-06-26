@@ -138,8 +138,7 @@ void CreatureSimulator::tryMoveCreature(CreatureAnimState& state,
             auto* ground_type = client_data->getItemTypeByServerId(ground->getServerId());
             if (ground_type) {
                 // Check if ground itself blocks
-                if (ground_type->is_blocking || 
-                    ground_type->hasFlag(Domain::ItemFlag::Unpassable) ||
+                if (ground_type->isBlocking() || 
                     ground_type->hasFlag(Domain::ItemFlag::BlockPathfinder)) {
                     return; // Ground is not walkable
                 }
@@ -150,8 +149,7 @@ void CreatureSimulator::tryMoveCreature(CreatureAnimState& state,
         for (const auto& item : tile->getItems()) {
             if (item) {
                 auto* item_type = client_data->getItemTypeByServerId(item->getServerId());
-                if (item_type && (item_type->is_blocking || 
-                    item_type->hasFlag(Domain::ItemFlag::Unpassable) ||
+                if (item_type && (item_type->isBlocking() || 
                     item_type->hasFlag(Domain::ItemFlag::BlockPathfinder))) {
                     return; // Blocked by item (wall, etc)
                 }

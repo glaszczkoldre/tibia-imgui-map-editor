@@ -71,7 +71,7 @@ void TileRenderer::queueTile(const Domain::Tile &tile, int tile_x, int tile_y,
         const auto &items = tile.getItems();
         const auto *topmost = items.back().get();
         if (topmost && topmost->getType()) {
-          topmost_is_border = topmost->getType()->is_border;
+          topmost_is_border = topmost->getType()->isBorder();
         }
       }
 
@@ -123,8 +123,8 @@ void TileRenderer::queueTile(const Domain::Tile &tile, int tile_x, int tile_y,
         type = client_data_->getItemTypeByServerId(ground->getServerId());
       }
       if (type) {
-        tile_has_hook_south |= type->hook_south;
-        tile_has_hook_east |= type->hook_east;
+        tile_has_hook_south |= type->hookSouth();
+        tile_has_hook_east |= type->hookEast();
       }
     }
 
@@ -181,12 +181,12 @@ void TileRenderer::queueTile(const Domain::Tile &tile, int tile_x, int tile_y,
 
       if (type) {
         // Conciseness fix: logical OR assignment
-        tile_has_hook_south |= type->hook_south;
-        tile_has_hook_east |= type->hook_east;
+        tile_has_hook_south |= type->hookSouth();
+        tile_has_hook_east |= type->hookEast();
 
         // Collect OnTop items for deferred rendering
         // Optimization: Cache the type with the item to avoid re-lookup
-        if (type->is_on_top) {
+        if (type->isOnTop()) {
           on_top_item_cache_.push_back({item.get(), type});
         }
       }

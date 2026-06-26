@@ -5,7 +5,10 @@
 #include "Domain/Outfit.h"
 namespace MapEditor {
 
-namespace IO { struct ClientItem; }
+namespace IO {
+struct DatItemFragment;
+using ClientItem = DatItemFragment;
+}
 
 namespace Services {
     class ClientDataService;

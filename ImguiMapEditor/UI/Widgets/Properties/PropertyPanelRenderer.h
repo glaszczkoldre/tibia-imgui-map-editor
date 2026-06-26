@@ -5,7 +5,8 @@
 namespace MapEditor {
 namespace Domain {
 class Item;
-class ItemType;
+class ItemDefinition;
+using ItemType = ItemDefinition;
 struct Spawn;
 struct Creature;
 class ChunkedMap;

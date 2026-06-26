@@ -51,7 +51,7 @@ bool GroundRenderer::queue(const Domain::Item *ground, float screen_x,
           item_type->hasFlag(Domain::ItemFlag::Unpassable) &&
           item_type->hasFlag(Domain::ItemFlag::BlockMissiles) &&
           !item_type->hasFlag(Domain::ItemFlag::Moveable) &&
-          item_type->top_order == 0 &&
+          item_type->alwaysOnTopOrder() == 0 &&
           !item_type->hasFlag(Domain::ItemFlag::FullTile);
       if (is_blocking_ground) {
         final_alpha = 0.5f;

@@ -85,7 +85,7 @@ void recordRedoBorderTouch(
   auto &touch = touches[it->second];
   if (itemType && itemType->isGround()) {
     touch.placedGround = true;
-  } else if (itemType && itemType->is_wall) {
+  } else if (itemType && itemType->isWall()) {
     touch.placedWall = true;
   }
 }
@@ -139,7 +139,7 @@ void DoodadBrush::undraw(Domain::ChunkedMap &map, Domain::Tile *tile,
                    return false;
                  }
                  const auto *itemType = item->getType();
-                 if (itemType && itemType->is_wall) {
+                 if (itemType && itemType->isWall()) {
                    redoTouch.placedWall = true;
                  }
                  return true;
@@ -344,7 +344,7 @@ DoodadBrush::buildErasePlan(const Domain::Position &center,
         continue;
       }
       if (const auto *itemType = item->getType();
-          itemType && itemType->is_wall) {
+          itemType && itemType->isWall()) {
         redoTouch.placedWall = true;
       }
       removesAny = true;
@@ -419,7 +419,7 @@ void DoodadBrush::applyPlacementPlan(Domain::ChunkedMap &map,
       if (itemType && itemType->isGround()) {
         targetTile->setGround(std::move(item));
       } else {
-        if (itemType && itemType->is_wall) {
+        if (itemType && itemType->isWall()) {
           const auto serverId = item->getServerId();
           const auto ownerBrushId = item->getOwnerBrushId();
           targetTile->removeItemsIf([serverId, ownerBrushId](const Domain::Item *existing) {
@@ -427,7 +427,7 @@ void DoodadBrush::applyPlacementPlan(Domain::ChunkedMap &map,
               return false;
             }
             const auto *existingType = existing->getType();
-            if (!existingType || !existingType->is_wall) {
+            if (!existingType || !existingType->isWall()) {
               return false;
             }
             if (existing->getServerId() == serverId) {

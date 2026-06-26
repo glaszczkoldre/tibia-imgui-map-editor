@@ -5,11 +5,7 @@
 
 namespace MapEditor::IO {
 
-ItemXmlResult ItemXmlReader::load(
-    const std::filesystem::path& xml_path,
-    std::vector<Domain::ItemType>& items,
-    const std::unordered_map<uint16_t, size_t>& server_id_index) {
-    
+ItemXmlResult ItemXmlReader::load(const std::filesystem::path& xml_path) {
     ItemXmlResult result;
     pugi::xml_document doc;
 
@@ -25,9 +21,7 @@ ItemXmlResult ItemXmlReader::load(
 
         if (auto attr = itemNode.attribute("id")) {
             id = static_cast<uint16_t>(attr.as_uint());
-            if (applyToItem(id, itemNode, items, server_id_index, result.warnings)) {
-                result.items_merged++;
-            }
+            parseItemNode(itemNode, id, result.items);
             result.items_loaded++;
         } else if (auto fromAttr = itemNode.attribute("fromid")) {
             fromId = static_cast<uint16_t>(fromAttr.as_uint());
@@ -35,9 +29,7 @@ ItemXmlResult ItemXmlReader::load(
                 toId = static_cast<uint16_t>(toAttr.as_uint());
                 
                 for (uint16_t currentId = fromId; currentId <= toId; ++currentId) {
-                    if (applyToItem(currentId, itemNode, items, server_id_index, result.warnings)) {
-                        result.items_merged++;
-                    }
+                    parseItemNode(itemNode, currentId, result.items);
                     result.items_loaded++;
                 }
             } else {
@@ -51,25 +43,18 @@ ItemXmlResult ItemXmlReader::load(
     }
 
     result.success = true;
-    spdlog::info("[ItemXmlReader] Loaded {} definitions, merged {} with existing types", 
-                 result.items_loaded, result.items_merged);
+    spdlog::info("[ItemXmlReader] Loaded {} override fragments from XML", result.items_loaded);
     
     return result;
 }
 
-bool ItemXmlReader::applyToItem(
-    uint16_t id,
+void ItemXmlReader::parseItemNode(
     const pugi::xml_node& itemNode,
-    std::vector<Domain::ItemType>& items,
-    const std::unordered_map<uint16_t, size_t>& server_id_index,
-    std::vector<std::string>& warnings) {
+    uint16_t id,
+    std::vector<XmlItemFragment>& items) {
     
-    auto it = server_id_index.find(id);
-    if (it == server_id_index.end()) {
-        return false;
-    }
-
-    Domain::ItemType& item = items[it->second];
+    XmlItemFragment item;
+    item.server_id = id;
 
     // Basic attributes on the item node itself
     if (auto attr = itemNode.attribute("name")) {
@@ -85,11 +70,10 @@ bool ItemXmlReader::applyToItem(
     // Parse nested attributes
     parseAttributes(itemNode, item);
 
-    item.xml_loaded = true;
-    return true;
+    items.push_back(std::move(item));
 }
 
-void ItemXmlReader::parseAttributes(const pugi::xml_node& itemNode, Domain::ItemType& item) {
+void ItemXmlReader::parseAttributes(const pugi::xml_node& itemNode, XmlItemFragment& item) {
     for (pugi::xml_node attrNode : itemNode.children("attribute")) {
         pugi::xml_attribute keyAttr = attrNode.attribute("key");
         pugi::xml_attribute valAttr = attrNode.attribute("value");
@@ -167,18 +151,16 @@ void ItemXmlReader::parseAttributes(const pugi::xml_node& itemNode, Domain::Item
             else if (value == "ammunition") item.weapon_type = Domain::WeaponType::Ammo;
         }
         else if (key == "ammotype") {
-            item.ammoType = value; // Store string representation
+            item.ammoType = value;
         }
         else if (key == "containersize") {
             item.volume = static_cast<uint16_t>(std::stoi(value));
         }
         else if (key == "rotateto") {
             item.rotateTo = static_cast<uint16_t>(std::stoul(value));
-            item.flags = item.flags | Domain::ItemFlag::Rotatable;
         }
         else if (key == "readable") {
             item.can_read_text = (value == "1" || value == "true");
-            if (item.can_read_text) item.flags = item.flags | Domain::ItemFlag::Readable;
         }
         else if (key == "writeable") {
             item.can_write_text = (value == "1" || value == "true");
@@ -188,7 +170,6 @@ void ItemXmlReader::parseAttributes(const pugi::xml_node& itemNode, Domain::Item
         }
         else if (key == "allowdistread") {
             item.allow_dist_read = (value == "1" || value == "true");
-            if (item.allow_dist_read) item.flags = item.flags | Domain::ItemFlag::AllowDistRead;
         }
         else if (key == "lightlevel") {
             item.light_level = static_cast<uint8_t>(std::stoi(value));
@@ -216,24 +197,18 @@ void ItemXmlReader::parseAttributes(const pugi::xml_node& itemNode, Domain::Item
         }
         else if (key == "pickupable") {
             item.is_pickupable = (value == "1" || value == "true");
-            if (item.is_pickupable) item.flags = item.flags | Domain::ItemFlag::Pickupable;
         }
         else if (key == "unpassable") {
-            bool val = (value == "1" || value == "true");
-            if (val) item.flags = item.flags | Domain::ItemFlag::Unpassable;
+            item.is_unpassable = (value == "1" || value == "true");
         }
         else if (key == "blockprojectile") {
             item.blocks_projectile = (value == "1" || value == "true");
-            if (item.blocks_projectile) item.flags = item.flags | Domain::ItemFlag::BlockMissiles;
         }
         else if (key == "walkstack") {
-            // "walkstack" usually implies blocking pathfinder or order
-            bool val = (value == "1" || value == "true");
-            if (val) item.flags = item.flags | Domain::ItemFlag::BlockPathfinder;
+            item.is_walkstack = (value == "1" || value == "true");
         }
         else if (key == "alwaysontop") {
-            bool val = (value == "1" || value == "true");
-            if (val) item.flags = item.flags | Domain::ItemFlag::AlwaysOnTop;
+            item.is_alwaysontop = (value == "1" || value == "true");
         }
     }
 }

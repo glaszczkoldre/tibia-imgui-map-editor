@@ -1,5 +1,5 @@
 #pragma once
-#include "Domain/ItemType.h"
+#include "IO/Loader/SourceFragments.h"
 #include <filesystem>
 #include <vector>
 #include <string>
@@ -12,7 +12,7 @@ namespace IO {
  */
 struct SrvResult {
     bool success = false;
-    std::vector<Domain::ItemType> items;
+    std::vector<ServerItemFragment> items;
     std::string error;
 };
 

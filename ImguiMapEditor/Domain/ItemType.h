@@ -37,51 +37,69 @@ enum class ItemGroup : uint8_t {
 };
 
 /**
- * Item flags from OTB file
+ * Item flags resolved from OTB, DAT, SRV, and XML
  */
-enum class ItemFlag : uint32_t {
+enum class ItemFlag : uint64_t {
   None = 0,
-  Unpassable = 1 << 0,
-  BlockMissiles = 1 << 1,
-  BlockPathfinder = 1 << 2,
-  HasElevation = 1 << 3,
-  Useable = 1 << 4,
-  Pickupable = 1 << 5,
-  Moveable = 1 << 6,
-  Stackable = 1 << 7,
-  FloorChangeDown = 1 << 8,
-  FloorChangeNorth = 1 << 9,
-  FloorChangeEast = 1 << 10,
-  FloorChangeSouth = 1 << 11,
-  FloorChangeWest = 1 << 12,
-  AlwaysOnTop = 1 << 13,
-  Readable = 1 << 14,
-  Rotatable = 1 << 15,
-  Hangable = 1 << 16,
-  HookEast = 1 << 17,
-  HookSouth = 1 << 18,
-  CanNotDecay = 1 << 19,
-  AllowDistRead = 1 << 20,
-  Unused = 1 << 21,
-  ClientCharges = 1 << 22,
-  IgnoreLook = 1 << 23,
-  Animation = 1 << 24,
-  FullTile = 1 << 25,
-  ForceUse = 1 << 26
+  Unpassable = 1ULL << 0,
+  BlockMissiles = 1ULL << 1,
+  BlockPathfinder = 1ULL << 2,
+  HasElevation = 1ULL << 3,
+  Useable = 1ULL << 4,
+  Pickupable = 1ULL << 5,
+  Moveable = 1ULL << 6,
+  Stackable = 1ULL << 7,
+  FloorChangeDown = 1ULL << 8,
+  FloorChangeNorth = 1ULL << 9,
+  FloorChangeEast = 1ULL << 10,
+  FloorChangeSouth = 1ULL << 11,
+  FloorChangeWest = 1ULL << 12,
+  AlwaysOnBottom = 1ULL << 13,
+  CanReadText = 1ULL << 14,
+  Rotatable = 1ULL << 15,
+  IsHangable = 1ULL << 16,
+  HookEast = 1ULL << 17,
+  HookSouth = 1ULL << 18,
+  CanNotDecay = 1ULL << 19,
+  AllowDistRead = 1ULL << 20,
+  CanWriteText = 1ULL << 21,
+  ClientCharges = 1ULL << 22,
+  IgnoreLook = 1ULL << 23,
+  Animation = 1ULL << 24,
+  FullTile = 1ULL << 25,
+  ForceUse = 1ULL << 26,
+  
+  // Visual/gameplay flags from DAT
+  Translucent = 1ULL << 27,
+  DontHide = 1ULL << 28,
+  OnTop = 1ULL << 29,
+  NoMoveAnimation = 1ULL << 30,
+  Wrappable = 1ULL << 31,
+  Unwrappable = 1ULL << 32,
+  TopEffect = 1ULL << 33,
+  Cloth = 1ULL << 34,
+  MarketItem = 1ULL << 35,
+  LensHelp = 1ULL << 36,
+  Decays = 1ULL << 37,
+  FloorChange = 1ULL << 38
 };
 
 inline ItemFlag operator|(ItemFlag a, ItemFlag b) {
-  return static_cast<ItemFlag>(static_cast<uint32_t>(a) |
-                               static_cast<uint32_t>(b));
+  return static_cast<ItemFlag>(static_cast<uint64_t>(a) |
+                               static_cast<uint64_t>(b));
 }
 
 inline ItemFlag operator&(ItemFlag a, ItemFlag b) {
-  return static_cast<ItemFlag>(static_cast<uint32_t>(a) &
-                               static_cast<uint32_t>(b));
+  return static_cast<ItemFlag>(static_cast<uint64_t>(a) &
+                               static_cast<uint64_t>(b));
+}
+
+inline ItemFlag operator~(ItemFlag a) {
+  return static_cast<ItemFlag>(~static_cast<uint64_t>(a));
 }
 
 inline bool hasFlag(ItemFlag flags, ItemFlag flag) {
-  return (static_cast<uint32_t>(flags) & static_cast<uint32_t>(flag)) != 0;
+  return (static_cast<uint64_t>(flags) & static_cast<uint64_t>(flag)) != 0;
 }
 
 /**
@@ -159,16 +177,15 @@ enum class ItemTypeEnum : uint8_t {
 };
 
 /**
- * Item type definition - loaded from OTB and DAT files
- * Represents the properties of an item type, not an instance
+ * Centralized, read-only item definition store structure.
+ * Generated from multiple raw source fragments via ItemDefinitionResolver.
  */
-class ItemType {
+class ItemDefinition {
 public:
   // Identifiers
-  uint16_t server_id = 0; // From OTB - used in OTBM maps
+  uint16_t server_id = 0; // From OTB/SRV - used in maps
   uint16_t client_id = 0; // From DAT - used for rendering
 
-  // OTB properties
   ItemGroup group = ItemGroup::None;
   ItemFlag flags = ItemFlag::None;
 
@@ -177,15 +194,10 @@ public:
   std::string article;
   std::string description;
 
-  // Movement properties
+  // Movement/attributes properties
   uint16_t speed = 0; // Ground speed
-  bool is_blocking = false;
-  bool is_moveable = true;
-  bool is_pickupable = false;
-  bool is_stackable = false;
-  bool is_fluid_container =
-      false;              // From DAT - items that hold fluids (buckets, vials)
-  bool is_ground = false; // From DAT - ThingAttrGround attribute
+  uint8_t ground_speed = 0;
+  int8_t always_on_top_order = 0; // Render order (previously top_order)
 
   // Rendering properties (from DAT)
   uint8_t width = 1;
@@ -195,8 +207,6 @@ public:
   uint8_t pattern_y = 1;
   uint8_t pattern_z = 1;
   uint8_t frames = 1;
-  uint8_t ground_speed = 0;
-  int8_t top_order = 0; // Render order for "always on top" items
 
   // Animation data (from DAT)
   bool animate_always = false;
@@ -204,9 +214,9 @@ public:
   int32_t loop_count = 0;
   uint8_t start_frame = 0;
   std::vector<std::pair<uint32_t, uint32_t>> frame_durations;
-  uint32_t total_duration = 0;       // Pre-calculated sum of frame duration midpoints (ms)
+  uint32_t total_duration = 0;       // Pre-calculated animation sum
 
-  // Frame groups (10.57+ creatures with idle/walking animations)
+  // Frame groups (creatures with idle/walking animations)
   std::vector<uint32_t> idle_sprite_ids;
   std::vector<uint32_t> walk_sprite_ids;
   uint8_t idle_frames = 1;
@@ -217,42 +227,15 @@ public:
   uint8_t light_level = 0;
   uint8_t light_color = 0;
 
-  // Minimap color (from DAT) - 8-bit index into 256-color palette
+  // Minimap color (from DAT/XML)
   uint16_t minimap_color = 0;
 
-  // Draw offset (from DAT) - sprite visual offset from tile position
+  // Draw offset (from DAT)
   int16_t draw_offset_x = 0;
   int16_t draw_offset_y = 0;
 
-  // Translucency (from DAT)
-  bool is_translucent = false;
-
-  // Elevation (from DAT) - items on this raise subsequent items visually
+  // Elevation (from DAT)
   uint16_t elevation = 0;
-
-  // Stacking order (from OTB FLAG_ALWAYSONTOP actually means bottom)
-  bool always_on_bottom = false;
-
-  // Hook/hangable properties (from OTB flags)
-  bool is_hangable = false;
-  bool hook_east = false;
-  bool hook_south = false;
-
-  // Floor visibility flags (from DAT - critical for floor rendering)
-  bool is_on_bottom = false; // Wall-like items that block floor view
-  bool is_on_top = false;    // Doors, windows (drawn last, priority 3)
-  bool is_dont_hide =
-      false; // Items that never block floor view (transparent roofs, etc)
-  bool blocks_projectile =
-      false; // Used in non-free view mode for floor blocking
-
-  // Border/wall detection (used for rendering order)
-  bool is_border = false;
-  bool is_wall = false;
-  bool is_locked = false; // Door key lock status (for highlight_locked_doors)
-
-  // Lying object (multi-tile corpses) — drawn before creatures
-  bool is_lying_object = false;
 
   // Sprite IDs for rendering
   std::vector<uint32_t> sprite_ids;
@@ -261,31 +244,21 @@ public:
   uint16_t wareId = 0;
 
   // Writeable properties (RME-compatible from items.json)
-  uint16_t maxTextLen = 0; // max_text_len in JSON
-  bool can_read_text = false;
-  bool can_write_text = false;
-  bool allow_dist_read = false;
-
-  // Rotation - target item ID when rotated (0 = not rotatable)
+  uint16_t maxTextLen = 0; 
   uint16_t rotateTo = 0;
 
-  // === FROM items.json (RME-compatible) ===
-
-  // Editor display
-  std::string editor_suffix; // editorSuffix in JSON
-
-  // Combat stats
-  float weight = 0.0f; // Divided by 100 from JSON
+  // Display and Stats
+  std::string editor_suffix;
+  float weight = 0.0f;
   int16_t armor = 0;
   int16_t defense = 0;
   int16_t attack = 0;
 
-  // Equipment
   SlotPosition slot_position = SlotPosition::None;
   WeaponType weapon_type = WeaponType::None;
   ItemTypeEnum item_type = ItemTypeEnum::None;
 
-  // Floor change
+  // Floor change details
   bool floor_change = false;
   bool floor_change_down = false;
   bool floor_change_north = false;
@@ -297,37 +270,29 @@ public:
   bool floor_change_east_ex = false;
   bool floor_change_west_ex = false;
 
-  // Container
-  uint16_t volume = 0; // containerSize in JSON
-
-  // Charges
+  // Attributes
+  uint16_t volume = 0;
   uint32_t charges = 0;
   bool extra_chargeable = false;
-
-  // Decay
-  bool decays = false;
-
-  // Track if XML was merged
-  bool xml_loaded = false;
-
-  // PERFORMANCE: Cached first sprite region (pre-fetched during loading)
-  // Eliminates hash lookup in getSpriteRegion() - 30k+ lookups/frame → 0
-  const MapEditor::Rendering::AtlasRegion *cached_sprite_region =
-      nullptr; // Points to AtlasRegion (avoid circular include)
-
-  // Additional RME-compatible fields
   uint8_t shootRange = 0;
   uint16_t decayTo = 0;
   uint32_t stopDuration = 0;
   std::string ammoType;
 
-  // Disguise - display this item using another item's appearance (from
-  // items.srv DisguiseTarget)
+  // Disguise target
   uint16_t disguise_target = 0;
 
+  // Track if XML was merged
+  bool xml_loaded = false;
+
+  // PERFORMANCE: Cached first sprite region
+  const MapEditor::Rendering::AtlasRegion *cached_sprite_region = nullptr;
+
   // Helper methods over the final resolved item definition.
+  bool hasFlag(ItemFlag flag) const { return Domain::hasFlag(flags, flag); }
+
   bool isReadable() const {
-    return can_read_text || hasFlag(ItemFlag::Readable);
+    return hasFlag(ItemFlag::CanReadText);
   }
 
   bool isGround() const { return group == ItemGroup::Ground; }
@@ -347,7 +312,7 @@ public:
     return item_type == ItemTypeEnum::MagicField;
   }
   bool isWriteable() const {
-    return group == ItemGroup::Writeable || can_write_text;
+    return hasFlag(ItemFlag::CanWriteText);
   }
   bool isKey() const {
     return item_type == ItemTypeEnum::Key;
@@ -361,14 +326,12 @@ public:
   bool isBed() const { return item_type == ItemTypeEnum::Bed; }
 
   bool isRotatable() const {
-    return Domain::hasFlag(flags, ItemFlag::Rotatable) && rotateTo != 0;
+    return hasFlag(ItemFlag::Rotatable) && rotateTo != 0;
   }
-
-  bool hasFlag(ItemFlag flag) const { return Domain::hasFlag(flags, flag); }
 
   // Check if this item has elevation (raises items on top of it)
   bool hasElevation() const {
-    return Domain::hasFlag(flags, ItemFlag::HasElevation) && elevation > 0;
+    return hasFlag(ItemFlag::HasElevation) && elevation > 0;
   }
 
   // Get the first sprite ID for rendering
@@ -382,17 +345,34 @@ public:
            pattern_y * pattern_z * frames;
   }
 
-  /**
-   * Check if this item type has valid data for rendering.
-   * Returns false for "gap" entries in items.otb that have a server_id
-   * but no actual item data (no client_id, no sprites).
-   */
   bool isValidForRendering() const {
-    // Item must have a client_id (DA T mapping) to be renderable
-    // Items with only server_id and no client_id are gaps/placeholders
     return client_id > 0 && !sprite_ids.empty();
   }
+
+  // Unified helpers to replace old boolean fields
+  bool isBlocking() const { return hasFlag(ItemFlag::Unpassable); }
+  bool isMoveable() const { return hasFlag(ItemFlag::Moveable); }
+  bool isPickupable() const { return hasFlag(ItemFlag::Pickupable); }
+  bool isStackable() const { return hasFlag(ItemFlag::Stackable); }
+  bool isOnBottom() const { return hasFlag(ItemFlag::AlwaysOnBottom); }
+  bool isOnTop() const { return hasFlag(ItemFlag::OnTop); }
+  bool isDontHide() const { return hasFlag(ItemFlag::DontHide); }
+  bool blocksProjectile() const { return hasFlag(ItemFlag::BlockMissiles); }
+  bool canReadText() const { return hasFlag(ItemFlag::CanReadText); }
+  bool canWriteText() const { return hasFlag(ItemFlag::CanWriteText); }
+  bool allowDistRead() const { return hasFlag(ItemFlag::AllowDistRead); }
+  bool isBorder() const { return false; }
+  bool isLocked() const { return false; }
+  bool isWall() const { return false; }
+  bool hookSouth() const { return hasFlag(ItemFlag::HookSouth); }
+  bool hookEast() const { return hasFlag(ItemFlag::HookEast); }
+  bool isHangable() const { return hasFlag(ItemFlag::IsHangable); }
+  bool decays() const { return hasFlag(ItemFlag::Decays); }
+  int8_t alwaysOnTopOrder() const { return always_on_top_order; }
 };
+
+// Aliasing ItemType to ItemDefinition for codebase compatibility
+using ItemType = ItemDefinition;
 
 } // namespace Domain
 } // namespace MapEditor

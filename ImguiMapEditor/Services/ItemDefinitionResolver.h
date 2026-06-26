@@ -2,9 +2,13 @@
 
 #include "Domain/ClientVersionTypes.h"
 #include "Domain/ItemType.h"
-#include "IO/Readers/DatReaderBase.h"
+#include "IO/Loader/SourceFragments.h"
 
 #include <vector>
+
+namespace MapEditor::IO {
+struct DatResult;
+}
 
 namespace MapEditor::Services {
 
@@ -19,10 +23,12 @@ class ItemDefinitionResolver {
 public:
   static std::vector<Domain::ItemType>
   resolve(Domain::ItemDataSource source,
-          const std::vector<Domain::ItemType> &server_items,
+          const std::vector<IO::ServerItemFragment> &server_items,
           const IO::DatResult &dat_result);
 
   static void normalizeResolvedItemTypes(std::vector<Domain::ItemType> &items);
+
+  static void mergeXmlOverride(Domain::ItemType &item, const IO::XmlItemFragment &xml);
 
 private:
   static Domain::ItemType createDatOnlyItem(const IO::ClientItem &dat);

@@ -101,7 +101,7 @@ void Tile::addItem(std::unique_ptr<Item> item) {
     // - Items without always_on_bottom are appended at the end
     // - Items WITHOUT type info are placed at the beginning (bottom)
     //   since they are likely corrupted bottom items like borders
-    if (type && type->always_on_bottom) {
+    if (type && type->isOnBottom()) {
       // Find insertion point: iterate through existing always_on_bottom items
       // Insert BEFORE the first item with higher top_order or without
       // always_on_bottom
@@ -112,11 +112,11 @@ void Tile::addItem(std::unique_ptr<Item> item) {
           // No type info - stop here (items without type are at start)
           break;
         }
-        if (!it_type->always_on_bottom) {
+        if (!it_type->isOnBottom()) {
           // Reached non-bottom items - insert here
           break;
         }
-        if (type->top_order < it_type->top_order) {
+        if (type->alwaysOnTopOrder() < it_type->alwaysOnTopOrder()) {
           // Current item has lower priority - insert before
           break;
         }
@@ -293,12 +293,12 @@ bool Tile::hasHookSouth() const {
   // Check all items (including ground) for hook_south property
   if (ground_) {
     const ItemType *type = ground_->getType();
-    if (type && type->hook_south)
+    if (type && type->hookSouth())
       return true;
   }
   for (const auto &item : items_) {
     const ItemType *type = item->getType();
-    if (type && type->hook_south)
+    if (type && type->hookSouth())
       return true;
   }
   return false;
@@ -308,12 +308,12 @@ bool Tile::hasHookEast() const {
   // Check all items (including ground) for hook_east property
   if (ground_) {
     const ItemType *type = ground_->getType();
-    if (type && type->hook_east)
+    if (type && type->hookEast())
       return true;
   }
   for (const auto &item : items_) {
     const ItemType *type = item->getType();
-    if (type && type->hook_east)
+    if (type && type->hookEast())
       return true;
   }
   return false;

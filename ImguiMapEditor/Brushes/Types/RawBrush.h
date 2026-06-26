@@ -1,7 +1,8 @@
 #pragma once
 #include "Brushes/Core/BrushBase.h"
 namespace MapEditor::Domain {
-    class ItemType;
+    class ItemDefinition;
+    using ItemType = ItemDefinition;
 }
 
 namespace MapEditor::Brushes {

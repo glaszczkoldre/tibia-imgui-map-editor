@@ -1,5 +1,5 @@
 #pragma once
-#include "Domain/ItemType.h"
+#include "IO/Loader/SourceFragments.h"
 #include <filesystem>
 #include <vector>
 #include <string>
@@ -25,7 +25,7 @@ struct OtbVersionInfo {
 struct OtbResult {
     bool success = false;
     OtbVersionInfo version;
-    std::vector<Domain::ItemType> items;
+    std::vector<ServerItemFragment> items;
     std::string error;
 };
 

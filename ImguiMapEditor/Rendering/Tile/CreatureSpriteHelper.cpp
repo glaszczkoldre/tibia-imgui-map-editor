@@ -4,6 +4,7 @@
 #include "Services/SpriteManager.h"
 #include "Domain/CreatureType.h"
 #include "IO/Readers/DatReaderBase.h"
+#include "IO/Loader/SourceFragments.h"
 namespace MapEditor::Rendering {
 
 CreatureSpriteHelper::CreatureSpriteHelper(Services::ClientDataService* client_data,

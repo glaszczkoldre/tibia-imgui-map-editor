@@ -236,7 +236,7 @@ void PreviewOverlay::renderItem(
   int fluidSubtype = -1;
   bool isFluid = itemType->isFluidContainer() || itemType->isSplash();
 
-  if (itemType->is_stackable) {
+  if (itemType->isStackable()) {
     int count = item.subtype;
     if (count <= 1)
       subtypeIndex = 0;
@@ -303,7 +303,7 @@ void PreviewOverlay::renderItem(
     patternY = worldPos.y % pat_y;
     patternZ = worldPos.z % pat_z;
 
-    if (itemType->is_hangable) {
+    if (itemType->isHangable()) {
       bool tile_has_hook_south = false;
       bool tile_has_hook_east = false;
       if (map) {
@@ -315,8 +315,8 @@ void PreviewOverlay::renderItem(
                 type = clientData->getItemTypeByServerId(ground->getServerId());
               }
               if (type) {
-                tile_has_hook_south |= type->hook_south;
-                tile_has_hook_east |= type->hook_east;
+                tile_has_hook_south |= type->hookSouth();
+                tile_has_hook_east |= type->hookEast();
               }
             }
           }
@@ -327,8 +327,8 @@ void PreviewOverlay::renderItem(
                 type = clientData->getItemTypeByServerId(tileItem->getServerId());
               }
               if (type) {
-                tile_has_hook_south |= type->hook_south;
-                tile_has_hook_east |= type->hook_east;
+                tile_has_hook_south |= type->hookSouth();
+                tile_has_hook_east |= type->hookEast();
               }
             }
           }

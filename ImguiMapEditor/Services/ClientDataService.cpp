@@ -1,8 +1,6 @@
 #include "ClientDataService.h"
 #include "ItemDefinitionResolver.h"
 #include "SpriteManager.h"
-// NOTE: TilesetXmlReader, TilesetRegistry, BrushRegistry, CreatureBrush
-// includes removed - tileset logic moved to TilesetService
 #include <algorithm>
 #include <format>
 #include <spdlog/spdlog.h>
@@ -25,13 +23,10 @@ ClientDataService::load(const std::filesystem::path &client_path,
     progress(0, "Loading item database...");
 
   // 1. Load item definitions (OTB or SRV format)
-  // SRV is an ancient text-based format from Tibia 7.0-7.7x
-  // OTB is the modern binary format
-  std::vector<Domain::ItemType> item_definitions;
+  std::vector<IO::ServerItemFragment> item_definitions;
 
   if (data_source == ::MapEditor::Domain::ItemDataSource::DAT) {
     spdlog::info("ClientDataService: Using DAT-only mode (Client IDs as Server IDs)");
-    // item_definitions will be generated later during merge
   } else if (data_source == ::MapEditor::Domain::ItemDataSource::SRV) {
     // Load SRV format
     std::filesystem::path srv_path = item_metadata_path;
@@ -48,7 +43,7 @@ ClientDataService::load(const std::filesystem::path &client_path,
     result.otb_version.major_version = 0;
     result.otb_version.minor_version = 0;
     result.otb_version.build_number = 0;
-    result.otb_version.valid = false; // No version info in SRV
+    result.otb_version.valid = false;
 
     spdlog::info("SRV loaded: {} items (ancient 7.x format)",
                  item_definitions.size());
@@ -82,12 +77,10 @@ ClientDataService::load(const std::filesystem::path &client_path,
     return result;
   }
 
-  // Try alternate casing if first fails
   if (!std::filesystem::exists(dat_path)) {
     dat_path = client_path / "tibia.dat";
   }
 
-  // DatReaderBase::read takes the path directly, there is no separate open()
   IO::DatResult dat_result = dat_reader->read(dat_path);
   if (!dat_result.success) {
     result.error = "Failed to read DAT file: " + dat_result.error;
@@ -96,7 +89,6 @@ ClientDataService::load(const std::filesystem::path &client_path,
 
   result.dat_signature = dat_result.signature;
 
-  // Fill result stats from DAT (as requested)
   result.item_count = dat_result.items.size();
   result.outfit_count = dat_result.outfits.size();
   result.effect_count = dat_result.effects.size();
@@ -110,26 +102,15 @@ ClientDataService::load(const std::filesystem::path &client_path,
     progress(60, "Merging data...");
 
   // 3. Resolve data into one final item definition table.
-  items_ = ItemDefinitionResolver::resolve(data_source, item_definitions,
-                                           dat_result);
-  server_id_index_.clear();
-  client_id_index_.clear();
-  max_server_id_ = 0;
-  max_client_id_ = 0;
-  for (size_t index = 0; index < items_.size(); ++index) {
-    const auto &item = items_[index];
-    if (item.server_id > 0) {
-      server_id_index_[item.server_id] = index;
-      max_server_id_ = std::max(max_server_id_, item.server_id);
-    }
-    if (item.client_id > 0) {
-      client_id_index_[item.client_id] = index;
-      max_client_id_ = std::max(max_client_id_, item.client_id);
-    }
-  }
+  auto resolved_items = ItemDefinitionResolver::resolve(data_source, item_definitions,
+                                                       dat_result);
+  item_store_.setItems(std::move(resolved_items));
+  max_server_id_ = item_store_.getMaxServerId();
+  max_client_id_ = item_store_.getMaxClientId();
 
   // 4. Store outfit data for creature sprite lookup
   outfits_ = dat_result.outfits;
+  outfit_index_.clear();
   for (size_t i = 0; i < outfits_.size(); ++i) {
     outfit_index_[outfits_[i].id] = i;
   }
@@ -138,20 +119,16 @@ ClientDataService::load(const std::filesystem::path &client_path,
   if (progress)
     progress(80, "Initializing Sprites...");
 
-  // 4. Initialize Sprite Reader (lazy)
+  // 5. Initialize Sprite Reader (lazy)
   std::filesystem::path spr_path = client_path / "Tibia.spr";
   if (!std::filesystem::exists(spr_path)) {
     spr_path = client_path / "tibia.spr";
   }
 
-  // Initialize Sprite Reader (if not already present)
   if (!spr_reader_) {
     spr_reader_ = std::make_shared<IO::SprReader>();
   }
 
-  // Need to handle result object, no implicit bool conversion
-  // spr_reader_ instance is preserved, only calling open() to reset internal
-  // state and load new file
   bool extended = client_version.isExtended();
   auto spr_result = spr_reader_->open(spr_path, 0, extended);
 
@@ -165,9 +142,7 @@ ClientDataService::load(const std::filesystem::path &client_path,
     return result;
   }
 
-  // Final success update
   result.success = true;
-
   loaded_ = true;
   client_version_ = version_num;
 
@@ -187,7 +162,6 @@ bool ClientDataService::loadCreatureData(
 
   spdlog::info("Loaded {} creatures from XML", result.creatures.size());
 
-  // Merge into storage
   for (auto &creature : result.creatures) {
     std::string lower_name = creature->name;
     std::transform(lower_name.begin(), lower_name.end(), lower_name.begin(),
@@ -207,22 +181,42 @@ bool ClientDataService::loadItemData(
     return false;
   }
 
-  auto result =
-      IO::ItemXmlReader::load(items_xml_path, items_, server_id_index_);
-  if (!result.success) {
-    spdlog::warn("Failed to load items.xml: {}", result.error);
+  auto xml_result = IO::ItemXmlReader::load(items_xml_path);
+  if (!xml_result.success) {
+    spdlog::warn("Failed to load items.xml: {}", xml_result.error);
     return false;
   }
 
+  // Merge override fragments using the resolver
+  size_t merged_count = 0;
+  auto& items = item_store_.getItemTypes();
+  
+  std::unordered_map<uint16_t, size_t> server_id_index;
+  server_id_index.reserve(items.size());
+  for (size_t index = 0; index < items.size(); ++index) {
+      if (items[index].server_id > 0) {
+          server_id_index[items[index].server_id] = index;
+      }
+  }
+
+  for (const auto &xml_fragment : xml_result.items) {
+      auto it = server_id_index.find(xml_fragment.server_id);
+      if (it != server_id_index.end()) {
+          ItemDefinitionResolver::mergeXmlOverride(items[it->second], xml_fragment);
+          merged_count++;
+      }
+  }
+
+  // Reindex the store after modifications
+  item_store_.rebuildIndexes();
+  max_server_id_ = item_store_.getMaxServerId();
+  max_client_id_ = item_store_.getMaxClientId();
+
   spdlog::info("Loaded {} items from XML, merged {} with existing types",
-               result.items_loaded, result.items_merged);
-  ItemDefinitionResolver::normalizeResolvedItemTypes(items_);
+               xml_result.items_loaded, merged_count);
+  ItemDefinitionResolver::normalizeResolvedItemTypes(items);
   return true;
 }
-
-// NOTE: loadTilesetData and generateCreatureTileset have been moved to
-// TilesetService This keeps ClientDataService focused on client data files
-// (OTB, DAT, SPR, items.xml, creatures.xml)
 
 const Domain::CreatureType *
 ClientDataService::getCreatureType(const std::string &name) const {
@@ -241,11 +235,10 @@ size_t ClientDataService::optimizeItemSprites(SpriteManager& sprite_manager, boo
   size_t cached_count = 0;
   size_t simple_items = 0;
 
-  spdlog::info("Caching sprite regions for {} item types...", items_.size());
+  auto& items = item_store_.getItemTypes();
+  spdlog::info("Caching sprite regions for {} item types...", items.size());
 
-  for (auto &item_type : items_) {
-    // Only cache simple items (1x1, single layer, no animation)
-    // These are ~99% of items and benefit most from caching
+  for (auto &item_type : items) {
     if (item_type.width == 1 && item_type.height == 1 &&
         item_type.layers == 1 && item_type.frames == 1 &&
         !item_type.sprite_ids.empty()) {
@@ -258,15 +251,12 @@ size_t ClientDataService::optimizeItemSprites(SpriteManager& sprite_manager, boo
 
       const Rendering::AtlasRegion *region = nullptr;
 
-      // Preload sprite to atlas if needed
       if (preload_sprites) {
         region = sprite_manager.preloadSprite(sprite_id);
       } else {
-        // Just try to get it if it exists
         region = sprite_manager.getSpriteRegion(sprite_id);
       }
 
-      // Cache the region pointer
       if (region) {
         item_type.cached_sprite_region = region;
         cached_count++;
@@ -283,9 +273,7 @@ size_t ClientDataService::optimizeItemSprites(SpriteManager& sprite_manager, boo
 }
 
 void ClientDataService::clear() {
-  items_.clear();
-  server_id_index_.clear();
-  client_id_index_.clear();
+  item_store_.clear();
   max_server_id_ = 0;
   max_client_id_ = 0;
 
@@ -295,32 +283,8 @@ void ClientDataService::clear() {
   outfits_.clear();
   outfit_index_.clear();
 
-  // Note: We don't need to reset spr_reader_ here since it's a shared_ptr
-  // and will be cleaned up automatically when all references are gone.
-  // However, we can reset it if we want to force release.
-  // Given the previous fragility, letting it persist or be replaced in load()
-  // is safer.
-
   loaded_ = false;
   client_version_ = 0;
-}
-
-const Domain::ItemType *
-ClientDataService::getItemTypeByServerId(uint16_t server_id) const {
-  auto it = server_id_index_.find(server_id);
-  if (it != server_id_index_.end()) {
-    return &items_[it->second];
-  }
-  return nullptr;
-}
-
-const Domain::ItemType *
-ClientDataService::getItemTypeByClientId(uint16_t client_id) const {
-  auto it = client_id_index_.find(client_id);
-  if (it != client_id_index_.end()) {
-    return &items_[it->second];
-  }
-  return nullptr;
 }
 
 const IO::ClientItem *

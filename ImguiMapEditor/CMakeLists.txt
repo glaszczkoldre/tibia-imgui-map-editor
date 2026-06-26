@@ -96,6 +96,7 @@ set(DOMAIN_SOURCES
     Domain/MapInstance.cpp
     Domain/ChunkedMap.cpp
     Domain/CopyBuffer.cpp
+    Domain/ItemDefinitionStore.cpp
     Domain/Selection/SelectionBucket.cpp
     Domain/History/TileSnapshot.cpp
     Domain/History/TileSnapshotCodec.cpp
@@ -596,6 +597,23 @@ add_executable(DoodadContextSmoke
     ${IMGUI_SOURCES}
 )
 
+add_executable(ItemDatabaseResolverTest
+    ${DOMAIN_SOURCES}
+    ${RENDERING_SOURCES}
+    ${IO_SOURCES}
+    ${SERVICES_SOURCES}
+    ${UI_SOURCES}
+    ${PLATFORM_SOURCES}
+    ${APPLICATION_SOURCES}
+    ${CONTROLLER_SOURCES}
+    ${PRESENTATION_SOURCES}
+    ${RIBBON_SOURCES}
+    ${BRUSHES_SOURCES}
+    Application.cpp
+    Tests/ItemDatabaseResolverTest.cpp
+    ${IMGUI_SOURCES}
+)
+
 function(configure_tme_target target_name)
     target_include_directories(${target_name} PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
@@ -649,6 +667,7 @@ configure_tme_target(DoodadBorderSmoke)
 configure_tme_target(DoodadContextSmoke)
 configure_tme_target(CarpetSmoke)
 configure_tme_target(WallBrushSmoke)
+configure_tme_target(ItemDatabaseResolverTest)
 target_compile_definitions(BrushSmoke PRIVATE
     BRUSH_SMOKE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
 )

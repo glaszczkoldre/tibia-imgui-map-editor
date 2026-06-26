@@ -16,7 +16,7 @@ SrvResult SrvReader::read(const std::filesystem::path& path) {
         return result;
     }
     
-    std::unique_ptr<Domain::ItemType> currentItem = nullptr;
+    std::unique_ptr<ServerItemFragment> currentItem = nullptr;
     uint16_t maxItemId = 0;
     
     while (true) {
@@ -42,10 +42,13 @@ SrvResult SrvReader::read(const std::filesystem::path& path) {
             }
             
             // Create new item
-            currentItem = std::make_unique<Domain::ItemType>();
+            currentItem = std::make_unique<ServerItemFragment>();
             uint16_t id = static_cast<uint16_t>(script.readNumber());
             currentItem->server_id = id;
             currentItem->client_id = id;  // SRV format: server_id == client_id
+            
+            // Items are moveable by default in SRV unless marked unmove
+            currentItem->flags = Domain::ItemFlag::Moveable;
             
             if (id > maxItemId) {
                 maxItemId = id;
@@ -76,21 +79,21 @@ SrvResult SrvReader::read(const std::filesystem::path& path) {
                 if (script.token == TokenType::Identifier) {
                     std::string flag = script.getIdentifier();
                     
-                    // Map flags to ItemType properties
+                    // Map flags to ServerItemFragment properties
                     if (flag == "bank") {
                         currentItem->group = Domain::ItemGroup::Ground;
                     }
                     else if (flag == "clip") {
-                        currentItem->always_on_bottom = true;
                         currentItem->top_order = 1;
+                        currentItem->flags = currentItem->flags | Domain::ItemFlag::AlwaysOnBottom;
                     }
                     else if (flag == "bottom") {
-                        currentItem->always_on_bottom = true;
                         currentItem->top_order = 2;
+                        currentItem->flags = currentItem->flags | Domain::ItemFlag::AlwaysOnBottom;
                     }
                     else if (flag == "top") {
-                        currentItem->always_on_bottom = true;
                         currentItem->top_order = 3;
+                        currentItem->flags = currentItem->flags | Domain::ItemFlag::AlwaysOnBottom;
                     }
                     else if (flag == "container" || flag == "chest") {
                         currentItem->group = Domain::ItemGroup::Container;
@@ -99,7 +102,6 @@ SrvResult SrvReader::read(const std::filesystem::path& path) {
                         }
                     }
                     else if (flag == "cumulative") {
-                        currentItem->is_stackable = true;
                         currentItem->flags = currentItem->flags | Domain::ItemFlag::Stackable;
                     }
                     else if (flag == "key") {
@@ -121,28 +123,25 @@ SrvResult SrvReader::read(const std::filesystem::path& path) {
                         currentItem->item_type = Domain::ItemTypeEnum::Mailbox;
                     }
                     else if (flag == "allowdistread") {
-                        currentItem->allow_dist_read = true;
+                        currentItem->flags = currentItem->flags | Domain::ItemFlag::AllowDistRead;
                     }
                     else if (flag == "text") {
-                        currentItem->can_read_text = true;
+                        currentItem->flags = currentItem->flags | Domain::ItemFlag::CanReadText;
                     }
                     else if (flag == "write" || flag == "writeonce") {
-                        currentItem->can_write_text = true;
-                        currentItem->can_read_text = true;
+                        currentItem->flags = currentItem->flags | Domain::ItemFlag::CanWriteText | Domain::ItemFlag::CanReadText;
                     }
                     else if (flag == "fluidcontainer") {
                         currentItem->group = Domain::ItemGroup::Fluid;
-                        currentItem->is_fluid_container = true;
                     }
                     else if (flag == "splash") {
                         currentItem->group = Domain::ItemGroup::Splash;
                     }
                     else if (flag == "unpass") {
-                        currentItem->is_blocking = true;
                         currentItem->flags = currentItem->flags | Domain::ItemFlag::Unpassable;
                     }
                     else if (flag == "unmove") {
-                        currentItem->is_moveable = false;
+                        currentItem->flags = currentItem->flags & ~Domain::ItemFlag::Moveable;
                     }
                     else if (flag == "unthrow") {
                         currentItem->flags = currentItem->flags | Domain::ItemFlag::BlockMissiles;
@@ -154,19 +153,15 @@ SrvResult SrvReader::read(const std::filesystem::path& path) {
                         currentItem->group = Domain::ItemGroup::MagicField;
                     }
                     else if (flag == "take") {
-                        currentItem->is_pickupable = true;
                         currentItem->flags = currentItem->flags | Domain::ItemFlag::Pickupable;
                     }
                     else if (flag == "hang") {
-                        currentItem->is_hangable = true;
-                        currentItem->flags = currentItem->flags | Domain::ItemFlag::Hangable;
+                        currentItem->flags = currentItem->flags | Domain::ItemFlag::IsHangable;
                     }
                     else if (flag == "hooksouth") {
-                        currentItem->hook_south = true;
                         currentItem->flags = currentItem->flags | Domain::ItemFlag::HookSouth;
                     }
                     else if (flag == "hookeast") {
-                        currentItem->hook_east = true;
                         currentItem->flags = currentItem->flags | Domain::ItemFlag::HookEast;
                     }
                     else if (flag == "rotate") {
@@ -177,9 +172,6 @@ SrvResult SrvReader::read(const std::filesystem::path& path) {
                     }
                     else if (flag == "armor") {
                         currentItem->group = Domain::ItemGroup::Armor;
-                    }
-                    else if (flag == "disguise") {
-                        // Will be handled with disguisetarget attribute
                     }
                     // Skip unknown flags silently
                 }
@@ -236,12 +228,12 @@ SrvResult SrvReader::read(const std::filesystem::path& path) {
                     else {
                         // Skip unknown attributes - read value
                         script.nextToken();
-                        // Could be number, string, or identifier
                     }
                 }
                 
                 // Skip commas between attributes
                 if (script.token == TokenType::Special && script.getSpecial() == ',') {
+                    
                     continue;
                 }
             }

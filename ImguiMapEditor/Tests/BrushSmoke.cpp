@@ -1399,26 +1399,25 @@ void requireRawBrushPlacementAndParity(MapEditor::Brushes::BrushRegistry &regist
   MapEditor::Domain::ItemType bottom1Type;
   bottom1Type.server_id = 9003;
   bottom1Type.client_id = 9003;
-  bottom1Type.always_on_bottom = true;
-  bottom1Type.top_order = 1;
+  bottom1Type.flags = MapEditor::Domain::ItemFlag::AlwaysOnBottom;
+  bottom1Type.always_on_top_order = 1;
 
   MapEditor::Domain::ItemType bottom3Type;
   bottom3Type.server_id = 9004;
   bottom3Type.client_id = 9004;
-  bottom3Type.always_on_bottom = true;
-  bottom3Type.top_order = 3;
+  bottom3Type.flags = MapEditor::Domain::ItemFlag::AlwaysOnBottom;
+  bottom3Type.always_on_top_order = 3;
 
   MapEditor::Domain::ItemType bottom2Type;
   bottom2Type.server_id = 9005;
   bottom2Type.client_id = 9005;
-  bottom2Type.always_on_bottom = true;
-  bottom2Type.top_order = 2;
+  bottom2Type.flags = MapEditor::Domain::ItemFlag::AlwaysOnBottom;
+  bottom2Type.always_on_top_order = 2;
 
   MapEditor::Domain::ItemType hookType;
   hookType.server_id = 9006;
   hookType.client_id = 9006;
-  hookType.hook_south = true;
-  hookType.hook_east = true;
+  hookType.flags = MapEditor::Domain::ItemFlag::HookSouth | MapEditor::Domain::ItemFlag::HookEast;
 
   // Let's register raw brushes with the registry
   auto* groundRaw = dynamic_cast<MapEditor::Brushes::RawBrush*>(registry.getOrCreateRAWBrush(9001));
@@ -1476,8 +1475,8 @@ void requireRawBrushPlacementAndParity(MapEditor::Brushes::BrushRegistry &regist
   MapEditor::Domain::ItemType bottom2AltType;
   bottom2AltType.server_id = 9007;
   bottom2AltType.client_id = 9007;
-  bottom2AltType.always_on_bottom = true;
-  bottom2AltType.top_order = 2;
+  bottom2AltType.flags = MapEditor::Domain::ItemFlag::AlwaysOnBottom;
+  bottom2AltType.always_on_top_order = 2;
 
   auto* bottom2AltRaw = dynamic_cast<MapEditor::Brushes::RawBrush*>(registry.getOrCreateRAWBrush(9007));
   bottom2AltRaw->setCachedType(&bottom2AltType);

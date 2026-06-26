@@ -66,7 +66,7 @@ PanelType PropertyPanelRenderer::detectPanelType() const {
     // Writeable check - uses group from OTB, also check maxTextLen, Readable flag, or if text is set
     if (item_type_->isWriteable() || 
         item_type_->maxTextLen > 0 || 
-        item_type_->hasFlag(Domain::ItemFlag::Readable) ||
+        item_type_->hasFlag(Domain::ItemFlag::CanReadText) ||
         !item_->getText().empty()) {
         return PanelType::Writeable;
     }
@@ -254,7 +254,7 @@ void PropertyPanelRenderer::renderCommonItemFields() {
     dirty_ |= PropertyWidgets::inputUniqueId(edit_.unique_id);
     
     // Count for stackables
-    if (item_type_->is_stackable) {
+    if (item_type_->isStackable()) {
         dirty_ |= PropertyWidgets::inputCount(edit_.count, 100);
     }
     

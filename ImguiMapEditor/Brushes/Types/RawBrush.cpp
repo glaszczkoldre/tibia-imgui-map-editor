@@ -35,9 +35,9 @@ void RawBrush::draw(Domain::ChunkedMap& map,
     bool rawLikeSimone = ctx.brushSettings ? ctx.brushSettings->getRawLikeSimone() : false;
     bool altPressed = (ctx.modifiers & Modifiers::Alt) != 0;
 
-    if (rawLikeSimone && !altPressed && type && type->always_on_bottom && type->top_order == 2) {
+    if (rawLikeSimone && !altPressed && type && type->isOnBottom() && type->alwaysOnTopOrder() == 2) {
         tile->removeItemsIf([](const Domain::Item* existingItem) {
-            return existingItem->getType() && existingItem->getType()->top_order == 2;
+            return existingItem->getType() && existingItem->getType()->alwaysOnTopOrder() == 2;
         });
     }
 

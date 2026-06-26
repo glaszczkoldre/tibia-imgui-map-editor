@@ -64,7 +64,7 @@ bool itemBlocksPlacement(const Domain::Item *item) {
     return false;
   }
   const auto *type = item->getType();
-  return type && (type->is_blocking ||
+  return type && (type->isBlocking() ||
                   (static_cast<uint32_t>(type->flags) & kBlockingItemFlags) != 0);
 }
 

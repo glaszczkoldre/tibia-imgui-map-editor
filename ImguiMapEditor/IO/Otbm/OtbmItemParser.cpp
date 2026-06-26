@@ -30,7 +30,7 @@ std::unique_ptr<Domain::Item> OtbmItemParser::parseItem(BinaryNode* node,
     if (version == OtbmVersion::V1) {
         const Domain::ItemType* type = item->getType();
         if (type) {
-            if (type->is_stackable || type->isSplash() || type->isFluidContainer()) {
+            if (type->isStackable() || type->isSplash() || type->isFluidContainer()) {
                 uint8_t count;
                 if (!node->getU8(count)) return nullptr;
                 item->setSubtype(count);

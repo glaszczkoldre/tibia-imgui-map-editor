@@ -319,7 +319,7 @@ std::vector<DoodadRedoBorderTouch> DoodadPlacementPlanner::buildRedoTouches(
       auto &touch = touches[it->second];
       if (itemType && itemType->isGround()) {
         touch.placedGround = true;
-      } else if (itemType && itemType->is_wall) {
+      } else if (itemType && itemType->isWall()) {
         touch.placedWall = true;
       }
     }

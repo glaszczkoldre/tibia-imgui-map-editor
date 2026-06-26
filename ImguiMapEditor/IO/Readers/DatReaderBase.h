@@ -1,119 +1,12 @@
 #pragma once
 #include "../BinaryReader.h"
-#include "Domain/ItemType.h"
+#include "IO/Loader/SourceFragments.h"
 #include <memory>
 #include <vector>
 #include <unordered_map>
 
 namespace MapEditor {
 namespace IO {
-
-/**
- * Item category in DAT file
- */
-enum class DatCategory : uint8_t {
-    Item = 0,
-    Outfit = 1,
-    Effect = 2,
-    Missile = 3
-};
-
-/**
- * Client item data loaded from DAT
- */
-struct ClientItem {
-    uint16_t id = 0;
-    DatCategory category = DatCategory::Item;
-    
-    // Sprite dimensions
-    uint8_t width = 1;
-    uint8_t height = 1;
-    uint8_t layers = 1;
-    uint8_t pattern_x = 1;
-    uint8_t pattern_y = 1;
-    uint8_t pattern_z = 1;
-    uint8_t frames = 1;
-    
-    // Sprite IDs
-    std::vector<uint32_t> sprite_ids;
-
-    // Frame groups (10.57+ creatures with idle/walking animations)
-    std::vector<uint32_t> idle_sprite_ids;
-    std::vector<uint32_t> walk_sprite_ids;
-    uint8_t idle_frames = 1;
-    uint8_t walk_frames = 1;
-    bool has_frame_groups = false;
-    
-    // Properties from flags
-    bool is_ground = false;
-    uint16_t ground_speed = 0;
-    bool is_on_bottom = false;
-    bool is_on_top = false;
-    bool is_container = false;
-    bool is_stackable = false;
-    bool is_useable = false;
-    bool is_writable = false;
-    uint16_t max_text_length = 0;
-    bool is_fluid_container = false;
-    bool is_fluid = false;
-    bool is_unpassable = false;
-    bool is_unmoveable = false;
-    bool blocks_missiles = false;
-    bool blocks_pathfinder = false;
-    bool is_pickupable = false;
-    bool is_hangable = false;
-    bool is_horizontal = false;
-    bool is_vertical = false;
-    bool is_rotatable = false;
-    bool has_light = false;
-    uint16_t light_level = 0;
-    uint16_t light_color = 0;
-    bool dont_hide = false;
-    bool is_translucent = false;
-    bool has_offset = false;
-    int16_t offset_x = 0;
-    int16_t offset_y = 0;
-    bool has_elevation = false;
-    uint16_t elevation = 0;
-    bool is_lying_object = false;
-    bool animate_always = false;
-    bool has_minimap_color = false;
-    uint16_t minimap_color = 0;
-    bool full_ground = false;
-    bool ignore_look = false;
-    bool is_cloth = false;
-    uint16_t cloth_slot = 0;
-    bool has_market_data = false;
-    uint16_t market_category = 0;
-    uint16_t trade_as = 0;
-    uint16_t show_as = 0;
-    std::string market_name;
-    uint16_t market_profession = 0;
-    uint16_t market_level = 0;
-    bool has_default_action = false;
-    uint16_t default_action = 0;
-    bool floor_change = false;
-    uint16_t lens_help = 0;
-    bool wrappable = false;
-    bool unwrappable = false;
-    bool top_effect = false;
-    bool no_move_animation = false;
-    bool usable = false;
-    
-    // Animation data (10.50+)
-    bool has_animation_data = false;
-    uint8_t animation_mode = 0;
-    int32_t loop_count = 0;
-    uint8_t start_frame = 0;
-    std::vector<std::pair<uint32_t, uint32_t>> frame_durations;
-    uint32_t total_duration = 0;
-    
-    // Calculate total sprite count
-    uint32_t getTotalSprites() const {
-        return static_cast<uint32_t>(width) * height * layers *
-               pattern_x * pattern_y * pattern_z * frames;
-    }
-};
 
 /**
  * Result of DAT parsing

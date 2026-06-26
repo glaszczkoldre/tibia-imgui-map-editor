@@ -14,7 +14,8 @@ namespace MapEditor {
 namespace Domain {
 
 // Forward declaration
-class ItemType;
+class ItemDefinition;
+using ItemType = ItemDefinition;
 
 // Position struct is now included directly
 
