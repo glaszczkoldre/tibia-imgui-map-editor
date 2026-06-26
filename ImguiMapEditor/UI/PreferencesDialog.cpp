@@ -192,22 +192,6 @@ void PreferencesDialog::renderEditorTab() {
     if (!brush_settings_) {
       ImGui::TextDisabled("Brush settings are unavailable.");
     } else {
-      bool doodadEraseMatchingOnly =
-          brush_settings_->getDoodadEraseMatchingOnly();
-      if (ImGui::Checkbox("Doodad brush only erases matching items",
-                          &doodadEraseMatchingOnly)) {
-        brush_settings_->setDoodadEraseMatchingOnly(
-            doodadEraseMatchingOnly);
-        if (on_apply_settings_) {
-          on_apply_settings_();
-        }
-      }
-      if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip(
-            "Limit doodad erase operations to the currently selected doodad "
-            "brush. When disabled, erase any doodad-owned item.");
-      }
-
       bool eraserLeaveUnique = brush_settings_->getEraserLeaveUniqueItems();
       if (ImGui::Checkbox("Eraser leaves unique items",
                           &eraserLeaveUnique)) {

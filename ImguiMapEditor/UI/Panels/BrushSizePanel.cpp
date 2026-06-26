@@ -53,6 +53,10 @@ namespace {
   return brush && brush->getType() == Brushes::BrushType::Door;
 }
 
+[[nodiscard]] bool supportsRawLikeSimone(const Brushes::IBrush *brush) {
+  return brush && brush->getType() == Brushes::BrushType::Raw;
+}
+
 [[nodiscard]] bool supportsThickness(const Brushes::IBrush *brush) {
   return brush && brush->getType() == Brushes::BrushType::Doodad;
 }
@@ -325,6 +329,15 @@ void BrushSizePanel::renderBrushOptions() {
       service_->setPreviewBorder(previewBorder);
     }
     ImGui::TextDisabled("Controls outline/autoborder-style preview generation.");
+  }
+
+  if (supportsRawLikeSimone(currentBrush)) {
+    beginSection();
+    bool rawLikeSimone = service_->getRawLikeSimone();
+    if (ImGui::Checkbox("RAW Like Simone", &rawLikeSimone)) {
+      service_->setRawLikeSimone(rawLikeSimone);
+    }
+    ImGui::TextDisabled("Enable Simone-compatible replacement behavior.");
   }
 
   if (!showedSection) {

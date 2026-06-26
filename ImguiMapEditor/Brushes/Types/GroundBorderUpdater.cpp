@@ -22,6 +22,7 @@ namespace {
 struct NeighborState {
     bool visited = false;
     const GroundBrush *brush = nullptr;
+    bool blocksBorder = false;
 };
 
 struct BorderCluster {
@@ -57,8 +58,13 @@ void GroundBrush::updateBorderItems(Domain::ChunkedMap &map,
     if (!item) {
       return false;
     }
-    auto *boundBrush = registry_.getBrushForItem(item->getServerId());
-    auto *groundBrush = dynamic_cast<const GroundBrush *>(boundBrush);
+    const GroundBrush *groundBrush = nullptr;
+    for (auto *b : registry_.getBrushesForItem(item->getServerId())) {
+      if (auto *gb = dynamic_cast<const GroundBrush *>(b)) {
+        groundBrush = gb;
+        break;
+      }
+    }
     return groundBrush && groundBrush->isBorderItem(item->getServerId());
   });
 
@@ -256,12 +262,21 @@ void GroundBrush::updateBorderItems(Domain::ChunkedMap &map,
 
   const auto pos = tile.getPosition();
   const auto *borderBrush = GroundBrush::resolveGroundBrush(registry_, tile);
+  if (tile.hasGround() && !borderBrush) {
+    return;
+  }
+
   std::array<NeighborState, kNeighborOffsets.size()> neighbors {};
   for (size_t index = 0; index < kNeighborOffsets.size(); ++index) {
     const auto &[dx, dy, _] = kNeighborOffsets[index];
     const auto *neighborTile = map.getTile(pos.x + dx, pos.y + dy, pos.z);
-    neighbors[index].brush =
-        neighborTile ? GroundBrush::resolveGroundBrush(registry_, *neighborTile) : nullptr;
+    if (!neighborTile) {
+      continue;
+    }
+
+    neighbors[index].brush = GroundBrush::resolveGroundBrush(registry_, *neighborTile);
+    neighbors[index].blocksBorder =
+        neighborTile->hasGround() && !neighbors[index].brush;
   }
 
   std::vector<BorderCluster> clusters;
@@ -272,10 +287,16 @@ void GroundBrush::updateBorderItems(Domain::ChunkedMap &map,
       continue;
     }
 
+    if (neighbors[index].blocksBorder) {
+      neighbors[index].visited = true;
+      continue;
+    }
+
     const auto *other = neighbors[index].brush;
     TileNeighbor alignment = TileNeighbor::None;
     for (size_t probe = index; probe < neighbors.size(); ++probe) {
-      if (!neighbors[probe].visited && neighbors[probe].brush == other) {
+      if (!neighbors[probe].visited && !neighbors[probe].blocksBorder &&
+          neighbors[probe].brush == other) {
         neighbors[probe].visited = true;
         alignment |= std::get<2>(kNeighborOffsets[probe]);
       }
@@ -372,8 +393,13 @@ void GroundBrush::updateBorderItems(Domain::ChunkedMap &map,
       return true;
     }
 
-    const auto *boundBrush = registry_.getBrushForItem(item->getServerId());
-    const auto *groundBrush = dynamic_cast<const GroundBrush *>(boundBrush);
+    const GroundBrush *groundBrush = nullptr;
+    for (auto *b : registry_.getBrushesForItem(item->getServerId())) {
+      if (auto *gb = dynamic_cast<const GroundBrush *>(b)) {
+        groundBrush = gb;
+        break;
+      }
+    }
     return groundBrush && groundBrush->isBorderItem(item->getServerId());
   };
 

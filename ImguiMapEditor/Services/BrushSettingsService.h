@@ -157,6 +157,14 @@ public:
   }
   bool getEraserLeaveUniqueItems() const { return eraserLeaveUniqueItems_; }
 
+  void setRawLikeSimone(bool enabled) {
+    if (rawLikeSimone_ != enabled) {
+      rawLikeSimone_ = enabled;
+      notifyChanged();
+    }
+  }
+  bool getRawLikeSimone() const { return rawLikeSimone_; }
+
   // ========================
   // Standard Size
   // ========================
@@ -335,8 +343,9 @@ private:
   // Tool options
   bool previewBorder_ = true;
   bool lockDoors_ = false;
-  bool doodadEraseMatchingOnly_ = false;
+  bool doodadEraseMatchingOnly_ = true;
   bool eraserLeaveUniqueItems_ = true;
+  bool rawLikeSimone_ = true;
 
   void notifyChanged();
 

@@ -118,8 +118,11 @@ void TileRenderer::queueTile(const Domain::Tile &tile, int tile_x, int tile_y,
   if (tile.hasGround()) {
     const auto *ground = tile.getGround();
     if (ground) {
-      // Conciseness fix: Use C++17 if-init and logical OR
-      if (const auto *type = ground->getType()) {
+      const auto *type = ground->getType();
+      if (!type && client_data_) {
+        type = client_data_->getItemTypeByServerId(ground->getServerId());
+      }
+      if (type) {
         tile_has_hook_south |= type->hook_south;
         tile_has_hook_east |= type->hook_east;
       }

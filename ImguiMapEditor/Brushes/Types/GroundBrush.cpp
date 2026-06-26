@@ -80,8 +80,14 @@ const GroundBrush *GroundBrush::resolveGroundBrush(const BrushRegistry &registry
     }
   }
 
-  return dynamic_cast<const GroundBrush *>(
-      registry.getBrushForItem(ground->getServerId()));
+  for (auto *brush : registry.getBrushesForItem(ground->getServerId())) {
+    if (const auto *groundBrush = dynamic_cast<const GroundBrush *>(brush);
+        groundBrush && groundBrush->hasDrawableGroundItem(ground->getServerId())) {
+      return groundBrush;
+    }
+  }
+
+  return nullptr;
 }
 
 std::string GroundBrush::normalizeName(const std::string &value) {
@@ -389,6 +395,12 @@ bool GroundBrush::connectsTo(const GroundBrush *other) const {
   return listed ? !hateFriends_ : hateFriends_;
 }
 
+bool GroundBrush::hasDrawableGroundItem(uint16_t itemId) const {
+  return std::ranges::any_of(groundItems_, [itemId](const auto &entry) {
+    return entry.first == itemId && entry.second > 0;
+  });
+}
+
 bool GroundBrush::hasOuterZilchBorderRule() const {
   return std::ranges::any_of(borderRules_, [](const BorderRule &rule) {
     return rule.outer && rule.targetNone;
@@ -422,10 +434,7 @@ uint16_t GroundBrush::selectWeightedItem(
 }
 
 bool GroundBrush::isBorderItem(uint16_t itemId) const {
-  return ownedItemIds_.contains(itemId) &&
-         std::ranges::none_of(groundItems_, [itemId](const auto &entry) {
-           return entry.first == itemId;
-         });
+  return ownedItemIds_.contains(itemId) && !hasDrawableGroundItem(itemId);
 }
 
 } // namespace MapEditor::Brushes

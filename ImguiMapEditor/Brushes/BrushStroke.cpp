@@ -386,8 +386,7 @@ void BrushController::eraseDoodadRecordedPosition(const Domain::Position &pos,
   }
 
   const DoodadBrush::EraseOptions eraseOptions{
-      .matchingBrushOnly = brushSettingsService_ &&
-                           brushSettingsService_->getDoodadEraseMatchingOnly(),
+      .matchingBrushOnly = true,
       .preserveComplexItems =
           !brushSettingsService_ ||
           brushSettingsService_->getEraserLeaveUniqueItems()};

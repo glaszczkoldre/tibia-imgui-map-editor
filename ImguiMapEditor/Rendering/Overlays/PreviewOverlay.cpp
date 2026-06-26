@@ -2,6 +2,10 @@
 #include "OutfitOverlay.h"
 #include "OverlaySpriteCache.h"
 #include "Services/SpriteManager.h"
+#include "Domain/ChunkedMap.h"
+#include "Domain/Tile.h"
+#include "Domain/Item.h"
+#include "Domain/ItemType.h"
 #include <algorithm>
 #include <cmath>
 
@@ -13,7 +17,8 @@ void PreviewOverlay::render(
     const std::vector<Services::Preview::PreviewTileData> &tiles,
     const Domain::Position &anchorWorldPos, const glm::vec2 &cameraPos,
     const glm::vec2 &viewportPos, const glm::vec2 &viewportSize, float zoom,
-    Services::Preview::PreviewStyle style) {
+    Services::Preview::PreviewStyle style,
+    const Domain::ChunkedMap *map) {
 
   if (!drawList || !clientData || !spriteCache || tiles.empty()) {
     return;
@@ -57,7 +62,7 @@ void PreviewOverlay::render(
     }
 
     renderTile(drawList, clientData, spriteManager, spriteCache, tile, worldPos,
-               cameraPos, viewportPos, viewportSize, zoom, tintColor);
+               cameraPos, viewportPos, viewportSize, zoom, tintColor, map);
 
     if (!drawOutlineBorder) {
       continue;
@@ -96,12 +101,13 @@ void PreviewOverlay::renderCulled(
     const Domain::Position &anchorWorldPos,
     const Services::Preview::PreviewBounds &bounds, const glm::vec2 &cameraPos,
     const glm::vec2 &viewportPos, const glm::vec2 &viewportSize, float zoom,
-    Services::Preview::PreviewStyle style) {
+    Services::Preview::PreviewStyle style,
+    const Domain::ChunkedMap *map) {
 
   // For now, just use regular render with viewport culling
   // Bounds parameter can be used for additional optimization later
   render(drawList, clientData, spriteManager, spriteCache, tiles,
-         anchorWorldPos, cameraPos, viewportPos, viewportSize, zoom, style);
+         anchorWorldPos, cameraPos, viewportPos, viewportSize, zoom, style, map);
 }
 
 void PreviewOverlay::renderTile(
@@ -110,7 +116,8 @@ void PreviewOverlay::renderTile(
     const Services::Preview::PreviewTileData &tile,
     const Domain::Position &worldPos, const glm::vec2 &cameraPos,
     const glm::vec2 &viewportPos, const glm::vec2 &viewportSize, float zoom,
-    ImU32 tintColor) {
+    ImU32 tintColor,
+    const Domain::ChunkedMap *map) {
 
   float accumulatedElevation = 0.0f;
   float tileSizePx = Config::Rendering::TILE_SIZE * zoom;
@@ -119,7 +126,7 @@ void PreviewOverlay::renderTile(
   for (const auto &item : tile.items) {
     renderItem(drawList, clientData, spriteCache, item, worldPos,
                accumulatedElevation, cameraPos, viewportPos, viewportSize, zoom,
-               tintColor);
+               tintColor, map);
   }
 
   // Render creature if present - lookup outfit from CreatureType by name
@@ -205,7 +212,8 @@ void PreviewOverlay::renderItem(
     const Services::Preview::PreviewItemData &item,
     const Domain::Position &worldPos, float &accumulatedElevation,
     const glm::vec2 &cameraPos, const glm::vec2 &viewportPos,
-    const glm::vec2 &viewportSize, float zoom, ImU32 tintColor) {
+    const glm::vec2 &viewportSize, float zoom, ImU32 tintColor,
+    const Domain::ChunkedMap *map) {
 
   if (item.itemId == 0)
     return;
@@ -294,6 +302,47 @@ void PreviewOverlay::renderItem(
     patternX = worldPos.x % pat_x;
     patternY = worldPos.y % pat_y;
     patternZ = worldPos.z % pat_z;
+
+    if (itemType->is_hangable) {
+      bool tile_has_hook_south = false;
+      bool tile_has_hook_east = false;
+      if (map) {
+        if (const auto *mapTile = map->getTile(worldPos)) {
+          if (mapTile->hasGround()) {
+            if (const auto *ground = mapTile->getGround()) {
+              const auto *type = ground->getType();
+              if (!type) {
+                type = clientData->getItemTypeByServerId(ground->getServerId());
+              }
+              if (type) {
+                tile_has_hook_south |= type->hook_south;
+                tile_has_hook_east |= type->hook_east;
+              }
+            }
+          }
+          for (const auto &tileItem : mapTile->getItems()) {
+            if (tileItem) {
+              const auto *type = tileItem->getType();
+              if (!type) {
+                type = clientData->getItemTypeByServerId(tileItem->getServerId());
+              }
+              if (type) {
+                tile_has_hook_south |= type->hook_south;
+                tile_has_hook_east |= type->hook_east;
+              }
+            }
+          }
+        }
+      }
+
+      if (tile_has_hook_south) {
+        patternX = 1;
+      } else if (tile_has_hook_east) {
+        patternX = 2;
+      } else {
+        patternX = 0;
+      }
+    }
   }
 
   float elevOffset = accumulatedElevation + item.elevationOffset;

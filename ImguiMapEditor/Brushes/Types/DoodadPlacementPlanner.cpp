@@ -317,7 +317,7 @@ std::vector<DoodadRedoBorderTouch> DoodadPlacementPlanner::buildRedoTouches(
                     static_cast<uint16_t>(item.itemId))
               : nullptr;
       auto &touch = touches[it->second];
-      if (itemType && itemType->is_ground) {
+      if (itemType && itemType->isGround()) {
         touch.placedGround = true;
       } else if (itemType && itemType->is_wall) {
         touch.placedWall = true;

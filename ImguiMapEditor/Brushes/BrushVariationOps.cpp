@@ -83,7 +83,19 @@ bool BrushController::eraseBrush(const Domain::Position &pos,
   paintedPositions_.clear();
   lastStrokePos_.reset();
 
-  eraseRecordedPosition(pos);
+  switch (getActionFamily()) {
+  case BrushActionFamily::GroundLike:
+  case BrushActionFamily::WallLike:
+    eraseExpandedCenter(pos);
+    break;
+  case BrushActionFamily::DoorLike:
+  case BrushActionFamily::PointLike:
+    eraseRecordedPosition(pos);
+    break;
+  case BrushActionFamily::DoodadLike:
+    eraseDoodadRecordedPosition(pos, modifiers);
+    break;
+  }
 
   const bool changed = !paintedPositions_.empty();
   if (changed) {

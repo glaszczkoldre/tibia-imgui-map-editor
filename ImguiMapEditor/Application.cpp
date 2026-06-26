@@ -172,6 +172,7 @@ void Application::wireCallbacks() {
       .hotkey = ui_.hotkey_controller.get(),
       .input_controller = ui_.input_controller.get(),
       .map_operations = ui_.map_operations.get(),
+      .brush_controller = &brush_system_->getController(),
       // Dialogs (via container)
       .unsaved_modal = &dialogs_.unsaved_changes,
       .import_map = &dialogs_.import_map,

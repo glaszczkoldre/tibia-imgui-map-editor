@@ -21,6 +21,7 @@ constexpr const char *kEraserLeaveUniqueItemsKey =
 constexpr const char *kAutoCreateSpawnKey = "brush.auto_create_spawn";
 constexpr const char *kDefaultSpawnRadiusKey = "brush.default_spawn_radius";
 constexpr const char *kDefaultSpawnTimeKey = "brush.default_spawn_time";
+constexpr const char *kRawLikeSimoneKey = "brush.raw_like_simone";
 
 [[nodiscard]] int snapToDiscreteBrushSize(int size) {
   size = std::clamp(size, BrushSettingsService::MIN_SIZE,
@@ -417,9 +418,10 @@ void BrushSettingsService::loadFromConfig(const ConfigService &config) {
   previewBorder_ = config.get<bool>(kPreviewBorderKey, true);
   lockDoors_ = config.get<bool>(kLockDoorsKey, false);
   doodadEraseMatchingOnly_ =
-      config.get<bool>(kDoodadEraseMatchingOnlyKey, false);
+      config.get<bool>(kDoodadEraseMatchingOnlyKey, true);
   eraserLeaveUniqueItems_ =
       config.get<bool>(kEraserLeaveUniqueItemsKey, true);
+  rawLikeSimone_ = config.get<bool>(kRawLikeSimoneKey, true);
   autoCreateSpawn_ = config.get<bool>(kAutoCreateSpawnKey, false);
   defaultSpawnRadius_ =
       std::clamp(config.get<int>(kDefaultSpawnRadiusKey, 3), 1, 10);
@@ -433,6 +435,7 @@ void BrushSettingsService::saveToConfig(ConfigService &config) const {
   config.set(kLockDoorsKey, lockDoors_);
   config.set(kDoodadEraseMatchingOnlyKey, doodadEraseMatchingOnly_);
   config.set(kEraserLeaveUniqueItemsKey, eraserLeaveUniqueItems_);
+  config.set(kRawLikeSimoneKey, rawLikeSimone_);
   config.set(kAutoCreateSpawnKey, autoCreateSpawn_);
   config.set(kDefaultSpawnRadiusKey, defaultSpawnRadius_);
   config.set(kDefaultSpawnTimeKey, defaultSpawnTime_);

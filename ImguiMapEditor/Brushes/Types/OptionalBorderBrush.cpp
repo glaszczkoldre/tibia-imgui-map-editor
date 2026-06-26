@@ -20,10 +20,9 @@ void OptionalBorderBrush::draw(Domain::ChunkedMap &map, Domain::Tile *tile,
   tile->setOptionalBorder(true);
   tile->setOptionalBorderBrushId(ctx.ownerBrushId);
 
-  if (auto *brush = dynamic_cast<GroundBrush *>(
-          ctx.brushRegistry->getBrushForItem(tile->getGround()->getServerId()));
+  if (const auto *brush = GroundBrush::resolveGroundBrush(*ctx.brushRegistry, *tile);
       brush && brush->hasOptionalBorderRule()) {
-    brush->rebuildAround(map, tile->getPosition());
+    const_cast<GroundBrush *>(brush)->rebuildAround(map, tile->getPosition());
   }
 
   map.markChanged();
@@ -37,10 +36,9 @@ void OptionalBorderBrush::undraw(Domain::ChunkedMap &map, Domain::Tile *tile) {
   tile->setOptionalBorderBrushId(InvalidBrushId);
 
   if (registry_) {
-    if (auto *brush = dynamic_cast<GroundBrush *>(
-            registry_->getBrushForItem(tile->getGround()->getServerId()));
+    if (const auto *brush = GroundBrush::resolveGroundBrush(*registry_, *tile);
         brush && brush->hasOptionalBorderRule()) {
-      brush->rebuildAround(map, tile->getPosition());
+      const_cast<GroundBrush *>(brush)->rebuildAround(map, tile->getPosition());
     }
   }
 

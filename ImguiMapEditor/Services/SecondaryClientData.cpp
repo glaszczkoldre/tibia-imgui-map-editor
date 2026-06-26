@@ -126,8 +126,8 @@ SecondaryClientResult SecondaryClientData::loadFromFolder(
             otb_item.is_ground = dat_item->is_ground;
             otb_item.is_border = false;
             otb_item.is_hangable = dat_item->is_hangable;
-            otb_item.hook_south = dat_item->is_horizontal;
-            otb_item.hook_east = dat_item->is_vertical;
+            otb_item.hook_south = dat_item->is_vertical;
+            otb_item.hook_east = dat_item->is_horizontal;
             otb_item.is_stackable = dat_item->is_stackable;
         }
         

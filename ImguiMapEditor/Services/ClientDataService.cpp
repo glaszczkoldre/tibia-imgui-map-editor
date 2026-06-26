@@ -369,11 +369,11 @@ void ClientDataService::mergeOtbWithDat(
       }
 
       // Hangable/hook properties
-      merged.is_hangable = dat->is_hangable;
+      merged.is_hangable = merged.is_hangable || dat->is_hangable;
       merged.hook_east =
-          dat->is_horizontal; // DAT uses is_horizontal for east hook
+          merged.hook_east || dat->is_horizontal; // DAT uses is_horizontal for east hook
       merged.hook_south =
-          dat->is_vertical; // DAT uses is_vertical for south hook
+          merged.hook_south || dat->is_vertical; // DAT uses is_vertical for south hook
 
       // Minimap color (for minimap rendering)
       if (dat->has_minimap_color) {

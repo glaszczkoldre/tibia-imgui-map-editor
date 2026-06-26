@@ -257,7 +257,8 @@ void MapPanel::renderInternal(MapType *map, Rendering::RenderState &state,
             previewService.getPreviewTiles(),
             previewService.getAnchorPosition(), camera_.getCameraPosition(),
             camera_.getViewportPos(), camera_.getViewportSize(),
-            camera_.getZoom(), previewService.getStyle());
+            camera_.getZoom(), previewService.getStyle(),
+            map);
       }
     }
   }

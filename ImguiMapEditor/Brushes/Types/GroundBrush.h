@@ -66,6 +66,7 @@ public:
 
 private:
   bool connectsTo(const GroundBrush *other) const;
+  bool hasDrawableGroundItem(uint16_t itemId) const;
   uint16_t selectWeightedItem(
       const std::vector<std::pair<uint16_t, uint32_t>> &items) const;
   void updateBorderItems(Domain::ChunkedMap &map, Domain::Tile &tile) const;

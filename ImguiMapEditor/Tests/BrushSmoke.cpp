@@ -3,6 +3,7 @@
 #include "Brushes/Behaviors/WeightedSelection.h"
 #include "Brushes/Core/IBrush.h"
 #include "Brushes/Data/BorderBlock.h"
+#include "Brushes/Types/DoodadBrush.h"
 #include "Brushes/Types/GroundBrush.h"
 #include "Brushes/Types/RawBrush.h"
 #include "Brushes/Types/WallBrush.h"
@@ -10,6 +11,7 @@
 #include "Controllers/MapInputController.h"
 #include "Domain/ChunkedMap.h"
 #include "Domain/History/HistoryManager.h"
+#include "Domain/Item.h"
 #include "Domain/ItemType.h"
 #include "Domain/MapInstance.h"
 #include "Domain/SelectionSettings.h"
@@ -133,6 +135,18 @@ bool tileContainsItemId(const MapEditor::Domain::Tile &tile, uint16_t itemId) {
   }
 
   return false;
+}
+
+size_t countItemId(const MapEditor::Domain::Tile &tile, uint16_t itemId) {
+  size_t count = tile.hasGround() && tile.getGround()->getServerId() == itemId
+                     ? 1
+                     : 0;
+  for (const auto &item : tile.getItems()) {
+    if (item && item->getServerId() == itemId) {
+      ++count;
+    }
+  }
+  return count;
 }
 
 MapEditor::Brushes::GroundBrush *
@@ -1356,6 +1370,319 @@ void requireGroundSequentialVsBatchedParity(const fs::path &tempDir) {
   }
 }
 
+void requireRawBrushPlacementAndParity(MapEditor::Brushes::BrushRegistry &registry) {
+  // 1. Prepare settings and controller
+  MapEditor::Services::BrushSettingsService brushSettings;
+  MapEditor::Brushes::BrushController controller;
+  MapEditor::Domain::History::HistoryManager history;
+
+  MapEditor::Domain::ChunkedMap map;
+  map.createNew(16, 16, 1098);
+  controller.initialize(&map, &history, nullptr);
+  controller.setBrushRegistry(&registry);
+  controller.setBrushSettingsService(&brushSettings);
+
+  const MapEditor::Domain::Position pos{8, 8, 7};
+  auto *tile = map.getOrCreateTile(pos);
+
+  // 2. Define mock ItemTypes
+  MapEditor::Domain::ItemType groundType;
+  groundType.server_id = 9001;
+  groundType.client_id = 9001;
+  groundType.group = MapEditor::Domain::ItemGroup::Ground;
+
+  MapEditor::Domain::ItemType normalType;
+  normalType.server_id = 9002;
+  normalType.client_id = 9002;
+  normalType.group = MapEditor::Domain::ItemGroup::None;
+
+  MapEditor::Domain::ItemType bottom1Type;
+  bottom1Type.server_id = 9003;
+  bottom1Type.client_id = 9003;
+  bottom1Type.always_on_bottom = true;
+  bottom1Type.top_order = 1;
+
+  MapEditor::Domain::ItemType bottom3Type;
+  bottom3Type.server_id = 9004;
+  bottom3Type.client_id = 9004;
+  bottom3Type.always_on_bottom = true;
+  bottom3Type.top_order = 3;
+
+  MapEditor::Domain::ItemType bottom2Type;
+  bottom2Type.server_id = 9005;
+  bottom2Type.client_id = 9005;
+  bottom2Type.always_on_bottom = true;
+  bottom2Type.top_order = 2;
+
+  MapEditor::Domain::ItemType hookType;
+  hookType.server_id = 9006;
+  hookType.client_id = 9006;
+  hookType.hook_south = true;
+  hookType.hook_east = true;
+
+  // Let's register raw brushes with the registry
+  auto* groundRaw = dynamic_cast<MapEditor::Brushes::RawBrush*>(registry.getOrCreateRAWBrush(9001));
+  auto* normalRaw = dynamic_cast<MapEditor::Brushes::RawBrush*>(registry.getOrCreateRAWBrush(9002));
+  auto* bottom1Raw = dynamic_cast<MapEditor::Brushes::RawBrush*>(registry.getOrCreateRAWBrush(9003));
+  auto* bottom3Raw = dynamic_cast<MapEditor::Brushes::RawBrush*>(registry.getOrCreateRAWBrush(9004));
+  auto* bottom2Raw = dynamic_cast<MapEditor::Brushes::RawBrush*>(registry.getOrCreateRAWBrush(9005));
+  auto* hookRaw = dynamic_cast<MapEditor::Brushes::RawBrush*>(registry.getOrCreateRAWBrush(9006));
+
+  require(groundRaw && normalRaw && bottom1Raw && bottom3Raw && bottom2Raw && hookRaw,
+          "failed to create RAW brushes for testing");
+
+  groundRaw->setCachedType(&groundType);
+  normalRaw->setCachedType(&normalType);
+  bottom1Raw->setCachedType(&bottom1Type);
+  bottom3Raw->setCachedType(&bottom3Type);
+  bottom2Raw->setCachedType(&bottom2Type);
+  hookRaw->setCachedType(&hookType);
+
+  // Test 1: Ground-like RAW placement overwrites ground slot
+  controller.setBrush(groundRaw);
+  require(controller.applyBrush(pos), "ground raw apply failed");
+  require(tile->getGround() != nullptr, "ground slot should be populated");
+  require(tile->getGround()->getServerId() == 9001, "ground server ID mismatch");
+
+  // Test 2: Normal item RAW placement appends to tile items
+  controller.setBrush(normalRaw);
+  require(controller.applyBrush(pos), "normal raw apply failed");
+  require(tile->getItemCount() == 1, "items list should have 1 item");
+  require(tile->getItem(0)->getServerId() == 9002, "item 0 server ID mismatch");
+
+  // Test 3: Always-on-bottom items sorted by top_order
+  // Draw in order: bottom3 (order 3), then bottom1 (order 1), then bottom2 (order 2)
+  controller.setBrush(bottom3Raw);
+  require(controller.applyBrush(pos), "bottom3 raw apply failed");
+  controller.setBrush(bottom1Raw);
+  require(controller.applyBrush(pos), "bottom1 raw apply failed");
+  controller.setBrush(bottom2Raw);
+  require(controller.applyBrush(pos), "bottom2 raw apply failed");
+
+  // Items should be: bottom1 (9003, order 1), bottom2 (9005, order 2), bottom3 (9004, order 3), normal (9002)
+  require(tile->getItemCount() == 4, "tile items count mismatch after bottom items draw");
+  require(tile->getItem(0)->getServerId() == 9003, "stack order mismatch: item 0 should be order 1");
+  require(tile->getItem(1)->getServerId() == 9005, "stack order mismatch: item 1 should be order 2");
+  require(tile->getItem(2)->getServerId() == 9004, "stack order mismatch: item 2 should be order 3");
+  require(tile->getItem(3)->getServerId() == 9002, "stack order mismatch: item 3 should be normal item");
+
+  // Test 4: Hook South/East item placement registers hooks on tile
+  controller.setBrush(hookRaw);
+  require(controller.applyBrush(pos), "hook raw apply failed");
+  require(tile->hasHookSouth(), "tile should register hook south");
+  require(tile->hasHookEast(), "tile should register hook east");
+
+  // Test 5: SimOne Replace vs Stacking (top_order == 2)
+  MapEditor::Domain::ItemType bottom2AltType;
+  bottom2AltType.server_id = 9007;
+  bottom2AltType.client_id = 9007;
+  bottom2AltType.always_on_bottom = true;
+  bottom2AltType.top_order = 2;
+
+  auto* bottom2AltRaw = dynamic_cast<MapEditor::Brushes::RawBrush*>(registry.getOrCreateRAWBrush(9007));
+  bottom2AltRaw->setCachedType(&bottom2AltType);
+
+  // rawLikeSimone is true by default, Alt modifier is false. Placing bottom2AltRaw should replace bottom2 (9005).
+  brushSettings.setRawLikeSimone(true);
+  controller.setBrush(bottom2AltRaw);
+  require(controller.applyBrush(pos), "bottom2alt raw apply failed");
+
+  // Verify that item 9005 (order 2) was replaced by 9007, but order 1 and 3 items and normal items remain.
+  require(!tileContainsItemId(*tile, 9005), "order 2 item 9005 should have been replaced");
+  require(tileContainsItemId(*tile, 9007), "order 2 item 9007 should be placed");
+  require(tileContainsItemId(*tile, 9003), "order 1 item should remain");
+  require(tileContainsItemId(*tile, 9004), "order 3 item should remain");
+
+  // Now, test with Alt modifier pressed (should stack instead of replace)
+  {
+    MapEditor::Brushes::DrawContext altCtx;
+    altCtx.brushRegistry = &registry;
+    altCtx.brushSettings = &brushSettings;
+    altCtx.modifiers = MapEditor::Brushes::Modifiers::Alt;
+    altCtx.ownerBrushId = registry.getBrushId(bottom2Raw);
+    bottom2Raw->draw(map, tile, altCtx);
+  }
+  // Now both 9007 and 9005 (both order 2) should be on the tile.
+  require(tileContainsItemId(*tile, 9007), "order 2 item 9007 should still be there");
+  require(tileContainsItemId(*tile, 9005), "order 2 item 9005 should be stacked");
+
+  // Test 6: RAW Erasing
+  controller.setBrush(groundRaw);
+  groundRaw->undraw(map, tile);
+  require(tile->getGround() == nullptr, "ground should be cleared after undraw");
+
+  normalRaw->undraw(map, tile);
+  require(!tileContainsItemId(*tile, 9002), "normal item should be cleared after undraw");
+
+  // Test 7: Smart Pick Fallback
+  tile->removeGround();
+  tile->removeItemsIf([](const MapEditor::Domain::Item*) { return true; });
+
+  controller.setBrush(groundRaw);
+  controller.applyBrush(pos);
+  controller.setBrush(normalRaw);
+  controller.applyBrush(pos);
+
+  auto selection = controller.resolveBrushFromTile(*tile, PickMode::Smart);
+  require(selection.has_value(), "smart pick should succeed");
+  require(selection->mode == MapEditor::Brushes::BrushPickMode::Raw, "resolved pick mode should be Raw");
+  require(selection->rawItemId == 9002, "resolved raw item ID should be top item (9002)");
+
+  normalRaw->undraw(map, tile);
+  selection = controller.resolveBrushFromTile(*tile, PickMode::Smart);
+  require(selection.has_value(), "smart pick should succeed");
+  require(selection->mode == MapEditor::Brushes::BrushPickMode::Raw, "resolved pick mode should be Raw");
+  require(selection->rawItemId == 9001, "resolved raw item ID should fall back to ground (9001)");
+}
+
+void requireDoodadCtrlEraseOnlyRemovesSelectedDoodad() {
+  MapEditor::Brushes::BrushRegistry registry;
+  MapEditor::Services::BrushSettingsService brushSettings;
+  brushSettings.setDoodadEraseMatchingOnly(false);
+
+  auto grassPtr = std::make_unique<MapEditor::Brushes::DoodadBrush>(
+      "grass turfs", 400, registry, false);
+  MapEditor::Brushes::DoodadAlternative grassAlternative;
+  grassAlternative.addSingleItem({.itemId = 400, .chance = 1});
+  grassPtr->addAlternative(std::move(grassAlternative));
+  auto *grassBrush = grassPtr.get();
+  registry.addBrush(std::move(grassPtr));
+
+  auto firePtr = std::make_unique<MapEditor::Brushes::DoodadBrush>(
+      "fire", 500, registry, false);
+  MapEditor::Brushes::DoodadAlternative fireAlternative;
+  fireAlternative.addSingleItem({.itemId = 500, .chance = 1});
+  firePtr->addAlternative(std::move(fireAlternative));
+  auto *fireBrush = firePtr.get();
+  registry.addBrush(std::move(firePtr));
+
+  MapEditor::Domain::ChunkedMap map;
+  map.createNew(16, 16, 1098);
+  MapEditor::Domain::History::HistoryManager history;
+  MapEditor::Brushes::BrushController controller;
+  controller.initialize(&map, &history, nullptr);
+  controller.setBrushRegistry(&registry);
+  controller.setBrushSettingsService(&brushSettings);
+
+  const MapEditor::Domain::Position pos{8, 8, 7};
+  controller.setBrush(fireBrush);
+  require(controller.applyBrush(pos), "fire doodad paint failed");
+  controller.setBrush(grassBrush);
+  require(controller.applyBrush(pos), "grass doodad paint failed");
+
+  auto *tile = map.getTile(pos);
+  require(tile != nullptr, "doodad erase fixture tile missing");
+  require(tileContainsItemId(*tile, 400), "grass doodad was not placed");
+  require(tileContainsItemId(*tile, 500), "fire doodad was not placed");
+
+  require(controller.eraseBrush(pos, GLFW_MOD_CONTROL),
+          "grass doodad ctrl erase did not mutate");
+  require(!tileContainsItemId(*tile, 400),
+          "ctrl erase left the selected grass doodad");
+  require(tileContainsItemId(*tile, 500),
+          "ctrl erase removed a different fire doodad");
+
+  tile->removeItemsIf([](const MapEditor::Domain::Item *) { return true; });
+  auto legacyGrassItem = std::make_unique<MapEditor::Domain::Item>(400);
+  tile->addItemDirect(std::move(legacyGrassItem));
+
+  auto fireOwnedSameId = std::make_unique<MapEditor::Domain::Item>(400);
+  fireOwnedSameId->setOwnerBrushId(registry.getBrushId(fireBrush));
+  tile->addItemDirect(std::move(fireOwnedSameId));
+
+  require(countItemId(*tile, 400) == 2,
+          "legacy doodad erase fixture did not stack two same-id items");
+  controller.setBrush(grassBrush);
+  require(controller.eraseBrush(pos, GLFW_MOD_CONTROL),
+          "legacy grass doodad ctrl erase did not mutate");
+  require(countItemId(*tile, 400) == 1,
+          "ctrl erase did not remove exactly one legacy matching item");
+  require(tile->getItemCount() == 1 &&
+              tile->getItem(0)->getOwnerBrushId() == registry.getBrushId(fireBrush),
+          "ctrl erase removed a same-id item owned by a different doodad");
+}
+
+void requireSandDuneGroundEquivalentDoesNotOuterBorder(const fs::path &tempDir) {
+  const fs::path brushPath = tempDir / "sand_dune_ground_equivalent.xml";
+  writeTextFile(
+      brushPath,
+      R"xml(<brushes>
+  <brush name="test-grass" type="ground" lookid="100" z-order="10">
+    <item id="100" />
+    <border align="inner" to="none">
+      <borderitem edge="n" id="895" />
+      <borderitem edge="e" id="895" />
+      <borderitem edge="s" id="895" />
+      <borderitem edge="w" id="895" />
+    </border>
+  </brush>
+  <brush name="test-sand" type="ground" lookid="231" z-order="20">
+    <item id="231" />
+    <item id="8317" chance="0" />
+    <border align="outer" to="none">
+      <borderitem edge="n" id="894" />
+      <borderitem edge="e" id="894" />
+      <borderitem edge="s" id="894" />
+      <borderitem edge="w" id="894" />
+      <specific>
+        <conditions>
+          <match_item id="894" />
+        </conditions>
+        <actions>
+          <replace_item id="894" with="8317" />
+        </actions>
+      </specific>
+    </border>
+  </brush>
+</brushes>)xml");
+
+  MapEditor::Brushes::BrushRegistry localRegistry;
+  MapEditor::IO::BrushXmlReader reader({&localRegistry});
+  require(reader.loadFile(brushPath), "sand dune fixture brush XML failed");
+
+  auto *sandBrush = dynamic_cast<MapEditor::Brushes::GroundBrush *>(
+      localRegistry.getBrush("test-sand"));
+  auto *grassBrush = dynamic_cast<MapEditor::Brushes::GroundBrush *>(
+      localRegistry.getBrush("test-grass"));
+  require(sandBrush != nullptr && grassBrush != nullptr,
+          "sand dune fixture brushes did not load");
+
+  MapEditor::Domain::ChunkedMap map;
+  map.createNew(16, 16, 1098);
+  const MapEditor::Domain::Position center{8, 8, 7};
+  for (int dy = -2; dy <= 2; ++dy) {
+    for (int dx = -2; dx <= 2; ++dx) {
+      if (dx == 0 && dy == 0) {
+        continue;
+      }
+      paintGround(map, localRegistry, *grassBrush,
+                  {center.x + dx, center.y + dy, center.z});
+    }
+  }
+
+  auto *duneTile = map.getOrCreateTile(center);
+  duneTile->setGround(std::make_unique<MapEditor::Domain::Item>(8317));
+  duneTile->setGroundBrushId(MapEditor::Brushes::InvalidBrushId);
+
+  require(MapEditor::Brushes::GroundBrush::resolveGroundBrush(localRegistry,
+                                                              *duneTile) ==
+              nullptr,
+          "sand dune ground-equivalent id resolved as a real sand ground brush");
+
+  sandBrush->rebuildAround(map, center);
+  for (int dy = -1; dy <= 1; ++dy) {
+    for (int dx = -1; dx <= 1; ++dx) {
+      const MapEditor::Domain::Position pos{center.x + dx, center.y + dy,
+                                            center.z};
+      const auto *tile = map.getTile(pos);
+      require(!tile || !tileContainsItemId(*tile, 894),
+              "sand dune ground-equivalent id created outer border rock 894");
+      require(!tile || !tileContainsItemId(*tile, 895),
+              "sand dune ground-equivalent id created inner grass border");
+    }
+  }
+}
+
 } // namespace
 
 int main() {
@@ -1423,6 +1750,9 @@ int main() {
     requireRealDataSandSpecificCaseReplaceItem(registry);
     requireRealDataFrozenMudSpecificCaseMatchGroup(registry);
     requireRealDataGroundOuterZilch(registry);
+    requireRawBrushPlacementAndParity(registry);
+    requireDoodadCtrlEraseOnlyRemovesSelectedDoodad();
+    requireSandDuneGroundEquivalentDoesNotOuterBorder(tempDir);
 
     auto *creatureOthersTileset =
         tilesetService.getTilesetRegistry().getTilesetBySourceFile(

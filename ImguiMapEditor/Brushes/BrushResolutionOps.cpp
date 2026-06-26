@@ -6,6 +6,7 @@
 #include "Types/WallBrush.h"
 #include "Types/DoorBrush.h"
 #include "Types/OptionalBorderBrush.h"
+#include "Types/RawBrush.h"
 #include "Services/ClientDataService.h"
 #include "Services/Autoborder/AutoborderEngine.h"
 #include <algorithm>
@@ -660,6 +661,15 @@ BrushController::resolveBrushFromTile(const Domain::Tile &tile,
 
   if (registry_) {
     if (auto *brush = registry_->resolveBrushForTile(tile)) {
+      if (brush->getType() == BrushType::Raw) {
+        auto *rawBrush = static_cast<const RawBrush *>(brush);
+        return ResolvedBrushSelection{
+            .mode = BrushPickMode::Raw,
+            .displayName = "RAW Item",
+            .rawItemId = rawBrush->getItemId(),
+        };
+      }
+
       auto selection = makeSelection(brush, BrushPickMode::Smart);
       if (!selection) {
         return std::nullopt;
@@ -702,6 +712,11 @@ BrushController::resolveBrushFromTile(const Domain::Tile &tile,
         return selection;
       }
     }
+  }
+
+  // Fallback to RAW Brush selection for any remaining items
+  if (auto selection = selectRawBrush(tile, preferredItem)) {
+    return selection;
   }
 
   return std::nullopt;

@@ -83,7 +83,7 @@ void recordRedoBorderTouch(
   }
 
   auto &touch = touches[it->second];
-  if (itemType && itemType->is_ground) {
+  if (itemType && itemType->isGround()) {
     touch.placedGround = true;
   } else if (itemType && itemType->is_wall) {
     touch.placedWall = true;
@@ -163,8 +163,12 @@ bool DoodadBrush::ownsItem(const Domain::Item *item) const {
   }
 
   const auto brushId = registry_.getBrushId(this);
-  return (brushId != InvalidBrushId && item->getOwnerBrushId() == brushId) ||
-         ownedItemIds_.contains(item->getServerId());
+  if (const auto ownerBrushId = item->getOwnerBrushId();
+      ownerBrushId != InvalidBrushId) {
+    return brushId != InvalidBrushId && ownerBrushId == brushId;
+  }
+
+  return ownedItemIds_.contains(item->getServerId());
 }
 
 bool DoodadBrush::shouldEraseDoodadItem(const Domain::Item *item,
@@ -412,7 +416,7 @@ void DoodadBrush::applyPlacementPlan(Domain::ChunkedMap &map,
                               absolutePosition, itemType);
       }
 
-      if (itemType && itemType->is_ground) {
+      if (itemType && itemType->isGround()) {
         targetTile->setGround(std::move(item));
       } else {
         if (itemType && itemType->is_wall) {

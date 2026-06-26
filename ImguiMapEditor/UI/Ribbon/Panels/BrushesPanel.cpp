@@ -43,6 +43,10 @@ namespace {
   return brush && brush->getType() == Brushes::BrushType::Door;
 }
 
+[[nodiscard]] bool supportsRawLikeSimone(const Brushes::IBrush *brush) {
+  return brush && brush->getType() == Brushes::BrushType::Raw;
+}
+
 [[nodiscard]] bool supportsSpawnSettings(const Brushes::IBrush *brush) {
   return brush &&
          (brush->getType() == Brushes::BrushType::Spawn ||
@@ -439,6 +443,17 @@ void BrushesPanel::Render() {
     }
     if (ImGui::IsItemHovered()) {
       ImGui::SetTooltip("Enable outline/autoborder-style preview generation");
+    }
+    ImGui::SameLine();
+  }
+
+  if (supportsRawLikeSimone(currentBrush) && settingsService_) {
+    bool rawLikeSimone = settingsService_->getRawLikeSimone();
+    if (ImGui::Checkbox("##RawLikeSimone", &rawLikeSimone)) {
+      settingsService_->setRawLikeSimone(rawLikeSimone);
+    }
+    if (ImGui::IsItemHovered()) {
+      ImGui::SetTooltip("Enable Simone-compatible replacement behavior");
     }
     ImGui::SameLine();
   }

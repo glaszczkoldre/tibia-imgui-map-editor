@@ -7,8 +7,10 @@
 #include "Domain/Selection/SelectionEntry.h"
 #include "Domain/Spawn.h"
 #include "Domain/Tile.h"
+#include "Domain/MapInstance.h"
 #include "Presentation/NotificationHelper.h"
 #include "Services/ClipboardService.h"
+#include "Services/ClientDataService.h"
 #include "Services/Selection/SelectionService.h"
 #include "ext/fontawesome6/IconsFontAwesome6.h"
 #include <algorithm>
@@ -292,7 +294,8 @@ void MapContextMenu::render(AppLogic::EditorSession *session,
     selected_item_ = getSelectedContextItem(session, position_);
     const auto selected_positions = session->getSelectionService().getPositions();
     has_single_selection_context_ =
-        selected_positions.size() == 1 && selected_positions.front() == position_;
+        selected_positions.empty() ||
+        (selected_positions.size() == 1 && selected_positions.front() == position_);
   }
 
   if (ImGui::BeginPopup("MapContextMenu")) {
@@ -407,12 +410,13 @@ void MapContextMenu::renderItemActions(AppLogic::EditorSession *session) {
     return;
   }
 
-  const auto *selected_item = selected_item_;
   const auto *active_item = getActiveItem(
       current_tile_, getTopSelectedItem(session, current_tile_, position_));
+  const auto *selected_item = selected_item_ ? selected_item_ : active_item;
   Domain::Item *mutable_selected_item =
       getMutableActiveItem(session, position_, selected_item);
-  const auto *selected_type = selected_item ? selected_item->getType() : nullptr;
+  const auto *client_data = (session && session->getDocument()) ? session->getDocument()->getClientData() : nullptr;
+  const auto *selected_type = selected_item ? (selected_item->getType() ? selected_item->getType() : (client_data ? client_data->getItemTypeByServerId(selected_item->getServerId()) : nullptr)) : nullptr;
   const bool can_rotate =
       selected_item &&
       ((can_rotate_item_callback_ &&
@@ -432,7 +436,7 @@ void MapContextMenu::renderItemActions(AppLogic::EditorSession *session) {
   const bool has_spawn = current_tile_->hasSpawn();
   const bool has_creature = current_tile_->hasCreature();
 
-  if (!active_item && !has_spawn && !has_creature) {
+  if (!selected_item && !has_spawn && !has_creature) {
     return;
   }
 
@@ -511,17 +515,17 @@ void MapContextMenu::renderBrushSelectionActions(
   };
 
   constexpr std::array brush_options{
-      BrushOption{"Select Creature", BrushPickMode::Creature},
-      BrushOption{"Select Spawn", BrushPickMode::Spawn},
-      BrushOption{"Select RAW", BrushPickMode::Raw},
-      BrushOption{"Select Wallbrush", BrushPickMode::Wall},
-      BrushOption{"Select Carpetbrush", BrushPickMode::Carpet},
-      BrushOption{"Select Tablebrush", BrushPickMode::Table},
-      BrushOption{"Select Doodadbrush", BrushPickMode::Doodad},
-      BrushOption{"Select Doorbrush", BrushPickMode::Door},
-      BrushOption{"Select Groundbrush", BrushPickMode::Ground},
-      BrushOption{"Select Collection", BrushPickMode::Collection},
-      BrushOption{"Select House", BrushPickMode::House},
+      BrushOption{ICON_FA_DRAGON " Select Creature", BrushPickMode::Creature},
+      BrushOption{ICON_FA_FIRE " Select Spawn", BrushPickMode::Spawn},
+      BrushOption{ICON_FA_CUBE " Select RAW", BrushPickMode::Raw},
+      BrushOption{ICON_FA_DUNGEON " Select Wallbrush", BrushPickMode::Wall},
+      BrushOption{ICON_FA_RUG " Select Carpetbrush", BrushPickMode::Carpet},
+      BrushOption{ICON_FA_TABLE " Select Tablebrush", BrushPickMode::Table},
+      BrushOption{ICON_FA_TREE " Select Doodadbrush", BrushPickMode::Doodad},
+      BrushOption{ICON_FA_DOOR_CLOSED " Select Doorbrush", BrushPickMode::Door},
+      BrushOption{ICON_FA_LAYER_GROUP " Select Groundbrush", BrushPickMode::Ground},
+      BrushOption{ICON_FA_BOXES_STACKED " Select Collection", BrushPickMode::Collection},
+      BrushOption{ICON_FA_HOUSE " Select House", BrushPickMode::House},
   };
 
   const auto brush_context = buildBrushMenuContext(session, current_tile_, position_);

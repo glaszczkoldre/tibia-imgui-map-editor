@@ -8,6 +8,10 @@
 #include <imgui.h>
 #include <vector>
 
+namespace MapEditor::Domain {
+class ChunkedMap;
+}
+
 namespace MapEditor::Services {
 class SpriteManager;
 }
@@ -44,6 +48,7 @@ public:
    * @param viewportSize Size of viewport in pixels
    * @param zoom Current zoom level
    * @param style Optional rendering style
+   * @param map For wall hook detection
    */
   void render(ImDrawList *drawList, Services::ClientDataService *clientData,
               Services::SpriteManager *spriteManager,
@@ -53,7 +58,8 @@ public:
               const glm::vec2 &cameraPos, const glm::vec2 &viewportPos,
               const glm::vec2 &viewportSize, float zoom,
               Services::Preview::PreviewStyle style =
-                  Services::Preview::PreviewStyle::Ghost);
+                  Services::Preview::PreviewStyle::Ghost,
+              const Domain::ChunkedMap *map = nullptr);
 
   /**
    * Render tiles within specified bounds only (culling).
@@ -68,7 +74,8 @@ public:
                const glm::vec2 &cameraPos, const glm::vec2 &viewportPos,
                const glm::vec2 &viewportSize, float zoom,
                Services::Preview::PreviewStyle style =
-                   Services::Preview::PreviewStyle::Ghost);
+                   Services::Preview::PreviewStyle::Ghost,
+               const Domain::ChunkedMap *map = nullptr);
 
 private:
   /**
@@ -80,7 +87,8 @@ private:
                   const Services::Preview::PreviewTileData &tile,
                   const Domain::Position &worldPos, const glm::vec2 &cameraPos,
                   const glm::vec2 &viewportPos, const glm::vec2 &viewportSize,
-                  float zoom, ImU32 tintColor);
+                  float zoom, ImU32 tintColor,
+                  const Domain::ChunkedMap *map);
 
   /**
    * Render a single item sprite with ghost effect.
@@ -91,7 +99,8 @@ private:
                   const Services::Preview::PreviewItemData &item,
                   const Domain::Position &worldPos, float &accumulatedElevation,
                   const glm::vec2 &cameraPos, const glm::vec2 &viewportPos,
-                  const glm::vec2 &viewportSize, float zoom, ImU32 tintColor);
+                  const glm::vec2 &viewportSize, float zoom, ImU32 tintColor,
+                  const Domain::ChunkedMap *map);
 
   /**
    * Convert tile position to screen coordinates.
