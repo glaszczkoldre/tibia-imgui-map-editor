@@ -192,12 +192,6 @@ public:
     void clear();
 
 private:
-    // Merges item metadata (OTB/SRV items, or DAT-generated stubs) with DAT item definitions.
-    // The name is historical; "otb_items" may contain SRV items or DAT-generated stubs.
-    void mergeOtbWithDat(const std::vector<Domain::ItemType>& otb_items,
-                         const IO::DatResult& dat_result,
-                         const Domain::ClientVersion& client_version);
-    
     // NOTE: generateCreatureTileset moved to TilesetService
 
     bool loaded_ = false;

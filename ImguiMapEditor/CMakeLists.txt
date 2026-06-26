@@ -220,6 +220,7 @@ set(SERVICES_SOURCES
     Services/ClientSignatureDetector.cpp
     Services/ClientAssetDetector.cpp
     Services/ClientDataService.cpp
+    Services/ItemDefinitionResolver.cpp
     Services/SpriteManager.cpp
     Services/SpriteAsyncLoader.cpp
     Services/SpriteLoadQueue.cpp

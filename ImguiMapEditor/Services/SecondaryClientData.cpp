@@ -2,6 +2,7 @@
 #include "ClientSignatureDetector.h"
 #include "ClientVersionRegistry.h"
 #include "ConfigService.h"
+#include "ItemDefinitionResolver.h"
 #include "IO/OtbReader.h"
 #include "IO/Readers/DatReaderFactory.h"
 #include <spdlog/spdlog.h>
@@ -89,54 +90,13 @@ SecondaryClientResult SecondaryClientData::loadFromFolder(
     spdlog::info("SecondaryClientData: SPR reader reports {} sprites (extended={})", 
                  result.sprite_count, uses_extended_sprites);
     
-    // 6. Build map of client_id -> DAT item for proper lookup
-    // DAT items have their own 'id' field which is the client_id
-    std::unordered_map<uint16_t, const IO::ClientItem*> dat_items;
-    for (const auto& item : dat_result.items) {
-        dat_items[item.id] = &item;
-    }
-    
-    // 7. Merge OTB with DAT (same logic as ClientDataService)
-    items_.reserve(otb_result.items.size());
-    
-    for (auto& otb_item : otb_result.items) {
-        uint16_t client_id = otb_item.client_id;
-        
-        // Find matching DAT entry by client_id (NOT by array index!)
-        auto it = dat_items.find(client_id);
-        if (it != dat_items.end()) {
-            const IO::ClientItem* dat_item = it->second;
-            
-            // Copy visual properties from DAT
-            otb_item.sprite_ids = dat_item->sprite_ids;
-            otb_item.width = dat_item->width;
-            otb_item.height = dat_item->height;
-            otb_item.layers = dat_item->layers;
-            otb_item.pattern_x = dat_item->pattern_x;
-            otb_item.pattern_y = dat_item->pattern_y;
-            otb_item.pattern_z = dat_item->pattern_z;
-            otb_item.frames = dat_item->frames;
-            otb_item.draw_offset_x = dat_item->offset_x;
-            otb_item.draw_offset_y = dat_item->offset_y;
-            
-            if (dat_item->has_elevation) {
-                otb_item.elevation = dat_item->elevation;
-            }
-            
-            otb_item.is_ground = dat_item->is_ground;
-            otb_item.is_border = false;
-            otb_item.is_hangable = dat_item->is_hangable;
-            otb_item.hook_south = dat_item->is_vertical;
-            otb_item.hook_east = dat_item->is_horizontal;
-            otb_item.is_stackable = dat_item->is_stackable;
+    // 6. Resolve OTB/DAT into the same final item definitions as the primary client.
+    items_ = ItemDefinitionResolver::resolve(Domain::ItemDataSource::OTB,
+                                             otb_result.items, dat_result);
+    for (size_t index = 0; index < items_.size(); ++index) {
+        if (items_[index].server_id > 0) {
+            server_id_index_[items_[index].server_id] = index;
         }
-        
-        // Build server_id lookup
-        if (otb_item.server_id > 0) {
-            server_id_index_[otb_item.server_id] = items_.size();
-        }
-        
-        items_.push_back(std::move(otb_item));
     }
     
     result.item_count = items_.size();

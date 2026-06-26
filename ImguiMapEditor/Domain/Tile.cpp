@@ -85,16 +85,12 @@ void Tile::addItem(std::unique_ptr<Item> item) {
   if (!item)
     return;
 
-  // Check if this is a ground item (first item or has ground flag)
+  // Check if this is a ground item using the final resolved item definition.
   const ItemType *type = item->getType();
   bool is_ground = false;
-  uint16_t sid = item->getServerId();
 
   if (type) {
-    // Use OTB's ItemGroup::Ground for classification (like original RME)
-    // DAT's is_ground is a visual property, OTB's group is the server
-    // classification
-    is_ground = (type->group == ItemGroup::Ground);
+    is_ground = type->isGround();
   }
 
   if (is_ground) {

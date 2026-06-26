@@ -29,7 +29,7 @@ bool FloorVisibilityCalculator::tileLimitsFloorsView(const Domain::Tile* tile, b
     if (ground_type->is_dont_hide) return false;
     
     // Ground tiles block view
-    if (ground_type->is_ground) return true;
+    if (ground_type->isGround()) return true;
     
     // isOnBottom items (walls) block view
     if (ground_type->is_on_bottom) {
@@ -49,7 +49,7 @@ bool FloorVisibilityCalculator::tileLimitsFloorsView(const Domain::Tile* tile, b
         
         if (item_type->is_dont_hide) continue;
         
-        if (item_type->is_ground) return true;
+        if (item_type->isGround()) return true;
         
         if (item_type->is_on_bottom) {
             if (is_free_view) {

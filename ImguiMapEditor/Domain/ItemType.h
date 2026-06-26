@@ -325,45 +325,35 @@ public:
   // items.srv DisguiseTarget)
   uint16_t disguise_target = 0;
 
-  // Helper methods
-  // Type checks - combines OTB group (from items.otb) AND item_type (from
-  // items.json) This ensures compatibility regardless of which data source
-  // defines the type
+  // Helper methods over the final resolved item definition.
   bool isReadable() const {
     return can_read_text || hasFlag(ItemFlag::Readable);
   }
-  // isWriteable() is defined below near line 304
 
   bool isGround() const { return group == ItemGroup::Ground; }
   bool isContainer() const {
-    return group == ItemGroup::Container ||
-           item_type == ItemTypeEnum::Container;
+    return item_type == ItemTypeEnum::Container;
   }
   bool isSplash() const { return group == ItemGroup::Splash; }
-  bool isFluid() const {
-    return group == ItemGroup::Fluid || is_fluid_container;
-  }
-  bool isFluidContainer() const {
-    return group == ItemGroup::Fluid || is_fluid_container;
-  }
+  bool isFluid() const { return group == ItemGroup::Fluid; }
+  bool isFluidContainer() const { return group == ItemGroup::Fluid; }
   bool isDoor() const {
-    return group == ItemGroup::Door || item_type == ItemTypeEnum::Door;
+    return item_type == ItemTypeEnum::Door;
   }
   bool isTeleport() const {
-    return group == ItemGroup::Teleport || item_type == ItemTypeEnum::Teleport;
+    return item_type == ItemTypeEnum::Teleport;
   }
   bool isMagicField() const {
-    return group == ItemGroup::MagicField ||
-           item_type == ItemTypeEnum::MagicField;
+    return item_type == ItemTypeEnum::MagicField;
   }
   bool isWriteable() const {
     return group == ItemGroup::Writeable || can_write_text;
   }
   bool isKey() const {
-    return group == ItemGroup::Key || item_type == ItemTypeEnum::Key;
+    return item_type == ItemTypeEnum::Key;
   }
   bool isPodium() const {
-    return group == ItemGroup::Podium || item_type == ItemTypeEnum::Podium;
+    return item_type == ItemTypeEnum::Podium;
   }
   bool isDepot() const { return item_type == ItemTypeEnum::Depot; }
   bool isMailbox() const { return item_type == ItemTypeEnum::Mailbox; }

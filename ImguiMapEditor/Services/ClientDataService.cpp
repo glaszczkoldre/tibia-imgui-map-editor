@@ -1,4 +1,5 @@
 #include "ClientDataService.h"
+#include "ItemDefinitionResolver.h"
 #include "SpriteManager.h"
 // NOTE: TilesetXmlReader, TilesetRegistry, BrushRegistry, CreatureBrush
 // includes removed - tileset logic moved to TilesetService
@@ -108,20 +109,24 @@ ClientDataService::load(const std::filesystem::path &client_path,
   if (progress)
     progress(60, "Merging data...");
 
-  // 3. Merge data
-  if (data_source == ::MapEditor::Domain::ItemDataSource::DAT) {
-      // Generate item definitions directly from DAT
-      item_definitions.reserve(dat_result.items.size());
-      for (const auto& dat_item : dat_result.items) {
-          Domain::ItemType it;
-          it.server_id = dat_item.id;
-          it.client_id = dat_item.id;
-          it.name = std::format("Item {}", dat_item.id);
-          item_definitions.push_back(std::move(it));
-      }
+  // 3. Resolve data into one final item definition table.
+  items_ = ItemDefinitionResolver::resolve(data_source, item_definitions,
+                                           dat_result);
+  server_id_index_.clear();
+  client_id_index_.clear();
+  max_server_id_ = 0;
+  max_client_id_ = 0;
+  for (size_t index = 0; index < items_.size(); ++index) {
+    const auto &item = items_[index];
+    if (item.server_id > 0) {
+      server_id_index_[item.server_id] = index;
+      max_server_id_ = std::max(max_server_id_, item.server_id);
+    }
+    if (item.client_id > 0) {
+      client_id_index_[item.client_id] = index;
+      max_client_id_ = std::max(max_client_id_, item.client_id);
+    }
   }
-
-  mergeOtbWithDat(item_definitions, dat_result, client_version);
 
   // 4. Store outfit data for creature sprite lookup
   outfits_ = dat_result.outfits;
@@ -211,6 +216,7 @@ bool ClientDataService::loadItemData(
 
   spdlog::info("Loaded {} items from XML, merged {} with existing types",
                result.items_loaded, result.items_merged);
+  ItemDefinitionResolver::normalizeResolvedItemTypes(items_);
   return true;
 }
 
@@ -297,142 +303,6 @@ void ClientDataService::clear() {
 
   loaded_ = false;
   client_version_ = 0;
-}
-
-void ClientDataService::mergeOtbWithDat(
-    const std::vector<Domain::ItemType> &otb_items,
-    const IO::DatResult &dat_result, const Domain::ClientVersion &client_version) {
-
-  // Build a map of client_id -> DAT item for quick lookup
-  std::unordered_map<uint16_t, const IO::ClientItem *> dat_items;
-  size_t dat_ground_count = 0;
-  for (const auto &item : dat_result.items) {
-    dat_items[item.id] = &item;
-    if (item.is_ground)
-      dat_ground_count++;
-  }
-
-  spdlog::info("ClientDataService: Merging {} OTB items with {} DAT items",
-               otb_items.size(), dat_result.items.size());
-
-  items_.reserve(otb_items.size());
-
-  for (const auto &otb_item : otb_items) {
-    Domain::ItemType merged = otb_item;
-
-    // Find matching DAT entry by client_id
-    auto it = dat_items.find(otb_item.client_id);
-    if (it != dat_items.end()) {
-      const IO::ClientItem *dat = it->second;
-
-      // Merge DAT appearance data
-      merged.width = dat->width;
-      merged.height = dat->height;
-      merged.layers = dat->layers;
-      merged.pattern_x = dat->pattern_x;
-      merged.pattern_y = dat->pattern_y;
-      merged.pattern_z = dat->pattern_z;
-      merged.frames = dat->frames;
-
-      // Copy sprite IDs
-      merged.sprite_ids = dat->sprite_ids;
-
-      // Copy ground flag from DAT
-      merged.is_ground = dat->is_ground;
-
-      // Merge light info
-      if (dat->has_light) {
-        merged.light_level = static_cast<uint8_t>(dat->light_level);
-        merged.light_color = static_cast<uint8_t>(dat->light_color);
-      }
-
-      // Translucency — DAT flag already false for pre-10.00 items
-      merged.is_translucent = dat->is_translucent;
-
-      // Ground speed from DAT
-      if (dat->is_ground && dat->ground_speed > 0) {
-        merged.speed = dat->ground_speed;
-      }
-
-      // Draw offset (critical for proper sprite positioning)
-      merged.draw_offset_x = dat->offset_x;
-      merged.draw_offset_y = dat->offset_y;
-
-      // Elevation (items on top shift upward visually)
-      merged.elevation = dat->elevation;
-
-      // CRITICAL FIX: Ensure OTB flags reflect DAT elevation
-      // If the OTB file didn't specify HasElevation but DAT has elevation,
-      // force the flag so rendering logic works.
-      if (merged.elevation > 0) {
-        merged.flags = merged.flags | Domain::ItemFlag::HasElevation;
-      }
-
-      // Hangable/hook properties
-      merged.is_hangable = merged.is_hangable || dat->is_hangable;
-      merged.hook_east =
-          merged.hook_east || dat->is_horizontal; // DAT uses is_horizontal for east hook
-      merged.hook_south =
-          merged.hook_south || dat->is_vertical; // DAT uses is_vertical for south hook
-
-      // Minimap color (for minimap rendering)
-      if (dat->has_minimap_color) {
-        merged.minimap_color = dat->minimap_color;
-      }
-
-      // Floor visibility flags (critical for floor rendering in ingame preview)
-      merged.is_on_bottom = dat->is_on_bottom;
-      merged.is_on_top = dat->is_on_top;
-      merged.is_dont_hide = dat->dont_hide;
-      merged.blocks_projectile = dat->blocks_missiles;
-
-      // Fluid container flag from DAT (for proper subtype-based sprite
-      // rendering)
-      merged.is_fluid_container = dat->is_fluid_container;
-
-      // Animation data (from DAT)
-      merged.animate_always = dat->animate_always;
-      merged.animation_mode = dat->animation_mode;
-      merged.loop_count = dat->loop_count;
-      merged.start_frame = dat->start_frame;
-      merged.frame_durations = dat->frame_durations;
-      merged.total_duration = 0;
-      for (const auto &d : dat->frame_durations) {
-        merged.total_duration += (d.first + d.second) / 2;
-      }
-
-      // Lying object (multi-tile corpses)
-      merged.is_lying_object = dat->is_lying_object;
-
-      // Frame groups (10.57+ creatures)
-      merged.idle_sprite_ids = dat->idle_sprite_ids;
-      merged.walk_sprite_ids = dat->walk_sprite_ids;
-      merged.idle_frames = dat->idle_frames;
-      merged.walk_frames = dat->walk_frames;
-      merged.has_frame_groups = dat->has_frame_groups;
-    }
-
-    // Store the item
-    size_t index = items_.size();
-    items_.push_back(std::move(merged));
-
-    // Index by server_id and client_id
-    if (otb_item.server_id > 0) {
-      server_id_index_[otb_item.server_id] = index;
-      max_server_id_ = std::max(max_server_id_, otb_item.server_id);
-    }
-    if (otb_item.client_id > 0) {
-      client_id_index_[otb_item.client_id] = index;
-      max_client_id_ = std::max(max_client_id_, otb_item.client_id);
-    }
-  }
-
-  size_t light_count = 0;
-  for (const auto &item : items_) {
-    if (item.light_level > 0)
-      light_count++;
-  }
-  spdlog::info("Light System: {} items have light_level > 0", light_count);
 }
 
 const Domain::ItemType *
