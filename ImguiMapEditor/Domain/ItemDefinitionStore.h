@@ -25,7 +25,9 @@ public:
     std::vector<ItemType>& getItemTypes() { return items_; }
 
     const ItemType* getItemTypeByServerId(uint16_t server_id) const;
+    ItemType* getItemTypeByServerId(uint16_t server_id);
     const ItemType* getItemTypeByClientId(uint16_t client_id) const;
+    ItemType* getItemTypeByClientId(uint16_t client_id);
 
     void clear();
 

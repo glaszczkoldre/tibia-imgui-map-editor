@@ -284,6 +284,7 @@ public:
 
   // Track if XML was merged
   bool xml_loaded = false;
+  bool locked_door = false;
 
   // PERFORMANCE: Cached first sprite region
   const MapEditor::Rendering::AtlasRegion *cached_sprite_region = nullptr;
@@ -312,7 +313,7 @@ public:
     return item_type == ItemTypeEnum::MagicField;
   }
   bool isWriteable() const {
-    return hasFlag(ItemFlag::CanWriteText);
+    return group == ItemGroup::Writeable || hasFlag(ItemFlag::CanWriteText);
   }
   bool isKey() const {
     return item_type == ItemTypeEnum::Key;
@@ -361,9 +362,21 @@ public:
   bool canReadText() const { return hasFlag(ItemFlag::CanReadText); }
   bool canWriteText() const { return hasFlag(ItemFlag::CanWriteText); }
   bool allowDistRead() const { return hasFlag(ItemFlag::AllowDistRead); }
-  bool isBorder() const { return false; }
-  bool isLocked() const { return false; }
-  bool isWall() const { return false; }
+  bool isBorder() const {
+    return hasFlag(ItemFlag::AlwaysOnBottom) && always_on_top_order == 1;
+  }
+  bool isBlockingGround() const {
+    return hasFlag(ItemFlag::Unpassable) &&
+           hasFlag(ItemFlag::BlockMissiles) &&
+           !hasFlag(ItemFlag::Moveable) && always_on_top_order == 0 &&
+           !hasFlag(ItemFlag::FullTile);
+  }
+  bool isLocked() const { return isDoor() && locked_door; }
+  bool isWall() const {
+    return hasFlag(ItemFlag::Unpassable) &&
+           hasFlag(ItemFlag::BlockMissiles) &&
+           !hasFlag(ItemFlag::Moveable) && always_on_top_order != 0;
+  }
   bool hookSouth() const { return hasFlag(ItemFlag::HookSouth); }
   bool hookEast() const { return hasFlag(ItemFlag::HookEast); }
   bool isHangable() const { return hasFlag(ItemFlag::IsHangable); }

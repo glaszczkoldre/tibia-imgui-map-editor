@@ -16,6 +16,7 @@ ClientDataService::load(const std::filesystem::path &client_path,
                         LoadProgressCallback progress) {
   ClientDataResult result;
   clear();
+  data_source_ = data_source;
 
   uint32_t version_num = client_version.getVersion();
 
@@ -97,6 +98,24 @@ ClientDataService::load(const std::filesystem::path &client_path,
   spdlog::info("DAT loaded: {} items, {} outfits, {} effects, {} missiles",
                dat_result.items.size(), dat_result.outfits.size(),
                dat_result.effects.size(), dat_result.missiles.size());
+
+  server_item_fragments_ = item_definitions;
+  server_item_fragment_index_.clear();
+  server_item_fragment_index_.reserve(server_item_fragments_.size());
+  for (size_t index = 0; index < server_item_fragments_.size(); ++index) {
+    if (server_item_fragments_[index].server_id > 0) {
+      server_item_fragment_index_[server_item_fragments_[index].server_id] = index;
+    }
+  }
+
+  client_item_fragments_ = dat_result.items;
+  client_item_fragment_index_.clear();
+  client_item_fragment_index_.reserve(client_item_fragments_.size());
+  for (size_t index = 0; index < client_item_fragments_.size(); ++index) {
+    if (client_item_fragments_[index].id > 0) {
+      client_item_fragment_index_[client_item_fragments_[index].id] = index;
+    }
+  }
 
   if (progress)
     progress(60, "Merging data...");
@@ -190,22 +209,36 @@ bool ClientDataService::loadItemData(
   // Merge override fragments using the resolver
   size_t merged_count = 0;
   auto& items = item_store_.getItemTypes();
-  
-  std::unordered_map<uint16_t, size_t> server_id_index;
-  server_id_index.reserve(items.size());
-  for (size_t index = 0; index < items.size(); ++index) {
-      if (items[index].server_id > 0) {
-          server_id_index[items[index].server_id] = index;
-      }
-  }
 
   for (const auto &xml_fragment : xml_result.items) {
-      auto it = server_id_index.find(xml_fragment.server_id);
-      if (it != server_id_index.end()) {
-          ItemDefinitionResolver::mergeXmlOverride(items[it->second], xml_fragment);
+      auto *item = item_store_.getItemTypeByServerId(xml_fragment.server_id);
+      if (item) {
+          if (xml_fragment.client_id.has_value()) {
+              const auto server_it =
+                  server_item_fragment_index_.find(xml_fragment.server_id);
+              const auto dat_it =
+                  client_item_fragment_index_.find(xml_fragment.client_id.value());
+              if (server_it != server_item_fragment_index_.end() &&
+                  dat_it != client_item_fragment_index_.end()) {
+                  auto server_fragment = server_item_fragments_[server_it->second];
+                  server_fragment.client_id = xml_fragment.client_id.value();
+
+                  IO::DatResult remap_dat;
+                  remap_dat.items.push_back(client_item_fragments_[dat_it->second]);
+                  auto remapped = ItemDefinitionResolver::resolve(
+                      data_source_, std::vector<IO::ServerItemFragment>{server_fragment},
+                      remap_dat);
+                  if (!remapped.empty()) {
+                      *item = std::move(remapped.front());
+                  }
+              }
+          }
+          ItemDefinitionResolver::mergeXmlOverride(*item, xml_fragment);
           merged_count++;
       }
   }
+
+  ItemDefinitionResolver::normalizeResolvedItemTypes(items);
 
   // Reindex the store after modifications
   item_store_.rebuildIndexes();
@@ -214,7 +247,6 @@ bool ClientDataService::loadItemData(
 
   spdlog::info("Loaded {} items from XML, merged {} with existing types",
                xml_result.items_loaded, merged_count);
-  ItemDefinitionResolver::normalizeResolvedItemTypes(items);
   return true;
 }
 
@@ -274,6 +306,11 @@ size_t ClientDataService::optimizeItemSprites(SpriteManager& sprite_manager, boo
 
 void ClientDataService::clear() {
   item_store_.clear();
+  server_item_fragments_.clear();
+  server_item_fragment_index_.clear();
+  client_item_fragments_.clear();
+  client_item_fragment_index_.clear();
+  data_source_ = Domain::ItemDataSource::OTB;
   max_server_id_ = 0;
   max_client_id_ = 0;
 

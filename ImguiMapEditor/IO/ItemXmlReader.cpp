@@ -66,6 +66,13 @@ void ItemXmlReader::parseItemNode(
     if (auto attr = itemNode.attribute("editorsuffix")) {
         item.editor_suffix = attr.as_string();
     }
+    if (auto attr = itemNode.attribute("clientid")) {
+        item.client_id = static_cast<uint16_t>(attr.as_uint());
+    } else if (auto attr = itemNode.attribute("client_id")) {
+        item.client_id = static_cast<uint16_t>(attr.as_uint());
+    } else if (auto attr = itemNode.attribute("clientId")) {
+        item.client_id = static_cast<uint16_t>(attr.as_uint());
+    }
 
     // Parse nested attributes
     parseAttributes(itemNode, item);
@@ -99,6 +106,9 @@ void ItemXmlReader::parseAttributes(const pugi::xml_node& itemNode, XmlItemFragm
         else if (key == "description") {
             item.description = value;
         } 
+        else if (key == "clientid" || key == "client_id") {
+            item.client_id = static_cast<uint16_t>(std::stoul(value));
+        }
         else if (key == "weight") {
             item.weight = std::stof(value) / 100.0f;
         } 

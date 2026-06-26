@@ -1,10 +1,9 @@
 #pragma once
+#include "Domain/ItemDefinitionStore.h"
 #include "Domain/ItemType.h"
 #include "IO/SprReader.h"
 #include "SecondaryClientConstants.h"
 #include <filesystem>
-#include <vector>
-#include <unordered_map>
 #include <memory>
 #include <string>
 #include <algorithm>
@@ -112,7 +111,7 @@ public:
     /**
      * Get count of loaded items.
      */
-    size_t getItemCount() const { return items_.size(); }
+    size_t getItemCount() const { return item_store_.getItemTypes().size(); }
     
     /**
      * Load visual settings from config (tint, alpha).
@@ -138,8 +137,7 @@ private:
     std::filesystem::path folder_path_;
     
     // ItemType storage and lookup
-    std::vector<Domain::ItemType> items_;
-    std::unordered_map<uint16_t, size_t> server_id_index_;
+    Domain::ItemDefinitionStore item_store_;
     
     // Sprite reader for secondary client
     std::unique_ptr<IO::SprReader> spr_reader_;

@@ -91,15 +91,10 @@ SecondaryClientResult SecondaryClientData::loadFromFolder(
                  result.sprite_count, uses_extended_sprites);
     
     // 6. Resolve OTB/DAT into the same final item definitions as the primary client.
-    items_ = ItemDefinitionResolver::resolve(Domain::ItemDataSource::OTB,
-                                             otb_result.items, dat_result);
-    for (size_t index = 0; index < items_.size(); ++index) {
-        if (items_[index].server_id > 0) {
-            server_id_index_[items_[index].server_id] = index;
-        }
-    }
+    item_store_.setItems(ItemDefinitionResolver::resolve(
+        Domain::ItemDataSource::OTB, otb_result.items, dat_result));
     
-    result.item_count = items_.size();
+    result.item_count = item_store_.getItemTypes().size();
     client_version_ = detected_version;
     folder_path_ = folder_path;
     loaded_ = true;
@@ -113,11 +108,7 @@ SecondaryClientResult SecondaryClientData::loadFromFolder(
 }
 
 const Domain::ItemType* SecondaryClientData::getItemTypeByServerId(uint16_t server_id) const {
-    auto it = server_id_index_.find(server_id);
-    if (it == server_id_index_.end()) {
-        return nullptr;
-    }
-    return &items_[it->second];
+    return item_store_.getItemTypeByServerId(server_id);
 }
 
 void SecondaryClientData::loadSettingsFromConfig(const ConfigService& config) {
@@ -135,8 +126,7 @@ void SecondaryClientData::clear() {
     active_ = false;
     client_version_ = 0;
     folder_path_.clear();
-    items_.clear();
-    server_id_index_.clear();
+    item_store_.clear();
     spr_reader_.reset();
     spdlog::debug("SecondaryClientData: Cleared");
 }

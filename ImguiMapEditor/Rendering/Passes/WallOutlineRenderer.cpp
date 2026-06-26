@@ -65,19 +65,11 @@ bool WallOutlineRenderer::initialize() {
 }
 
 bool WallOutlineRenderer::isBlockingGround(const Domain::ItemType &type) const {
-  // Blocking ground: Unpassable + BlockMissiles + NOT Moveable + top_order==0 +
-  // NOT FullTile
-  return type.hasFlag(Domain::ItemFlag::Unpassable) &&
-         type.hasFlag(Domain::ItemFlag::BlockMissiles) &&
-         !type.hasFlag(Domain::ItemFlag::Moveable) && type.alwaysOnTopOrder() == 0 &&
-         !type.hasFlag(Domain::ItemFlag::FullTile);
+  return type.isBlockingGround();
 }
 
 bool WallOutlineRenderer::isWallItem(const Domain::ItemType &type) const {
-  // Yellow lines: Unpassable + BlockMissiles + NOT Moveable + top_order!=0
-  return type.hasFlag(Domain::ItemFlag::Unpassable) &&
-         type.hasFlag(Domain::ItemFlag::BlockMissiles) &&
-         !type.hasFlag(Domain::ItemFlag::Moveable) && type.alwaysOnTopOrder() != 0;
+  return type.isWall();
 }
 
 bool WallOutlineRenderer::tileHasWall(const Domain::ChunkedMap &map, int x,

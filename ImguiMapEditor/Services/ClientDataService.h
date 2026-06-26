@@ -198,9 +198,14 @@ private:
     uint32_t client_version_ = 0;
     uint16_t max_server_id_ = 0;
     uint16_t max_client_id_ = 0;
+    Domain::ItemDataSource data_source_ = Domain::ItemDataSource::OTB;
     
     // Item type storage
     Domain::ItemDefinitionStore item_store_;
+    std::vector<IO::ServerItemFragment> server_item_fragments_;
+    std::unordered_map<uint16_t, size_t> server_item_fragment_index_;
+    std::vector<IO::ClientItem> client_item_fragments_;
+    std::unordered_map<uint16_t, size_t> client_item_fragment_index_;
     
     // Creature storage
     std::vector<std::unique_ptr<Domain::CreatureType>> creatures_;

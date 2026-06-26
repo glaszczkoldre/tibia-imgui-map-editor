@@ -16,7 +16,23 @@ const ItemType* ItemDefinitionStore::getItemTypeByServerId(uint16_t server_id) c
     return nullptr;
 }
 
+ItemType* ItemDefinitionStore::getItemTypeByServerId(uint16_t server_id) {
+    auto it = server_id_index_.find(server_id);
+    if (it != server_id_index_.end()) {
+        return &items_[it->second];
+    }
+    return nullptr;
+}
+
 const ItemType* ItemDefinitionStore::getItemTypeByClientId(uint16_t client_id) const {
+    auto it = client_id_index_.find(client_id);
+    if (it != client_id_index_.end()) {
+        return &items_[it->second];
+    }
+    return nullptr;
+}
+
+ItemType* ItemDefinitionStore::getItemTypeByClientId(uint16_t client_id) {
     auto it = client_id_index_.find(client_id);
     if (it != client_id_index_.end()) {
         return &items_[it->second];

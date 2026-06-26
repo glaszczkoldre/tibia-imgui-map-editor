@@ -2,9 +2,9 @@
 #include "IO/Readers/DatReaderBase.h"
 
 #include <algorithm>
+#include <cctype>
 #include <format>
 #include <unordered_map>
-#include <spdlog/spdlog.h>
 
 namespace MapEditor::Services {
 namespace {
@@ -13,11 +13,27 @@ using Domain::ItemFlag;
 using Domain::ItemGroup;
 using Domain::ItemTypeEnum;
 
-void setFlag(Domain::ItemType &item, ItemFlag flag, bool enabled) {
-  if (!enabled) {
-    return;
-  }
+void enableFlag(Domain::ItemType &item, ItemFlag flag, bool enabled) {
+  if (!enabled) return;
   item.flags = item.flags | flag;
+}
+
+void setFlag(Domain::ItemType &item, ItemFlag flag, bool enabled) {
+  item.flags = enabled ? (item.flags | flag) : (item.flags & ~flag);
+}
+
+std::string toLower(std::string value) {
+  std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
+    return static_cast<char>(std::tolower(ch));
+  });
+  return value;
+}
+
+bool marksLockedDoor(const Domain::ItemType &item) {
+  const auto suffix = toLower(item.editor_suffix);
+  const auto description = toLower(item.description);
+  return suffix.find("locked") != std::string::npos ||
+         description.find("it is locked") != std::string::npos;
 }
 
 ItemGroup datGroup(const IO::ClientItem &dat) {
@@ -76,14 +92,16 @@ std::vector<Domain::ItemType> ItemDefinitionResolver::resolve(
     item.wareId = server_item.wareId;
     item.maxTextLen = server_item.maxTextLen;
     item.disguise_target = server_item.disguise_target;
+    item.volume = server_item.volume;
+    item.weight = server_item.weight;
+    item.attack = server_item.attack;
+    item.defense = server_item.defense;
+    item.armor = server_item.armor;
+    item.charges = server_item.charges;
+    item.rotateTo = server_item.rotateTo;
     
     // Copy flags
     item.flags = server_item.flags;
-    
-    // Map OTB flags (e.g. AlwaysOnTop is OTB bit 13 which actually means bottom)
-    if (hasFlag(server_item.flags, ItemFlag::AlwaysOnBottom)) {
-      setFlag(item, ItemFlag::AlwaysOnBottom, true);
-    }
     
     // Translate some SRV/OTB types if they have explicit groups/types
     if (server_item.item_type != ItemTypeEnum::None) {
@@ -201,44 +219,49 @@ void ItemDefinitionResolver::applyDatFragment(Domain::ItemType &item,
   }
 
   // Final visual/gameplay flags from DAT OR'ed into final flags
-  setFlag(item, ItemFlag::Unpassable, dat.is_unpassable);
-  setFlag(item, ItemFlag::BlockMissiles, dat.blocks_missiles);
-  setFlag(item, ItemFlag::BlockPathfinder, dat.blocks_pathfinder);
-  setFlag(item, ItemFlag::Pickupable, dat.is_pickupable);
-  setFlag(item, ItemFlag::Stackable, dat.is_stackable);
-  setFlag(item, ItemFlag::Useable, dat.is_useable || dat.usable);
-  setFlag(item, ItemFlag::IsHangable, dat.is_hangable);
-  setFlag(item, ItemFlag::HookEast, dat.is_horizontal);
-  setFlag(item, ItemFlag::HookSouth, dat.is_vertical);
-  setFlag(item, ItemFlag::Rotatable, dat.is_rotatable);
-  setFlag(item, ItemFlag::HasElevation, dat.has_elevation && dat.elevation > 0);
-  setFlag(item, ItemFlag::IgnoreLook, dat.ignore_look);
-  setFlag(item, ItemFlag::FullTile, dat.full_ground);
-  setFlag(item, ItemFlag::Animation,
+  enableFlag(item, ItemFlag::Unpassable, dat.is_unpassable);
+  enableFlag(item, ItemFlag::BlockMissiles, dat.blocks_missiles);
+  enableFlag(item, ItemFlag::BlockPathfinder, dat.blocks_pathfinder);
+  enableFlag(item, ItemFlag::Pickupable, dat.is_pickupable);
+  enableFlag(item, ItemFlag::Stackable, dat.is_stackable);
+  enableFlag(item, ItemFlag::Useable, dat.is_useable || dat.usable);
+  enableFlag(item, ItemFlag::CanReadText, dat.is_writable);
+  enableFlag(item, ItemFlag::CanWriteText, dat.is_writable);
+  enableFlag(item, ItemFlag::IsHangable, dat.is_hangable);
+  enableFlag(item, ItemFlag::HookEast, dat.is_horizontal);
+  enableFlag(item, ItemFlag::HookSouth, dat.is_vertical);
+  enableFlag(item, ItemFlag::Rotatable, dat.is_rotatable);
+  enableFlag(item, ItemFlag::HasElevation, dat.has_elevation && dat.elevation > 0);
+  enableFlag(item, ItemFlag::IgnoreLook, dat.ignore_look);
+  enableFlag(item, ItemFlag::FullTile, dat.full_ground);
+  enableFlag(item, ItemFlag::Animation,
           dat.animate_always || dat.has_animation_data || dat.frames > 1);
-  setFlag(item, ItemFlag::ClientCharges, dat.has_default_action || dat.default_action > 0);
-  setFlag(item, ItemFlag::ForceUse, dat.usable);
+  enableFlag(item, ItemFlag::ClientCharges, dat.has_default_action || dat.default_action > 0);
+  enableFlag(item, ItemFlag::ForceUse, dat.usable);
   
   // Custom DAT flags
-  setFlag(item, ItemFlag::AlwaysOnBottom, dat.is_on_bottom);
-  setFlag(item, ItemFlag::OnTop, dat.is_on_top);
-  setFlag(item, ItemFlag::DontHide, dat.dont_hide);
-  setFlag(item, ItemFlag::Translucent, dat.is_translucent);
-  setFlag(item, ItemFlag::NoMoveAnimation, dat.no_move_animation);
-  setFlag(item, ItemFlag::Wrappable, dat.wrappable);
-  setFlag(item, ItemFlag::Unwrappable, dat.unwrappable);
-  setFlag(item, ItemFlag::TopEffect, dat.top_effect);
-  setFlag(item, ItemFlag::Cloth, dat.is_cloth);
-  setFlag(item, ItemFlag::MarketItem, dat.has_market_data);
-  setFlag(item, ItemFlag::LensHelp, dat.lens_help > 0);
+  enableFlag(item, ItemFlag::AlwaysOnBottom, dat.is_on_bottom);
+  enableFlag(item, ItemFlag::OnTop, dat.is_on_top);
+  enableFlag(item, ItemFlag::DontHide, dat.dont_hide);
+  enableFlag(item, ItemFlag::Translucent, dat.is_translucent);
+  enableFlag(item, ItemFlag::NoMoveAnimation, dat.no_move_animation);
+  enableFlag(item, ItemFlag::Wrappable, dat.wrappable);
+  enableFlag(item, ItemFlag::Unwrappable, dat.unwrappable);
+  enableFlag(item, ItemFlag::TopEffect, dat.top_effect);
+  enableFlag(item, ItemFlag::Cloth, dat.is_cloth);
+  enableFlag(item, ItemFlag::MarketItem, dat.has_market_data);
+  enableFlag(item, ItemFlag::LensHelp, dat.lens_help > 0);
 
+  if (dat.is_writable && item.maxTextLen == 0) {
+    item.maxTextLen = dat.max_text_length;
+  }
   if (dat.floor_change) {
-    setFlag(item, ItemFlag::FloorChange, true);
+    enableFlag(item, ItemFlag::FloorChange, true);
   }
 
   // Handle moveability in DatOnly (where no OTB metadata exists)
   if (datOwnsClassification) {
-    setFlag(item, ItemFlag::Moveable, !dat.is_unmoveable);
+    enableFlag(item, ItemFlag::Moveable, !dat.is_unmoveable);
   }
 }
 
@@ -287,7 +310,7 @@ void ItemDefinitionResolver::mergeXmlOverride(Domain::ItemType &item, const IO::
     }
     if (xml.rotateTo.has_value()) {
         item.rotateTo = xml.rotateTo.value();
-        setFlag(item, ItemFlag::Rotatable, true);
+        setFlag(item, ItemFlag::Rotatable, item.rotateTo != 0);
     }
     if (xml.can_read_text.has_value()) {
         setFlag(item, ItemFlag::CanReadText, xml.can_read_text.value());
@@ -297,7 +320,7 @@ void ItemDefinitionResolver::mergeXmlOverride(Domain::ItemType &item, const IO::
     }
     if (xml.maxTextLen.has_value()) {
         item.maxTextLen = xml.maxTextLen.value();
-        setFlag(item, ItemFlag::CanReadText, true);
+        setFlag(item, ItemFlag::CanReadText, item.maxTextLen != 0);
     }
     if (xml.allow_dist_read.has_value()) {
         setFlag(item, ItemFlag::AllowDistRead, xml.allow_dist_read.value());
@@ -313,6 +336,7 @@ void ItemDefinitionResolver::mergeXmlOverride(Domain::ItemType &item, const IO::
     }
     if (xml.charges.has_value()) {
         item.charges = xml.charges.value();
+        setFlag(item, ItemFlag::ClientCharges, item.charges != 0);
     }
     if (xml.extra_chargeable.has_value()) {
         item.extra_chargeable = xml.extra_chargeable.value();
@@ -343,9 +367,9 @@ void ItemDefinitionResolver::mergeXmlOverride(Domain::ItemType &item, const IO::
     }
     
     // Floor change overrides
-    if (xml.floor_change.has_value() && xml.floor_change.value()) {
-        item.floor_change = true;
-        setFlag(item, ItemFlag::FloorChange, true);
+    if (xml.floor_change.has_value()) {
+        item.floor_change = xml.floor_change.value();
+        setFlag(item, ItemFlag::FloorChange, item.floor_change);
     }
     if (xml.floor_change_down.has_value()) item.floor_change_down = xml.floor_change_down.value();
     if (xml.floor_change_north.has_value()) item.floor_change_north = xml.floor_change_north.value();
@@ -363,6 +387,10 @@ void ItemDefinitionResolver::mergeXmlOverride(Domain::ItemType &item, const IO::
     if (xml.weapon_type.has_value()) {
         item.weapon_type = xml.weapon_type.value();
     }
+    if (marksLockedDoor(item)) {
+        item.locked_door = true;
+    }
+    item.xml_loaded = true;
 }
 
 void ItemDefinitionResolver::normalizeResolvedItemType(Domain::ItemType &item) {
