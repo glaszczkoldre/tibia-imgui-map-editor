@@ -36,7 +36,8 @@
 // UI Factory
 #include "Application/UIFactory.h"
 #include "UI/Widgets/TilesetWidget.h"
-#include "UI/Panels/BrushSizePanel.h"
+#include "UI/Panels/BrushSettingsPanel.h"
+#include "UI/Utils/IconTextureCache.h"
 // Utilities
 #include "Presentation/NotificationHelper.h"
 namespace MapEditor {
@@ -388,7 +389,7 @@ void Application::render() {
       .dialogs = &dialogs_,
       // Brush system (for preview rendering)
       .brush_controller = &brush_system_->getController(),
-      .brush_size_panel = ui_.brush_size_panel.get(),
+      .brush_settings_panel = ui_.brush_settings_panel.get(),
       // Map operations (for compatibility popup)
       .map_operations = ui_.map_operations.get(),
       // Callbacks

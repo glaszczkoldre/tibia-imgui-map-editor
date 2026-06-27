@@ -1,453 +1,427 @@
 #include "BrushSettingsService.h"
-#include "BrushSettingsSerializer.h"
 
 #include "Services/ConfigService.h"
-#include <cstdlib>
-#include <fstream>
-#include <ranges>
-#include <nlohmann/json.hpp>
-#include <spdlog/spdlog.h>
+#include <algorithm>
+#include <cmath>
+#include <limits>
 
 namespace MapEditor::Services {
 
 namespace {
 
+constexpr const char *kBrushShapeKey = "brush.shape";
+constexpr const char *kBrushSizeXKey = "brush.size_x";
+constexpr const char *kBrushSizeYKey = "brush.size_y";
+constexpr const char *kBrushExactKey = "brush.exact_size";
+constexpr const char *kBrushAspectLockedKey = "brush.aspect_locked";
 constexpr const char *kPreviewBorderKey = "brush.preview_border";
+constexpr const char *kAutoBorderKey = "brush.autoborder";
 constexpr const char *kLockDoorsKey = "brush.lock_doors";
-constexpr const char *kDoodadEraseMatchingOnlyKey =
-    "brush.doodad_erase_matching_only";
 constexpr const char *kEraserLeaveUniqueItemsKey =
     "brush.eraser_leave_unique_items";
+constexpr const char *kRawLikeSimoneKey = "brush.raw_like_simone";
 constexpr const char *kAutoCreateSpawnKey = "brush.auto_create_spawn";
 constexpr const char *kDefaultSpawnRadiusKey = "brush.default_spawn_radius";
 constexpr const char *kDefaultSpawnTimeKey = "brush.default_spawn_time";
-constexpr const char *kRawLikeSimoneKey = "brush.raw_like_simone";
+constexpr double kEllipseEpsilon = 0.005;
 
-[[nodiscard]] int snapToDiscreteBrushSize(int size) {
-  size = std::clamp(size, BrushSettingsService::MIN_SIZE,
-                    BrushSettingsService::MAX_SIZE);
-
-  auto best = BrushSettingsService::STANDARD_SIZE_PROGRESSION.front();
-  auto bestDistance = std::abs(best - size);
-  for (const auto candidate :
-       BrushSettingsService::STANDARD_SIZE_PROGRESSION) {
-    const auto distance = std::abs(candidate - size);
-    if (distance < bestDistance) {
-      best = candidate;
-      bestDistance = distance;
-    }
-  }
-  return best;
+[[nodiscard]] int computeSpan(int value, bool exact) {
+  return exact ? std::max(1, value) : std::max(0, value) * 2 + 1;
 }
 
-[[nodiscard]] int nextDiscreteBrushSize(int current) {
-  current = snapToDiscreteBrushSize(current);
-  for (const auto candidate :
-       BrushSettingsService::STANDARD_SIZE_PROGRESSION) {
+[[nodiscard]] int normalizeAxisValue(int value, bool exact) {
+  const int minValue = exact ? BrushSettingsService::MIN_EXACT_AXIS_SIZE
+                             : BrushSettingsService::MIN_RADIUS_AXIS_SIZE;
+  return std::clamp(value, minValue, BrushSettingsService::MAX_AXIS_SIZE);
+}
+
+[[nodiscard]] int nextSizeFrom(int current) {
+  for (const auto candidate : BrushSettingsService::LEGACY_SIZE_PROGRESSION) {
     if (candidate > current) {
       return candidate;
     }
   }
-  return BrushSettingsService::STANDARD_SIZE_PROGRESSION.back();
+  return BrushSettingsService::LEGACY_SIZE_PROGRESSION.back();
 }
 
-[[nodiscard]] int previousDiscreteBrushSize(int current) {
-  current = snapToDiscreteBrushSize(current);
-  for (auto it = BrushSettingsService::STANDARD_SIZE_PROGRESSION.rbegin();
-       it != BrushSettingsService::STANDARD_SIZE_PROGRESSION.rend(); ++it) {
+[[nodiscard]] int previousSizeFrom(int current) {
+  for (auto it = BrushSettingsService::LEGACY_SIZE_PROGRESSION.rbegin();
+       it != BrushSettingsService::LEGACY_SIZE_PROGRESSION.rend(); ++it) {
     if (*it < current) {
       return *it;
     }
   }
-  return BrushSettingsService::STANDARD_SIZE_PROGRESSION.front();
+  return BrushSettingsService::LEGACY_SIZE_PROGRESSION.front();
+}
+
+[[nodiscard]] double safeNormalize(double delta, double radius) {
+  if (radius <= 0.0) {
+    return delta == 0.0 ? 0.0 : std::numeric_limits<double>::infinity();
+  }
+  return delta / radius;
 }
 
 } // namespace
 
-int BrushSettingsService::normalizeStandardSize(int size) {
-  return snapToDiscreteBrushSize(size);
+bool BrushFootprint::containsOffset(int dx, int dy) const {
+  if (dx < min_offset_x || dx > max_offset_x || dy < min_offset_y ||
+      dy > max_offset_y) {
+    return false;
+  }
+
+  if (shape == BrushShape::Square) {
+    return true;
+  }
+
+  if (!exact) {
+    const double nx =
+        safeNormalize(static_cast<double>(dx), static_cast<double>(size_x));
+    const double ny =
+        safeNormalize(static_cast<double>(dy), static_cast<double>(size_y));
+    return nx * nx + ny * ny < 1.0 + kEllipseEpsilon;
+  }
+
+  const double centerX =
+      (static_cast<double>(min_offset_x) + static_cast<double>(max_offset_x)) /
+      2.0;
+  const double centerY =
+      (static_cast<double>(min_offset_y) + static_cast<double>(max_offset_y)) /
+      2.0;
+  const double radiusX = static_cast<double>(span_x) / 2.0;
+  const double radiusY = static_cast<double>(span_y) / 2.0;
+  const double nx = safeNormalize(static_cast<double>(dx) - centerX, radiusX);
+  const double ny = safeNormalize(static_cast<double>(dy) - centerY, radiusY);
+  return nx * nx + ny * ny <= 1.0 + kEllipseEpsilon;
 }
 
-int BrushSettingsService::getStandardSizeProgressionIndexForValue(int size) {
-  const auto normalized = normalizeStandardSize(size);
-  const auto it =
-      std::ranges::find(STANDARD_SIZE_PROGRESSION, normalized);
-  if (it == STANDARD_SIZE_PROGRESSION.end()) {
+int BrushFootprint::legacySize() const {
+  if (exact && size_x == 1 && size_y == 1) {
     return 0;
   }
-  return static_cast<int>(std::distance(STANDARD_SIZE_PROGRESSION.begin(), it));
+  return std::max(size_x, size_y);
 }
 
-int BrushSettingsService::getNextStandardSize() const {
-  return nextDiscreteBrushSize(standardSize_);
-}
-
-int BrushSettingsService::getPreviousStandardSize() const {
-  return previousDiscreteBrushSize(standardSize_);
-}
-
-// ========================
-// Brush Type
-// ========================
-
-void BrushSettingsService::setBrushType(BrushType type) {
-  if (type_ != type) {
-    type_ = type;
-    notifyChanged();
+void BrushSettingsService::setBrushShape(BrushShape shape) {
+  if (shape_ == shape) {
+    return;
   }
-}
-
-// ========================
-// Size Mode
-// ========================
-
-void BrushSettingsService::setBrushSizeMode(BrushSizeMode mode) {
-  if (sizeMode_ != mode) {
-    sizeMode_ = mode;
-    notifyChanged();
-  }
-}
-
-void BrushSettingsService::setPreviewBorder(bool enabled) {
-  if (previewBorder_ != enabled) {
-    previewBorder_ = enabled;
-    notifyChanged();
-  }
-}
-
-void BrushSettingsService::setLockDoors(bool enabled) {
-  if (lockDoors_ != enabled) {
-    lockDoors_ = enabled;
-    notifyChanged();
-  }
-}
-
-// ========================
-// Standard Size (now direct tile count, not radius)
-// ========================
-
-void BrushSettingsService::setStandardSize(int size) {
-  size = std::clamp(size, MIN_SIZE, MAX_SIZE);
-
-  if (std::ranges::find(STANDARD_SIZE_PROGRESSION, size) ==
-      STANDARD_SIZE_PROGRESSION.end()) {
-    if (size > standardSize_) {
-      size = getNextStandardSize();
-    } else if (size < standardSize_) {
-      size = getPreviousStandardSize();
-    } else {
-      size = normalizeStandardSize(size);
-    }
-  }
-
-  if (standardSize_ != size) {
-    standardSize_ = size;
-    notifyChanged();
-  }
-}
-
-void BrushSettingsService::increaseSize() {
-  setStandardSize(getNextStandardSize());
-}
-
-void BrushSettingsService::decreaseSize() {
-  setStandardSize(getPreviousStandardSize());
-}
-
-// ========================
-// Custom Dimensions
-// ========================
-
-void BrushSettingsService::setCustomDimensions(int width, int height) {
-  width = std::clamp(width, MIN_SIZE, MAX_SIZE);
-  height = std::clamp(height, MIN_SIZE, MAX_SIZE);
-
-  if (customWidth_ != width || customHeight_ != height) {
-    customWidth_ = width;
-    customHeight_ = height;
-    notifyChanged();
-  }
-}
-
-// ========================
-// Computed Properties
-// ========================
-
-int BrushSettingsService::getEffectiveWidth() const {
-  if (type_ == BrushType::Custom) {
-    const auto *brush = getSelectedCustomBrush();
-    if (brush && !brush->offsets.empty()) {
-      int minX = 0, maxX = 0;
-      for (const auto &[dx, dy] : brush->offsets) {
-        minX = std::min(minX, dx);
-        maxX = std::max(maxX, dx);
-      }
-      return maxX - minX + 1;
-    }
-    return 1;
-  }
-
-  if (sizeMode_ == BrushSizeMode::CustomDimensions) {
-    return customWidth_;
-  }
-
-  // Standard size: direct tile count (size=3 means 3 tiles wide)
-  return standardSize_;
-}
-
-int BrushSettingsService::getEffectiveHeight() const {
-  if (type_ == BrushType::Custom) {
-    const auto *brush = getSelectedCustomBrush();
-    if (brush && !brush->offsets.empty()) {
-      int minY = 0, maxY = 0;
-      for (const auto &[dx, dy] : brush->offsets) {
-        minY = std::min(minY, dy);
-        maxY = std::max(maxY, dy);
-      }
-      return maxY - minY + 1;
-    }
-    return 1;
-  }
-
-  if (sizeMode_ == BrushSizeMode::CustomDimensions) {
-    return customHeight_;
-  }
-
-  // Standard size: direct tile count (size=3 means 3 tiles tall)
-  return standardSize_;
-}
-
-// ========================
-// Custom Brushes
-// ========================
-
-void BrushSettingsService::addCustomBrush(const CustomBrushShape &brush) {
-  // Check if brush with same name exists
-  for (auto &existing : customBrushes_) {
-    if (existing.name == brush.name) {
-      existing = brush;
-      existing.computeOffsets();
-      notifyChanged();
-      return;
-    }
-  }
-
-  // Add new brush
-  customBrushes_.push_back(brush);
-  customBrushes_.back().computeOffsets();
+  shape_ = shape;
   notifyChanged();
 }
 
-void BrushSettingsService::removeCustomBrush(const std::string &name) {
-  auto it = std::remove_if(
-      customBrushes_.begin(), customBrushes_.end(),
-      [&name](const CustomBrushShape &b) { return b.name == name; });
+void BrushSettingsService::setBrushSizeX(int size) {
+  const int normalized = normalizeAxisValue(size);
+  setBrushSizeAxes(normalized, aspect_locked_ ? normalized : size_y_);
+}
 
-  if (it != customBrushes_.end()) {
-    customBrushes_.erase(it, customBrushes_.end());
+void BrushSettingsService::setBrushSizeY(int size) {
+  const int normalized = normalizeAxisValue(size);
+  setBrushSizeAxes(aspect_locked_ ? normalized : size_x_, normalized);
+}
 
-    // Clear selection if removed brush was selected
-    if (selectedCustomBrushName_ == name) {
-      selectedCustomBrushName_.clear();
-    }
+void BrushSettingsService::setBrushSizeAxes(int sizeX, int sizeY) {
+  const int normalizedX = normalizeAxisValue(sizeX);
+  const int normalizedY = normalizeAxisValue(sizeY);
+  if (size_x_ == normalizedX && size_y_ == normalizedY) {
+    return;
+  }
+
+  size_x_ = normalizedX;
+  size_y_ = normalizedY;
+  notifyChanged();
+}
+
+void BrushSettingsService::setExactBrushSize(bool exact) {
+  if (exact_ == exact) {
+    return;
+  }
+
+  exact_ = exact;
+  size_x_ = normalizeAxisValue(size_x_);
+  size_y_ = normalizeAxisValue(size_y_);
+  notifyChanged();
+}
+
+void BrushSettingsService::setBrushAspectRatioLocked(bool locked) {
+  if (aspect_locked_ == locked) {
+    return;
+  }
+
+  aspect_locked_ = locked;
+  if (aspect_locked_ && size_x_ != size_y_) {
+    size_y_ = size_x_;
+  }
+  notifyChanged();
+}
+
+void BrushSettingsService::setStandardSize(int size) {
+  const int normalized = MapEditor::Services::normalizeAxisValue(size, false);
+  const bool changed =
+      size_x_ != normalized || size_y_ != normalized || exact_ ||
+      !aspect_locked_;
+
+  size_x_ = normalized;
+  size_y_ = normalized;
+  exact_ = false;
+  aspect_locked_ = true;
+
+  if (changed) {
     notifyChanged();
   }
 }
 
-void BrushSettingsService::selectCustomBrush(const std::string &name) {
-  if (selectedCustomBrushName_ != name) {
-    selectedCustomBrushName_ = name;
+void BrushSettingsService::adjustSize(int delta) {
+  if (delta == 0) {
+    return;
+  }
+
+  const int minValue = exact_ ? MIN_EXACT_AXIS_SIZE : MIN_RADIUS_AXIS_SIZE;
+  const int maxValue = MAX_AXIS_SIZE;
+
+  int actualDelta = delta;
+  if (delta < 0) {
+    int limitDecrease = std::min(size_x_ - minValue, size_y_ - minValue);
+    actualDelta = -std::min(-delta, limitDecrease);
+  } else {
+    int limitIncrease = std::min(maxValue - size_x_, maxValue - size_y_);
+    actualDelta = std::min(delta, limitIncrease);
+  }
+
+  if (actualDelta != 0) {
+    size_x_ += actualDelta;
+    size_y_ += actualDelta;
     notifyChanged();
   }
 }
 
-const CustomBrushShape *BrushSettingsService::getSelectedCustomBrush() const {
-  if (selectedCustomBrushName_.empty()) {
-    return nullptr;
+int BrushSettingsService::getStandardSize() const {
+  return getBrushFootprint().legacySize();
+}
+
+void BrushSettingsService::increaseSize() {
+  setStandardSize(nextLegacySize());
+}
+
+void BrushSettingsService::decreaseSize() {
+  setStandardSize(previousLegacySize());
+}
+
+int BrushSettingsService::getEffectiveWidth() const {
+  return getEffectiveAxisSpanX();
+}
+
+int BrushSettingsService::getEffectiveHeight() const {
+  return getEffectiveAxisSpanY();
+}
+
+int BrushSettingsService::getEffectiveAxisSpanX() const {
+  return computeSpan(size_x_, exact_);
+}
+
+int BrushSettingsService::getEffectiveAxisSpanY() const {
+  return computeSpan(size_y_, exact_);
+}
+
+BrushFootprint BrushSettingsService::getBrushFootprint(bool forceSquare) const {
+  BrushFootprint footprint;
+  footprint.shape = forceSquare ? BrushShape::Square : shape_;
+  footprint.size_x = normalizeAxisValue(size_x_);
+  footprint.size_y = normalizeAxisValue(size_y_);
+  footprint.exact = exact_;
+  footprint.aspect_locked = aspect_locked_;
+  footprint.span_x = computeSpan(footprint.size_x, exact_);
+  footprint.span_y = computeSpan(footprint.size_y, exact_);
+
+  if (!exact_) {
+    footprint.min_offset_x = -footprint.size_x;
+    footprint.max_offset_x = footprint.size_x;
+    footprint.min_offset_y = -footprint.size_y;
+    footprint.max_offset_y = footprint.size_y;
+    return footprint;
   }
 
-  for (const auto &brush : customBrushes_) {
-    if (brush.name == selectedCustomBrushName_) {
-      return &brush;
+  const auto assignAxis = [](int span, int &minOffset, int &maxOffset) {
+    if (span % 2 == 1) {
+      minOffset = -(span / 2);
+      maxOffset = span / 2;
+      return;
     }
-  }
-  return nullptr;
+
+    minOffset = -(span - 1);
+    maxOffset = 0;
+  };
+
+  assignAxis(footprint.span_x, footprint.min_offset_x,
+             footprint.max_offset_x);
+  assignAxis(footprint.span_y, footprint.min_offset_y,
+             footprint.max_offset_y);
+  return footprint;
 }
 
-// ========================
-// Core API: Position Calculation
-// ========================
-
-std::vector<Domain::Position>
-BrushSettingsService::getBrushPositions(const Domain::Position &center) const {
-
-  std::vector<Domain::Position> positions;
-  auto offsets = getBrushOffsets();
-
-  positions.reserve(offsets.size());
-  for (const auto &[dx, dy] : offsets) {
-    positions.emplace_back(center.x + dx, center.y + dy, center.z);
-  }
-
-  return positions;
+BrushFootprint BrushSettingsService::getSquareBrushFootprint() const {
+  return getBrushFootprint(true);
 }
 
-std::vector<std::pair<int, int>> BrushSettingsService::getBrushOffsets() const {
-  switch (type_) {
-  case BrushType::Square:
-    return calculateSquareOffsets();
-  case BrushType::Circle:
-    return calculateCircleOffsets();
-  case BrushType::Custom:
-    return calculateCustomOffsets();
-  }
-}
-
-// ========================
-// Position Calculation Helpers
-// ========================
-
-std::vector<std::pair<int, int>>
-BrushSettingsService::calculateSquareOffsets() const {
+std::vector<std::pair<int, int>> BrushSettingsService::getBrushOffsets(bool forceSquare) const {
+  const auto footprint = getBrushFootprint(forceSquare);
   std::vector<std::pair<int, int>> offsets;
+  offsets.reserve(static_cast<size_t>(footprint.span_x * footprint.span_y));
 
-  int width, height;
-  if (sizeMode_ == BrushSizeMode::CustomDimensions) {
-    width = customWidth_;
-    height = customHeight_;
-  } else {
-    // Standard: direct tile count (size=3 means 3x3 grid)
-    width = height = standardSize_;
-  }
-
-  // Calculate half extents (center is at 0,0)
-  int halfW = width / 2;
-  int halfH = height / 2;
-
-  // For even sizes, bias toward negative
-  int startX = -halfW;
-  int endX = width - halfW - 1;
-  int startY = -halfH;
-  int endY = height - halfH - 1;
-
-  for (int dy = startY; dy <= endY; ++dy) {
-    for (int dx = startX; dx <= endX; ++dx) {
-      offsets.emplace_back(dx, dy);
-    }
-  }
-
-  return offsets;
-}
-
-std::vector<std::pair<int, int>>
-BrushSettingsService::calculateCircleOffsets() const {
-  std::vector<std::pair<int, int>> offsets;
-
-  int width, height;
-  if (sizeMode_ == BrushSizeMode::CustomDimensions) {
-    width = customWidth_;
-    height = customHeight_;
-  } else {
-    // Standard: direct tile count
-    width = height = standardSize_;
-  }
-
-  if (width == 1 && height == 1) {
-    // Size 1 = single tile
-    offsets.emplace_back(0, 0);
-    return offsets;
-  }
-
-  // Calculate half extents for ellipse
-  int halfW = width / 2;
-  int halfH = height / 2;
-
-  float rX = static_cast<float>(width) / 2.0f;
-  float rY = static_cast<float>(height) / 2.0f;
-
-  int startX = -halfW;
-  int endX = width - halfW - 1;
-  int startY = -halfH;
-  int endY = height - halfH - 1;
-
-  for (int dy = startY; dy <= endY; ++dy) {
-    for (int dx = startX; dx <= endX; ++dx) {
-      // Check if point is inside ellipse (with 0.5 offset for center of tile)
-      float nx = (static_cast<float>(dx) + 0.5f) / rX;
-      float ny = (static_cast<float>(dy) + 0.5f) / rY;
-
-      if (nx * nx + ny * ny <= 1.0f) {
+  for (int dy = footprint.min_offset_y; dy <= footprint.max_offset_y; ++dy) {
+    for (int dx = footprint.min_offset_x; dx <= footprint.max_offset_x; ++dx) {
+      if (footprint.containsOffset(dx, dy)) {
         offsets.emplace_back(dx, dy);
       }
     }
   }
 
-  // Ensure at least center tile
   if (offsets.empty()) {
     offsets.emplace_back(0, 0);
   }
-
   return offsets;
 }
 
 std::vector<std::pair<int, int>>
-BrushSettingsService::calculateCustomOffsets() const {
-  const auto *brush = getSelectedCustomBrush();
-  if (!brush || brush->offsets.empty()) {
-    // No custom brush selected, return single tile
-    return {{0, 0}};
+BrushSettingsService::getSquareBrushOffsets() const {
+  return getBrushOffsets(true);
+}
+
+std::vector<Domain::Position>
+BrushSettingsService::getBrushPositions(const Domain::Position &center, bool forceSquare) const {
+  std::vector<Domain::Position> positions;
+  const auto offsets = getBrushOffsets(forceSquare);
+  positions.reserve(offsets.size());
+  for (const auto &[dx, dy] : offsets) {
+    positions.emplace_back(center.x + dx, center.y + dy, center.z);
   }
-
-  return brush->offsets;
+  return positions;
 }
 
-// ========================
-// Persistence
-// ========================
-
-bool BrushSettingsService::saveCustomBrushes(
-    const std::string &filepath) const {
-  return BrushSettingsSerializer::saveCustomBrushes(filepath, customBrushes_);
+void BrushSettingsService::setPreviewBorder(bool enabled) {
+  if (preview_border_ == enabled) {
+    return;
+  }
+  preview_border_ = enabled;
+  notifyChanged();
 }
 
-bool BrushSettingsService::loadCustomBrushes(const std::string &filepath) {
-  return BrushSettingsSerializer::loadCustomBrushes(filepath, customBrushes_);
+void BrushSettingsService::setAutoBorder(bool enabled) {
+  if (auto_border_ == enabled) {
+    return;
+  }
+  auto_border_ = enabled;
+  notifyChanged();
+}
+
+void BrushSettingsService::toggleAutoBorder() {
+  setAutoBorder(!auto_border_);
+}
+
+void BrushSettingsService::setLockDoors(bool enabled) {
+  if (lock_doors_ == enabled) {
+    return;
+  }
+  lock_doors_ = enabled;
+  notifyChanged();
+}
+
+void BrushSettingsService::setEraserLeaveUniqueItems(bool enabled) {
+  if (eraser_leave_unique_items_ == enabled) {
+    return;
+  }
+  eraser_leave_unique_items_ = enabled;
+  notifyChanged();
+}
+
+void BrushSettingsService::setRawLikeSimone(bool enabled) {
+  if (raw_like_simone_ == enabled) {
+    return;
+  }
+  raw_like_simone_ = enabled;
+  notifyChanged();
+}
+
+void BrushSettingsService::setAutoCreateSpawn(bool enabled) {
+  if (auto_create_spawn_ == enabled) {
+    return;
+  }
+  auto_create_spawn_ = enabled;
+  notifyChanged();
+}
+
+void BrushSettingsService::setDefaultSpawnRadius(int radius) {
+  radius = std::clamp(radius, MIN_SPAWN_RADIUS, MAX_SPAWN_RADIUS);
+  if (default_spawn_radius_ == radius) {
+    return;
+  }
+  default_spawn_radius_ = radius;
+  notifyChanged();
+}
+
+void BrushSettingsService::setDefaultSpawnTime(int seconds) {
+  seconds = std::clamp(seconds, 0, 86400);
+  if (default_spawn_time_ == seconds) {
+    return;
+  }
+  default_spawn_time_ = seconds;
+  notifyChanged();
 }
 
 void BrushSettingsService::loadFromConfig(const ConfigService &config) {
-  previewBorder_ = config.get<bool>(kPreviewBorderKey, true);
-  lockDoors_ = config.get<bool>(kLockDoorsKey, false);
-  doodadEraseMatchingOnly_ =
-      config.get<bool>(kDoodadEraseMatchingOnlyKey, true);
-  eraserLeaveUniqueItems_ =
+  const auto shapeName = config.get<std::string>(kBrushShapeKey, "square");
+  shape_ = shapeName == "circle" ? BrushShape::Circle : BrushShape::Square;
+  exact_ = config.get<bool>(kBrushExactKey, true);
+  aspect_locked_ = config.get<bool>(kBrushAspectLockedKey, true);
+  size_x_ = normalizeAxisValue(config.get<int>(kBrushSizeXKey, 1));
+  size_y_ = aspect_locked_
+                ? size_x_
+                : normalizeAxisValue(config.get<int>(kBrushSizeYKey, 1));
+  preview_border_ = config.get<bool>(kPreviewBorderKey, true);
+  auto_border_ = config.get<bool>(kAutoBorderKey, true);
+  lock_doors_ = config.get<bool>(kLockDoorsKey, false);
+  eraser_leave_unique_items_ =
       config.get<bool>(kEraserLeaveUniqueItemsKey, true);
-  rawLikeSimone_ = config.get<bool>(kRawLikeSimoneKey, true);
-  autoCreateSpawn_ = config.get<bool>(kAutoCreateSpawnKey, false);
-  defaultSpawnRadius_ =
-      std::clamp(config.get<int>(kDefaultSpawnRadiusKey, 3), 1, 10);
-  defaultSpawnTime_ =
-      std::clamp(config.get<int>(kDefaultSpawnTimeKey, 60), 1, 86400);
+  raw_like_simone_ = config.get<bool>(kRawLikeSimoneKey, true);
+  auto_create_spawn_ = config.get<bool>(kAutoCreateSpawnKey, false);
+  default_spawn_radius_ =
+      std::clamp(config.get<int>(kDefaultSpawnRadiusKey, 3),
+                 MIN_SPAWN_RADIUS, MAX_SPAWN_RADIUS);
+  default_spawn_time_ =
+      std::clamp(config.get<int>(kDefaultSpawnTimeKey, 60), 0, 86400);
   notifyChanged();
 }
 
 void BrushSettingsService::saveToConfig(ConfigService &config) const {
-  config.set(kPreviewBorderKey, previewBorder_);
-  config.set(kLockDoorsKey, lockDoors_);
-  config.set(kDoodadEraseMatchingOnlyKey, doodadEraseMatchingOnly_);
-  config.set(kEraserLeaveUniqueItemsKey, eraserLeaveUniqueItems_);
-  config.set(kRawLikeSimoneKey, rawLikeSimone_);
-  config.set(kAutoCreateSpawnKey, autoCreateSpawn_);
-  config.set(kDefaultSpawnRadiusKey, defaultSpawnRadius_);
-  config.set(kDefaultSpawnTimeKey, defaultSpawnTime_);
+  config.set(kBrushShapeKey, shape_ == BrushShape::Circle ? "circle" : "square");
+  config.set(kBrushSizeXKey, size_x_);
+  config.set(kBrushSizeYKey, size_y_);
+  config.set(kBrushExactKey, exact_);
+  config.set(kBrushAspectLockedKey, aspect_locked_);
+  config.set(kPreviewBorderKey, preview_border_);
+  config.set(kAutoBorderKey, auto_border_);
+  config.set(kLockDoorsKey, lock_doors_);
+  config.set(kEraserLeaveUniqueItemsKey, eraser_leave_unique_items_);
+  config.set(kRawLikeSimoneKey, raw_like_simone_);
+  config.set(kAutoCreateSpawnKey, auto_create_spawn_);
+  config.set(kDefaultSpawnRadiusKey, default_spawn_radius_);
+  config.set(kDefaultSpawnTimeKey, default_spawn_time_);
 }
 
-// ========================
-// Change Notification
-// ========================
+int BrushSettingsService::normalizeAxisValue(int value) const {
+  return MapEditor::Services::normalizeAxisValue(value, exact_);
+}
+
+int BrushSettingsService::nextLegacySize() const {
+  return nextSizeFrom(getStandardSize());
+}
+
+int BrushSettingsService::previousLegacySize() const {
+  return previousSizeFrom(getStandardSize());
+}
 
 void BrushSettingsService::notifyChanged() {
-  if (onSettingsChanged_) {
-    onSettingsChanged_();
+  if (on_settings_changed_) {
+    on_settings_changed_();
   }
 }
 

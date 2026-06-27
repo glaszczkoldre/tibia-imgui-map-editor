@@ -672,7 +672,7 @@ int main() {
 
     // ─── Section 7: preview matches commit ────────────────────────────
     MapEditor::Services::BrushSettingsService settings;
-    settings.setStandardSize(1);
+    settings.setStandardSize(0);
     requirePreviewMatchesCommit(map, registry, *carpetBrush, settings);
 
     // ─── Section 8: context pick ───────────────────────────────────────

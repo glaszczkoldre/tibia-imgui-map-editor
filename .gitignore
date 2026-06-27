@@ -71,3 +71,4 @@ gha-creds-*.json
 # ============================================================
 /OTCLIENT_Readonly
 /data
+/assets

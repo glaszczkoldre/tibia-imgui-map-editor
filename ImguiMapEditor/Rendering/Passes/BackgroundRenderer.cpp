@@ -4,7 +4,6 @@
 // implementation block.
 #ifndef STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION
-#define STBI_ONLY_JPEG
 #endif
 #include <stb_image.h>
 

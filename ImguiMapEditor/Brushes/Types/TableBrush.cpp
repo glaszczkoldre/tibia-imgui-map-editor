@@ -6,6 +6,7 @@
 #include "Domain/ChunkedMap.h"
 #include "Domain/Item.h"
 #include "Domain/Tile.h"
+#include "Services/BrushSettingsService.h"
 #include "Services/Brushes/TableLookupService.h"
 #include <array>
 #include <algorithm>
@@ -35,7 +36,9 @@ void TableBrush::draw(Domain::ChunkedMap &map, Domain::Tile *tile,
   }
 
   placeAloneTile(*tile, ctx);
-  rebuildAround(map, tile->getPosition());
+  if (!ctx.brushSettings || ctx.brushSettings->getAutoBorder()) {
+    rebuildAround(map, tile->getPosition());
+  }
   map.markChanged();
 }
 

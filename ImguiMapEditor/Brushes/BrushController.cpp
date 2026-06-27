@@ -109,6 +109,29 @@ void BrushController::setBrush(IBrush *brush) {
   spdlog::info("[BrushController] Set brush: {}", brush->getName());
 }
 
+void BrushController::setPreviewService(Services::Preview::PreviewService *previewService) {
+  previewService_ = previewService;
+  if (brushSettingsService_) {
+    brushSettingsService_->setOnSettingsChanged([this]() {
+      if (previewService_) {
+        previewService_->regenerate();
+      }
+    });
+  }
+}
+
+void BrushController::setBrushSettingsService(Services::BrushSettingsService *service) {
+  brushSettingsService_ = service;
+  spawnBrush_.setSettingsService(service);
+  if (brushSettingsService_) {
+    brushSettingsService_->setOnSettingsChanged([this]() {
+      if (previewService_) {
+        previewService_->regenerate();
+      }
+    });
+  }
+}
+
 void BrushController::refreshPreviewProvider() {
   if (!previewService_) {
     return;

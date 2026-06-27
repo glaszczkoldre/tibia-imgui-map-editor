@@ -68,5 +68,6 @@ inline constexpr const char* BRUSH_RESTORE_LAST          = "BRUSH_RESTORE_LAST";
 inline constexpr const char* BRUSH_VARIATION_PREV        = "BRUSH_VARIATION_PREV";
 inline constexpr const char* BRUSH_VARIATION_NEXT        = "BRUSH_VARIATION_NEXT";
 inline constexpr const char* ROTATE_ITEM                 = "ROTATE_ITEM";
+inline constexpr const char* TOGGLE_AUTOBORDER           = "TOGGLE_AUTOBORDER";
 
 } // namespace MapEditor::Domain::Actions

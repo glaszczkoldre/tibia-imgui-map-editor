@@ -502,7 +502,7 @@ int main() {
 
     MapEditor::Domain::History::HistoryManager history;
     MapEditor::Services::BrushSettingsService settings;
-    settings.setStandardSize(1);
+    settings.setStandardSize(0);
 
     MapEditor::Brushes::BrushController controller;
     controller.initialize(&map, &history, nullptr);

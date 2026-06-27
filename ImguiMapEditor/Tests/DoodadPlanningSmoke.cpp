@@ -32,7 +32,7 @@ int main() {
     map.createNew(32, 32, 1098);
 
     MapEditor::Services::BrushSettingsService settings;
-    settings.setStandardSize(1);
+    settings.setStandardSize(0);
 
     // Create a custom DoodadBrush manually
     auto brushPtr = std::make_unique<MapEditor::Brushes::DoodadBrush>(

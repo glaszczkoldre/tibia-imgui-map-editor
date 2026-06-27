@@ -135,7 +135,9 @@ int main() {
 
     MapEditor::Domain::History::HistoryManager history;
     MapEditor::Services::BrushSettingsService settings;
-    settings.setStandardSize(4);
+    settings.setExactBrushSize(true);
+    settings.setBrushSizeX(4);
+    settings.setBrushSizeY(4);
 
     MapEditor::Brushes::BrushController controller;
     controller.initialize(&map, &history, nullptr);
@@ -189,7 +191,7 @@ int main() {
       require(tileCount <= 8,
               "RME-style doodad density exceeded expected 25/100 range");
     }
-    settings.setStandardSize(1);
+    settings.setStandardSize(0);
 
     // 4. Verify controller painting and notification
     controller.setBrush(waterfall);

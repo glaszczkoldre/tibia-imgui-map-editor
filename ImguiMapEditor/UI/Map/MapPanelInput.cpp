@@ -103,9 +103,12 @@ void MapPanelInput::handleMousePan(MapViewCamera &camera, bool is_focused) {
 void MapPanelInput::handleMouseZoom(MapViewCamera &camera) {
   ImGuiIO &io = ImGui::GetIO();
 
-  if (brush_controller_ && brush_controller_->hasBrush() && io.KeyAlt &&
+  const bool isAltDown = io.KeyAlt || ImGui::IsKeyDown(ImGuiKey_LeftAlt) || ImGui::IsKeyDown(ImGuiKey_RightAlt);
+  const bool isShiftDown = io.KeyShift || ImGui::IsKeyDown(ImGuiKey_LeftShift) || ImGui::IsKeyDown(ImGuiKey_RightShift);
+
+  if (brush_controller_ && brush_controller_->hasBrush() && (isAltDown || isShiftDown) &&
       io.MouseWheel != 0.0f) {
-    brush_controller_->adjustBrushSize(io.MouseWheel > 0.0f ? 1 : -1);
+    brush_controller_->adjustBrushSize(io.MouseWheel > 0.0f ? -1 : 1);
     return;
   }
 

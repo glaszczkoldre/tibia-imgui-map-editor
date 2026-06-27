@@ -418,7 +418,7 @@ ImU32 PreviewOverlay::getStyleColor(Services::Preview::PreviewStyle style) {
     return IM_COL32(180, 200, 255, 153); // ~60% alpha
 
   case Services::Preview::PreviewStyle::Outline:
-    return IM_COL32(255, 255, 0, 200); // Yellow outline
+    return IM_COL32(240, 245, 255, 180); // Soft clean light white outline
 
   case Services::Preview::PreviewStyle::Tinted:
     return IM_COL32(160, 255, 160, 180); // Green tint

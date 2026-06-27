@@ -168,13 +168,28 @@ void BrushController::adjustBrushSize(int delta) {
     return;
   }
 
+  if (currentBrush_ && (currentBrush_->getType() == BrushType::Creature ||
+                        currentBrush_->getType() == BrushType::Spawn)) {
+    if (brushSettingsService_) {
+      int newSpawnSize = std::clamp(brushSettingsService_->getDefaultSpawnRadius() + delta, 1, 15);
+      brushSettingsService_->setDefaultSpawnRadius(newSpawnSize);
+      brushSettingsService_->setStandardSize(newSpawnSize);
+    }
+    return;
+  }
+
   if (brushSettingsService_) {
-    brushSettingsService_->setStandardSize(
-        brushSettingsService_->getStandardSize() + delta);
+    brushSettingsService_->adjustSize(delta);
     return;
   }
 
   setBrushSize(brushSize_ + delta);
+}
+
+void BrushController::toggleAutoBorder() {
+  if (brushSettingsService_) {
+    brushSettingsService_->toggleAutoBorder();
+  }
 }
 
 bool BrushController::storeBrushSlot(size_t slot) {

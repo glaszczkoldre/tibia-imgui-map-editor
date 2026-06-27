@@ -35,6 +35,7 @@ public:
 
   BrushType getType() const override { return BrushType::Ground; }
   bool needsBorderUpdate() const override { return true; }
+  bool needBorders() const override { return true; }
 
   void draw(Domain::ChunkedMap &map, Domain::Tile *tile,
             const DrawContext &ctx) override;
@@ -59,6 +60,7 @@ public:
   void rebuildTile(Domain::ChunkedMap &map, const Domain::Position &pos) const;
   bool placeGroundTile(Domain::Tile &tile, const DrawContext &ctx) const;
   void eraseFromTile(Domain::Tile &tile) const;
+  bool isBorderItem(uint16_t itemId) const;
 
   static const GroundBrush *resolveGroundBrush(const BrushRegistry &registry,
                                                 const Domain::Tile &tile);
@@ -71,7 +73,6 @@ private:
       const std::vector<std::pair<uint16_t, uint32_t>> &items) const;
   void updateBorderItems(Domain::ChunkedMap &map, Domain::Tile &tile) const;
   bool hasOuterZilchBorderRule() const;
-  bool isBorderItem(uint16_t itemId) const;
 
   BrushRegistry &registry_;
   int zOrder_ = 0;

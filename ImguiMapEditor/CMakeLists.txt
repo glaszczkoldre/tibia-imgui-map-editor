@@ -215,7 +215,6 @@ set(SERVICES_SOURCES
     Utils/SpriteUtils.cpp
     Services/ConfigService.cpp
     Services/BrushSettingsService.cpp
-    Services/BrushSettingsSerializer.cpp
     Services/ClientVersionRegistry.cpp
     Services/ClientVersionPersistence.cpp
     Services/ClientSignatureDetector.cpp
@@ -294,7 +293,9 @@ set(UI_SOURCES
     UI/Map/SelectionMenu.cpp
     UI/Panels/NewMapPanel.cpp
     UI/Panels/MapPropertiesPanel.cpp
-    UI/Panels/BrushSizePanel.cpp
+    UI/Panels/BrushSettingsPanel.cpp
+    UI/Utils/IconTextureCache.cpp
+    UI/Helpers/BrushToolOptionsModel.cpp
     UI/PreferencesDialog.cpp
     UI/Ribbon/Panels/BrushesPanel.cpp
     UI/Ribbon/Panels/EditPanel.cpp
@@ -425,7 +426,7 @@ add_executable(${PROJECT_NAME}
     ${IMGUI_SOURCES}
 )
 
-set(BRUSH_SMOKE_SOURCES
+set(COMMON_TEST_SOURCES
     ${DOMAIN_SOURCES}
     ${RENDERING_SOURCES}
     ${IO_SOURCES}
@@ -438,8 +439,12 @@ set(BRUSH_SMOKE_SOURCES
     ${RIBBON_SOURCES}
     ${BRUSHES_SOURCES}
     Application.cpp
-    Tests/BrushSmoke.cpp
     ${IMGUI_SOURCES}
+)
+
+set(BRUSH_SMOKE_SOURCES
+    ${COMMON_TEST_SOURCES}
+    Tests/BrushSmoke.cpp
 )
 
 set_target_properties(${PROJECT_NAME} PROPERTIES UNITY_BUILD ${TME_UNITY_BUILD})
@@ -459,6 +464,11 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 
 add_executable(BrushSmoke
     ${BRUSH_SMOKE_SOURCES}
+)
+
+add_executable(BrushSettingsTests
+    ${COMMON_TEST_SOURCES}
+    Tests/BrushSettingsTests.cpp
 )
 
 add_executable(AutoborderSmoke
@@ -668,8 +678,12 @@ configure_tme_target(DoodadContextSmoke)
 configure_tme_target(CarpetSmoke)
 configure_tme_target(WallBrushSmoke)
 configure_tme_target(ItemDatabaseResolverTest)
+configure_tme_target(BrushSettingsTests)
 target_compile_definitions(BrushSmoke PRIVATE
     BRUSH_SMOKE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+)
+target_compile_definitions(BrushSettingsTests PRIVATE
+    BRUSH_SETTINGS_TESTS_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
 )
 target_compile_definitions(AutoborderSmoke PRIVATE
     AUTOBORDER_SMOKE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"

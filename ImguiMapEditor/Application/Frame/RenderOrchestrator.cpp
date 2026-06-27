@@ -20,7 +20,7 @@
 #include "UI/Dialogs/Startup/StartupDialog.h"
 #include "UI/Dialogs/UnsavedChangesModal.h"
 #include "UI/Map/MapPanel.h"
-#include "UI/Panels/BrushSizePanel.h"
+#include "UI/Panels/BrushSettingsPanel.h"
 #include "UI/Ribbon/Panels/FilePanel.h"
 #include "UI/Ribbon/RibbonController.h"
 #include "UI/Widgets/SearchResultsWidget.h"
@@ -125,9 +125,9 @@ void RenderOrchestrator::renderEditorState(Context &ctx,
       ctx.palette_window_manager->renderAllWindows();
     }
 
-    // Brush size panel (dockable)
-    if (ctx.brush_size_panel && ctx.view_settings) {
-      ctx.brush_size_panel->render(&ctx.view_settings->show_brush_settings);
+    // Brush settings panel (dockable)
+    if (ctx.brush_settings_panel && ctx.view_settings) {
+      ctx.brush_settings_panel->render(&ctx.view_settings->show_brush_settings);
     }
   }
 }

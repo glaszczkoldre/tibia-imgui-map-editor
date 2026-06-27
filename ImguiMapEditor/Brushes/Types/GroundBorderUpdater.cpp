@@ -220,7 +220,7 @@ void GroundBrush::updateBorderItems(Domain::ChunkedMap &map,
     borderCtx.clientData = registry_.getClientDataService();
     borderCtx.brushRegistry = &registry_;
     borderCtx.ownerBrushId = registry_.getBrushId(ownerBrush);
-    tile.addItem(Types::createTypedItem(borderCtx, itemId));
+    tile.insertItem(0, Types::createTypedItem(borderCtx, itemId));
     return true;
   };
 

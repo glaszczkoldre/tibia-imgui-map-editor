@@ -1537,7 +1537,6 @@ void requireRawBrushPlacementAndParity(MapEditor::Brushes::BrushRegistry &regist
 void requireDoodadCtrlEraseOnlyRemovesSelectedDoodad() {
   MapEditor::Brushes::BrushRegistry registry;
   MapEditor::Services::BrushSettingsService brushSettings;
-  brushSettings.setDoodadEraseMatchingOnly(false);
 
   auto grassPtr = std::make_unique<MapEditor::Brushes::DoodadBrush>(
       "grass turfs", 400, registry, false);
@@ -1992,7 +1991,7 @@ int main() {
                 settings.getBrushOffsets().size(),
             "ground preview does not expand with brush settings");
 
-    settings.setStandardSize(1);
+    settings.setStandardSize(0);
     previewService.regenerate();
 
     const MapEditor::Domain::Position cavePos{20, 20, 7};
@@ -2530,17 +2529,30 @@ int main() {
     require(controller.applyBrush(erasePos), "eraser test house paint failed");
     auto *eraseTile = map.getTile(erasePos);
     require(eraseTile != nullptr, "eraser test tile missing");
+
+    // Manually add a border item to verify it is preserved by the eraser
+    auto borderItem = std::make_unique<MapEditor::Domain::Item>(9003);
+    static MapEditor::Domain::ItemType borderType;
+    borderType.server_id = 9003;
+    borderType.client_id = 9003;
+    borderType.flags = MapEditor::Domain::ItemFlag::AlwaysOnBottom;
+    borderType.always_on_top_order = 1;
+    borderItem->setType(&borderType);
+    eraseTile->addItem(std::move(borderItem));
+
     controller.activateEraserBrush();
     require(controller.applyBrush(erasePos), "eraser brush paint failed");
-    require(eraseTile->getGround() == nullptr && eraseTile->getItemCount() == 0 &&
+    require(eraseTile->getGround() != nullptr && eraseTile->getItemCount() == 1 &&
+                eraseTile->getItem(0)->getServerId() == 9003 &&
                 !eraseTile->hasSpawn() &&
                 !eraseTile->hasFlag(MapEditor::Domain::TileFlag::ProtectionZone) &&
                 eraseTile->getHouseId() == 0 &&
                 map.getWaypointAt(erasePos) == nullptr,
-            "eraser brush did not clear painted tile state");
-    require(controller.resolveBrushFromTile(*eraseTile, PickMode::Smart) ==
-                std::nullopt,
-            "erased tile should not resolve to a brush");
+            "eraser brush did not clear painted tile state while preserving borders");
+    eraseTile->clearItems();
+    auto smartRes = controller.resolveBrushFromTile(*eraseTile, PickMode::Smart);
+    require(smartRes.has_value() && smartRes->brush == groundBrush,
+            "erased tile should resolve to ground brush");
 
     const fs::path housesXml = tempDir / "houses.xml";
     require(MapEditor::IO::HouseXmlWriter::write(housesXml, map),

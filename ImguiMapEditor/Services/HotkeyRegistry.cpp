@@ -157,6 +157,7 @@ HotkeyRegistry HotkeyRegistry::createDefaults() {
     registry.registerBinding({BRUSH_VARIATION_PREV, GLFW_KEY_Z, 0, "brush"});
     registry.registerBinding({BRUSH_VARIATION_NEXT, GLFW_KEY_X, 0, "brush"});
     registry.registerBinding({ROTATE_ITEM, GLFW_KEY_R, 0, "brush"});
+    registry.registerBinding({TOGGLE_AUTOBORDER, GLFW_KEY_A, 0, "brush"});
 
     for (int slot = 0; slot < 10; ++slot) {
         const auto slot_suffix = std::to_string(slot);

@@ -55,6 +55,12 @@
       "skillPath": "skills/engineering/triage/SKILL.md",
       "computedHash": "56ff15b41bbebfa4cb329d96150d9b297c1d919ce30784d883b8755b4bfd8e7e"
     },
+    "uncodixfy": {
+      "source": "cyxzdev/Uncodixfy",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "f7de0a6d2ba22702c8f436d4d38fa399bf8d4a8480c73c67a882f27f2609b2d5"
+    },
     "write-a-skill": {
       "source": "mattpocock/skills",
       "sourceType": "github",

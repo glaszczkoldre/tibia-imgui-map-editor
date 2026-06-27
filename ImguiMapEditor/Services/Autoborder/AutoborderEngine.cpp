@@ -2,6 +2,7 @@
 
 #include "Brushes/Types/CarpetBrush.h"
 #include "Brushes/Types/GroundBrush.h"
+#include "Services/BrushSettingsService.h"
 #include "Brushes/Types/TableBrush.h"
 #include "Brushes/Types/WallBrush.h"
 #include "Brushes/Behaviors/WeightedSelection.h"
@@ -300,6 +301,9 @@ AutoborderEngine::AutoborderEngine() {
 AutoborderEngine::~AutoborderEngine() = default;
 
 bool AutoborderEngine::canPlan(const PlacementIntent &intent) const {
+  if (intent.context.brushSettings && !intent.context.brushSettings->getAutoBorder()) {
+    return false;
+  }
   return intent.isValid() && findResolver(intent) != nullptr;
 }
 

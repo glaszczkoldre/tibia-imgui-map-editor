@@ -46,6 +46,7 @@ private:
   mutable PreviewBounds bounds_;
   mutable bool needsRegen_ = true;
   mutable std::vector<std::pair<int, int>> cachedOffsets_;
+  mutable bool cachedAutoBorder_ = true;
 };
 
 } // namespace MapEditor::Services::Preview

@@ -7,6 +7,7 @@
 #include "Domain/Item.h"
 #include "Domain/Tile.h"
 #include "Services/ClientDataService.h"
+#include "Services/BrushSettingsService.h"
 #include <algorithm>
 #include <cctype>
 #include <limits>
@@ -110,7 +111,9 @@ void GroundBrush::draw(Domain::ChunkedMap &map, Domain::Tile *tile,
     return;
   }
 
-  rebuildAround(map, tile->getPosition());
+  if (!ctx.brushSettings || ctx.brushSettings->getAutoBorder()) {
+    rebuildAround(map, tile->getPosition());
+  }
 }
 
 void GroundBrush::undraw(Domain::ChunkedMap &map, Domain::Tile *tile) {

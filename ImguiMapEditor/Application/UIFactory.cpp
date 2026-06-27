@@ -33,7 +33,8 @@
 #include "UI/Windows/MinimapWindow.h"
 #include "UI/Windows/PaletteWindowManager.h"
 #include "UI/Widgets/TilesetWidget.h"
-#include "UI/Panels/BrushSizePanel.h"
+#include "UI/Panels/BrushSettingsPanel.h"
+#include "UI/Utils/IconTextureCache.h"
 #include "Brushes/BrushSystem.h"
 
 
@@ -55,9 +56,11 @@ UIComponentContainer UIFactory::create(const UIFactoryContext &ctx) {
   components.browse_tile_window = std::make_unique<UI::BrowseTileWindow>();
 
   components.tileset_widget = std::make_unique<UI::TilesetWidget>();
-  components.brush_size_panel = std::make_unique<UI::Panels::BrushSizePanel>(
+  components.icon_texture_cache = std::make_unique<UI::IconTextureCache>();
+  components.icon_texture_cache->loadAll("assets/png");
+  components.brush_settings_panel = std::make_unique<UI::Panels::BrushSettingsPanel>(
       &ctx.brush_system.getSettingsService(), &ctx.brush_controller,
-      [&ctx]() { ctx.brush_system.saveBrushes(); });
+      &ctx.brush_registry, components.icon_texture_cache.get());
 
   components.hotkey_controller = std::make_unique<AppLogic::HotkeyController>(
       ctx.hotkey_registry, ctx.view_settings, components.map_panel.get(),
@@ -114,7 +117,7 @@ UIComponentContainer UIFactory::create(const UIFactoryContext &ctx) {
   auto selection_panel = std::make_unique<UI::Ribbon::SelectionPanel>(
       ctx.selection_settings, &ctx.tab_manager);
   auto brushes_panel = std::make_unique<UI::Ribbon::BrushesPanel>(
-      &ctx.brush_controller, ctx.brush_controller.getBrushSettingsService());
+      &ctx.brush_controller);
 
   // Create PaletteWindowManager (initialized later when services available)
   components.palette_window_manager =

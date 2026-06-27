@@ -208,6 +208,11 @@ public:
    */
   virtual bool needsBorderUpdate() const { return false; }
 
+  /**
+   * Whether RME Tool Options should expose Preview Border for this brush.
+   */
+  virtual bool needBorders() const { return false; }
+
   // ─── Variations (for brushes with alternates) ─────────────────────────
 
   /**

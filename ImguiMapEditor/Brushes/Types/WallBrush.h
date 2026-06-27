@@ -29,6 +29,7 @@ public:
 
   BrushType getType() const override { return BrushType::Wall; }
   bool needsBorderUpdate() const override { return true; }
+  bool needBorders() const override { return true; }
 
   void draw(Domain::ChunkedMap &map, Domain::Tile *tile,
             const DrawContext &ctx) override;

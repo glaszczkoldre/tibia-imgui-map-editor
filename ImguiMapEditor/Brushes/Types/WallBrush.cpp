@@ -6,6 +6,7 @@
 #include "Domain/Item.h"
 #include "Domain/Tile.h"
 #include "Services/ClientDataService.h"
+#include "Services/BrushSettingsService.h"
 #include "Services/Brushes/WallLookupService.h"
 #include <algorithm>
 #include <array>
@@ -121,7 +122,7 @@ void WallBrush::draw(Domain::ChunkedMap &map, Domain::Tile *tile,
     return;
   }
 
-  if (placement.requiresRebuild) {
+  if (placement.requiresRebuild && (!ctx.brushSettings || ctx.brushSettings->getAutoBorder())) {
     rebuildAround(map, tile->getPosition());
   }
   map.markChanged();

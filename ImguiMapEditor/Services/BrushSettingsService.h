@@ -2,357 +2,149 @@
 
 #include "Domain/Position.h"
 #include <array>
-#include <algorithm>
 #include <functional>
 #include <span>
-#include <string>
+#include <utility>
 #include <vector>
 
 namespace MapEditor::Services {
 
 class ConfigService;
 
-/**
- * Brush shape type - determines how brush positions are calculated.
- */
-enum class BrushType {
-  Square, // Rectangular brush pattern
-  Circle, // Circular brush pattern
-  Custom  // User-defined custom shape
+enum class BrushShape {
+  Square,
+  Circle,
 };
 
-/**
- * Brush size mode - determines how dimensions are specified.
- */
-enum class BrushSizeMode {
-  Standard,        // Symmetric radius (produces NxN square or N-radius circle)
-  CustomDimensions // Independent width and height
+struct BrushFootprint {
+  BrushShape shape = BrushShape::Square;
+  int size_x = 1;
+  int size_y = 1;
+  bool exact = true;
+  bool aspect_locked = true;
+  int span_x = 1;
+  int span_y = 1;
+  int min_offset_x = 0;
+  int max_offset_x = 0;
+  int min_offset_y = 0;
+  int max_offset_y = 0;
+
+  [[nodiscard]] bool containsOffset(int dx, int dy) const;
+  [[nodiscard]] int legacySize() const;
 };
 
-/**
- * Custom brush shape definition.
- * Contains a 2D grid of selected tiles and pre-computed offsets.
- */
-struct CustomBrushShape {
-  std::string name;
-  std::vector<std::vector<bool>> grid; // [row][col], true = selected
-  int gridSize = 10;                   // Default 10x10 grid
-
-  // Pre-computed offsets relative to center (calculated on creation/load)
-  std::vector<std::pair<int, int>> offsets;
-
-  CustomBrushShape() = default;
-  CustomBrushShape(const std::string &n, int size = 10)
-      : name(n), gridSize(size) {
-    grid.resize(size, std::vector<bool>(size, false));
-  }
-
-  /**
-   * Compute offsets from grid data.
-   * Center is at (gridSize/2, gridSize/2).
-   */
-  void computeOffsets() {
-    offsets.clear();
-    int center = gridSize / 2;
-    for (int y = 0; y < gridSize; ++y) {
-      for (int x = 0; x < gridSize; ++x) {
-        if (grid[y][x]) {
-          offsets.emplace_back(x - center, y - center);
-        }
-      }
-    }
-  }
-
-  [[nodiscard]] bool isEmpty() const {
-    for (const auto &row : grid) {
-      for (bool cell : row) {
-        if (cell) return false;
-      }
-    }
-    return true;
-  }
-};
-
-/**
- * Central service for brush size, shape, and custom brush management.
- *
- * This service holds all brush settings state and provides:
- * - Brush type selection (Square/Circle/Custom)
- * - Size mode (Standard symmetric or Custom W×H)
- * - Standard size control (radius 1-10)
- * - Custom dimensions (independent width/height)
- * - Custom brush creation, storage, and selection
- * - Position calculation for painting operations
- * - JSON persistence for custom brushes
- *
- * Usage:
- *   // Set brush type and size
- *   service.setBrushType(BrushType::Square);
- *   service.setStandardSize(3);
- *
- *   // Get positions to paint
- *   auto positions = service.getBrushPositions(cursorPos);
- *   for (const auto& pos : positions) {
- *       paintTile(pos);
- *   }
- */
 class BrushSettingsService {
 public:
-  static constexpr int MIN_SIZE = 1;
-  static constexpr int MAX_SIZE = 11;
-  static constexpr int DEFAULT_CUSTOM_GRID_SIZE = 10;
-  static constexpr std::array<int, 6> STANDARD_SIZE_PROGRESSION{1, 2, 4, 6, 8,
-                                                                11};
+  static constexpr int MIN_RADIUS_AXIS_SIZE = 0;
+  static constexpr int MIN_EXACT_AXIS_SIZE = 1;
+  static constexpr int MAX_AXIS_SIZE = 15;
+  static constexpr int MIN_SPAWN_RADIUS = 1;
+  static constexpr int MAX_SPAWN_RADIUS = 15;
+  static constexpr std::array<int, 7> LEGACY_SIZE_PROGRESSION{0, 1, 2, 4, 6,
+                                                              8, 11};
+
+  using OnSettingsChangedCallback = std::function<void()>;
 
   BrushSettingsService() = default;
   ~BrushSettingsService() = default;
-
-  // Non-copyable
   BrushSettingsService(const BrushSettingsService &) = delete;
   BrushSettingsService &operator=(const BrushSettingsService &) = delete;
 
-  // ========================
-  // Brush Type
-  // ========================
+  void setBrushShape(BrushShape shape);
+  [[nodiscard]] BrushShape getBrushShape() const { return shape_; }
 
-  void setBrushType(BrushType type);
-  BrushType getBrushType() const { return type_; }
+  void setBrushSizeX(int size);
+  void setBrushSizeY(int size);
+  void setBrushSizeAxes(int sizeX, int sizeY);
+  [[nodiscard]] int getBrushSizeX() const { return size_x_; }
+  [[nodiscard]] int getBrushSizeY() const { return size_y_; }
 
-  /**
-   * Check if size mode controls are enabled.
-   * Returns false when Custom brush type is selected.
-   */
-  bool isSizeModeEnabled() const { return type_ != BrushType::Custom; }
+  void setExactBrushSize(bool exact);
+  [[nodiscard]] bool isExactBrushSize() const { return exact_; }
 
-  // ========================
-  // Size Mode
-  // ========================
-
-  void setBrushSizeMode(BrushSizeMode mode);
-  BrushSizeMode getBrushSizeMode() const { return sizeMode_; }
-
-  // ========================
-  // Tool Options
-  // ========================
-
-  void setPreviewBorder(bool enabled);
-  bool getPreviewBorder() const { return previewBorder_; }
-
-  void setLockDoors(bool enabled);
-  bool getLockDoors() const { return lockDoors_; }
-
-  void setDoodadEraseMatchingOnly(bool enabled) {
-    if (doodadEraseMatchingOnly_ != enabled) {
-      doodadEraseMatchingOnly_ = enabled;
-      notifyChanged();
-    }
+  void setBrushAspectRatioLocked(bool locked);
+  [[nodiscard]] bool isBrushAspectRatioLocked() const {
+    return aspect_locked_;
   }
-  bool getDoodadEraseMatchingOnly() const { return doodadEraseMatchingOnly_; }
-
-  void setEraserLeaveUniqueItems(bool enabled) {
-    if (eraserLeaveUniqueItems_ != enabled) {
-      eraserLeaveUniqueItems_ = enabled;
-      notifyChanged();
-    }
-  }
-  bool getEraserLeaveUniqueItems() const { return eraserLeaveUniqueItems_; }
-
-  void setRawLikeSimone(bool enabled) {
-    if (rawLikeSimone_ != enabled) {
-      rawLikeSimone_ = enabled;
-      notifyChanged();
-    }
-  }
-  bool getRawLikeSimone() const { return rawLikeSimone_; }
-
-  // ========================
-  // Standard Size
-  // ========================
 
   void setStandardSize(int size);
-  int getStandardSize() const { return standardSize_; }
-
+  void adjustSize(int delta);
+  [[nodiscard]] int getStandardSize() const;
   void increaseSize();
   void decreaseSize();
-
   [[nodiscard]] static std::span<const int> getStandardSizeProgression() {
-    return STANDARD_SIZE_PROGRESSION;
-  }
-  [[nodiscard]] static int normalizeStandardSize(int size);
-  [[nodiscard]] static int
-  getStandardSizeProgressionIndexForValue(int size);
-  [[nodiscard]] int getStandardSizeProgressionIndex() const {
-    return getStandardSizeProgressionIndexForValue(standardSize_);
-  }
-  [[nodiscard]] int getNextStandardSize() const;
-  [[nodiscard]] int getPreviousStandardSize() const;
-
-  // ========================
-  // Custom Dimensions (independent W×H)
-  // ========================
-
-  void setCustomDimensions(int width, int height);
-  int getCustomWidth() const { return customWidth_; }
-  int getCustomHeight() const { return customHeight_; }
-
-  // ========================
-  // Computed Properties
-  // ========================
-
-  /**
-   * Get effective brush width based on current settings.
-   */
-  int getEffectiveWidth() const;
-
-  /**
-   * Get effective brush height based on current settings.
-   */
-  int getEffectiveHeight() const;
-
-  // ========================
-  // Custom Brushes
-  // ========================
-
-  /**
-   * Add or update a custom brush.
-   */
-  void addCustomBrush(const CustomBrushShape &brush);
-
-  /**
-   * Remove a custom brush by name.
-   */
-  void removeCustomBrush(const std::string &name);
-
-  /**
-   * Select a custom brush by name.
-   * Only effective when BrushType is Custom.
-   */
-  void selectCustomBrush(const std::string &name);
-
-  /**
-   * Get currently selected custom brush (may be nullptr).
-   */
-  [[nodiscard]] const CustomBrushShape *getSelectedCustomBrush() const;
-
-  /**
-   * Get all custom brushes.
-   */
-  const std::vector<CustomBrushShape> &getCustomBrushes() const {
-    return customBrushes_;
+    return LEGACY_SIZE_PROGRESSION;
   }
 
-  // ========================
-  // Core API: Position Calculation
-  // ========================
-
-  /**
-   * Get all tile positions that should be affected by the brush.
-   *
-   * @param center The center position (usually cursor position)
-   * @return Vector of positions to paint/erase
-   */
+  [[nodiscard]] int getEffectiveWidth() const;
+  [[nodiscard]] int getEffectiveHeight() const;
+  [[nodiscard]] int getEffectiveAxisSpanX() const;
+  [[nodiscard]] int getEffectiveAxisSpanY() const;
+  [[nodiscard]] BrushFootprint getBrushFootprint(bool forceSquare = false) const;
+  [[nodiscard]] BrushFootprint getSquareBrushFootprint() const;
+  [[nodiscard]] std::vector<std::pair<int, int>> getBrushOffsets(bool forceSquare = false) const;
+  [[nodiscard]] std::vector<std::pair<int, int>> getSquareBrushOffsets() const;
   [[nodiscard]] std::vector<Domain::Position>
-  getBrushPositions(const Domain::Position &center) const;
+  getBrushPositions(const Domain::Position &center, bool forceSquare = false) const;
 
-  /**
-   * Get relative offsets for current brush settings.
-   * These are (dx, dy) pairs relative to center (0,0).
-   * Useful for preview rendering.
-   */
-  [[nodiscard]] std::vector<std::pair<int, int>> getBrushOffsets() const;
+  void setPreviewBorder(bool enabled);
+  [[nodiscard]] bool getPreviewBorder() const { return preview_border_; }
 
-  // ========================
-  // Persistence
-  // ========================
+  void setAutoBorder(bool enabled);
+  [[nodiscard]] bool getAutoBorder() const { return auto_border_; }
+  void toggleAutoBorder();
 
-  /**
-   * Save custom brushes to JSON file.
-   */
-  [[nodiscard]] bool saveCustomBrushes(const std::string &filepath) const;
+  void setLockDoors(bool enabled);
+  [[nodiscard]] bool getLockDoors() const { return lock_doors_; }
 
-  /**
-   * Load custom brushes from JSON file.
-   */
-  [[nodiscard]] bool loadCustomBrushes(const std::string &filepath);
+  void setEraserLeaveUniqueItems(bool enabled);
+  [[nodiscard]] bool getEraserLeaveUniqueItems() const {
+    return eraser_leave_unique_items_;
+  }
+
+  void setRawLikeSimone(bool enabled);
+  [[nodiscard]] bool getRawLikeSimone() const { return raw_like_simone_; }
+
+  void setAutoCreateSpawn(bool enabled);
+  [[nodiscard]] bool getAutoCreateSpawn() const { return auto_create_spawn_; }
+
+  void setDefaultSpawnRadius(int radius);
+  [[nodiscard]] int getDefaultSpawnRadius() const {
+    return default_spawn_radius_;
+  }
+
+  void setDefaultSpawnTime(int seconds);
+  [[nodiscard]] int getDefaultSpawnTime() const { return default_spawn_time_; }
 
   void loadFromConfig(const ConfigService &config);
   void saveToConfig(ConfigService &config) const;
 
-  // ========================
-  // Change Notification
-  // ========================
-
-  using OnSettingsChangedCallback = std::function<void()>;
-
-  /**
-   * Set callback to be invoked when any setting changes.
-   * Used to update preview when brush parameters change.
-   */
   void setOnSettingsChanged(OnSettingsChangedCallback callback) {
-    onSettingsChanged_ = std::move(callback);
+    on_settings_changed_ = std::move(callback);
   }
-
-  // ========================
-  // Spawn Settings (for CreatureBrush auto-spawn)
-  // ========================
-
-  /**
-   * Enable/disable automatic spawn creation when placing creatures.
-   */
-  void setAutoCreateSpawn(bool enabled) {
-    autoCreateSpawn_ = enabled;
-    notifyChanged();
-  }
-  bool getAutoCreateSpawn() const { return autoCreateSpawn_; }
-
-  /**
-   * Default spawn radius (1-10 tiles).
-   */
-  void setDefaultSpawnRadius(int radius) {
-    defaultSpawnRadius_ = std::clamp(radius, 1, 10);
-    notifyChanged();
-  }
-  int getDefaultSpawnRadius() const { return defaultSpawnRadius_; }
-
-  /**
-   * Default spawn timer in seconds.
-   */
-  void setDefaultSpawnTime(int seconds) {
-    defaultSpawnTime_ = std::clamp(seconds, 1, 86400); // 1 sec to 24 hours
-    notifyChanged();
-  }
-  int getDefaultSpawnTime() const { return defaultSpawnTime_; }
 
 private:
-  BrushType type_ = BrushType::Square;
-  BrushSizeMode sizeMode_ = BrushSizeMode::Standard;
-  int standardSize_ = 1;
-  int customWidth_ = 1;
-  int customHeight_ = 1;
+  BrushShape shape_ = BrushShape::Square;
+  int size_x_ = 1;
+  int size_y_ = 1;
+  bool exact_ = true;
+  bool aspect_locked_ = true;
 
-  std::vector<CustomBrushShape> customBrushes_;
-  std::string selectedCustomBrushName_;
+  bool preview_border_ = true;
+  bool auto_border_ = true;
+  bool lock_doors_ = false;
+  bool eraser_leave_unique_items_ = true;
+  bool raw_like_simone_ = true;
+  bool auto_create_spawn_ = false;
+  int default_spawn_radius_ = 3;
+  int default_spawn_time_ = 60;
 
-  OnSettingsChangedCallback onSettingsChanged_;
+  OnSettingsChangedCallback on_settings_changed_;
 
-  // Spawn settings
-  bool autoCreateSpawn_ = false;
-  int defaultSpawnRadius_ = 3;
-  int defaultSpawnTime_ = 60; // seconds
-
-  // Tool options
-  bool previewBorder_ = true;
-  bool lockDoors_ = false;
-  bool doodadEraseMatchingOnly_ = true;
-  bool eraserLeaveUniqueItems_ = true;
-  bool rawLikeSimone_ = true;
-
+  [[nodiscard]] int normalizeAxisValue(int value) const;
+  [[nodiscard]] int nextLegacySize() const;
+  [[nodiscard]] int previousLegacySize() const;
   void notifyChanged();
-
-  // Position calculation helpers
-  std::vector<std::pair<int, int>> calculateSquareOffsets() const;
-  std::vector<std::pair<int, int>> calculateCircleOffsets() const;
-  std::vector<std::pair<int, int>> calculateCustomOffsets() const;
 };
 
 } // namespace MapEditor::Services

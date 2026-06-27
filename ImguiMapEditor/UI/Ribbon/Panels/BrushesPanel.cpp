@@ -1,7 +1,6 @@
 #include "BrushesPanel.h"
 #include "Brushes/BrushController.h"
 #include "IconsFontAwesome6.h"
-#include "Services/BrushSettingsService.h"
 #include "UI/Ribbon/Utils/RibbonUtils.h"
 #include <algorithm>
 #include <cstdio>
@@ -15,53 +14,6 @@ namespace UI {
 namespace Ribbon {
 
 namespace {
-
-[[nodiscard]] bool supportsPreviewBorder(const Brushes::IBrush *brush) {
-  if (!brush) {
-    return false;
-  }
-
-  if (brush->hasCollection()) {
-    return true;
-  }
-
-  switch (brush->getType()) {
-  case Brushes::BrushType::Raw:
-  case Brushes::BrushType::Ground:
-  case Brushes::BrushType::Wall:
-  case Brushes::BrushType::WallDecoration:
-  case Brushes::BrushType::Table:
-  case Brushes::BrushType::Carpet:
-  case Brushes::BrushType::Door:
-    return true;
-  default:
-    return false;
-  }
-}
-
-[[nodiscard]] bool supportsLockDoors(const Brushes::IBrush *brush) {
-  return brush && brush->getType() == Brushes::BrushType::Door;
-}
-
-[[nodiscard]] bool supportsRawLikeSimone(const Brushes::IBrush *brush) {
-  return brush && brush->getType() == Brushes::BrushType::Raw;
-}
-
-[[nodiscard]] bool supportsSpawnSettings(const Brushes::IBrush *brush) {
-  return brush &&
-         (brush->getType() == Brushes::BrushType::Spawn ||
-          brush->getType() == Brushes::BrushType::Creature);
-}
-
-[[nodiscard]] bool supportsHouseAssignment(const Brushes::IBrush *brush) {
-  return brush &&
-         (brush->getType() == Brushes::BrushType::House ||
-          brush->getType() == Brushes::BrushType::HouseExit);
-}
-
-[[nodiscard]] bool supportsWaypointName(const Brushes::IBrush *brush) {
-  return brush && brush->getType() == Brushes::BrushType::Waypoint;
-}
 
 [[nodiscard]] int resolveSelectedBrushId(
     Brushes::BrushController *controller) {
@@ -139,13 +91,11 @@ namespace {
 
 } // namespace
 
-BrushesPanel::BrushesPanel(Brushes::BrushController *controller,
-                           Services::BrushSettingsService *settingsService)
-    : controller_(controller), settingsService_(settingsService) {}
+BrushesPanel::BrushesPanel(Brushes::BrushController *controller)
+    : controller_(controller) {}
 
 void BrushesPanel::Render() {
   selected_brush_ = resolveSelectedBrushId(controller_);
-  const auto *currentBrush = controller_ ? controller_->getCurrentBrush() : nullptr;
 
   Utils::RenderToggleButton(
       ICON_FA_PAINTBRUSH, selected_brush_ == 0, "Paint ground tiles (G)",
@@ -170,46 +120,6 @@ void BrushesPanel::Render() {
       " Spawn");
 
   ImGui::SameLine();
-
-  if (supportsSpawnSettings(currentBrush) && settingsService_) {
-    bool autoSpawn = settingsService_->getAutoCreateSpawn();
-    if (ImGui::Checkbox("##AutoSpawn", &autoSpawn)) {
-      settingsService_->setAutoCreateSpawn(autoSpawn);
-    }
-    if (ImGui::IsItemHovered()) {
-      ImGui::SetTooltip("Auto-create spawn when placing creatures");
-    }
-    ImGui::SameLine();
-
-    ImGui::Text(ICON_FA_CIRCLE_NOTCH);
-    if (ImGui::IsItemHovered()) {
-      ImGui::SetTooltip("Spawn radius follows the current brush size");
-    }
-    ImGui::SameLine();
-
-    ImGui::Text("%d", settingsService_->getStandardSize());
-    if (ImGui::IsItemHovered()) {
-      ImGui::SetTooltip("Spawn radius: %d tiles",
-                        settingsService_->getStandardSize());
-    }
-    ImGui::SameLine();
-
-    ImGui::Text(ICON_FA_CLOCK);
-    if (ImGui::IsItemHovered()) {
-      ImGui::SetTooltip("Spawn timer (seconds)");
-    }
-    ImGui::SameLine();
-
-    ImGui::SetNextItemWidth(60.0f);
-    int time = settingsService_->getDefaultSpawnTime();
-    if (ImGui::InputInt("##SpawnTime", &time, 0, 0)) {
-      settingsService_->setDefaultSpawnTime(std::clamp(time, 1, 86400));
-    }
-    if (ImGui::IsItemHovered()) {
-      ImGui::SetTooltip("Spawn timer: %d seconds", time);
-    }
-    ImGui::SameLine();
-  }
 
   Utils::RenderToggleButton(
       ICON_FA_SHIELD_HALVED, selected_brush_ == 3, "Protection Zone flag (PZ)",
@@ -389,170 +299,6 @@ void BrushesPanel::Render() {
         }
       },
       " Window");
-  ImGui::SameLine();
-
-  if (supportsHouseAssignment(currentBrush) && controller_) {
-    uint32_t houseId = currentBrush->getType() == Brushes::BrushType::House
-                           ? controller_->getHouseBrush()->getHouseId()
-                           : controller_->getHouseExitBrush()->getHouseId();
-    ImGui::SetNextItemWidth(80.0f);
-    if (ImGui::InputScalar("##HouseId", ImGuiDataType_U32, &houseId)) {
-      controller_->getHouseBrush()->setHouseId(houseId);
-      controller_->getHouseExitBrush()->setHouseId(houseId);
-    }
-    if (ImGui::IsItemHovered()) {
-      ImGui::SetTooltip("Active house ID");
-    }
-    ImGui::SameLine();
-  }
-
-  if (supportsWaypointName(currentBrush) && controller_) {
-    static char waypointName[128] = "";
-    auto *waypointBrush = controller_->getWaypointBrush();
-    if (std::string_view(waypointName).empty() &&
-        !waypointBrush->getWaypointName().empty()) {
-      std::snprintf(waypointName, sizeof(waypointName), "%s",
-                    waypointBrush->getWaypointName().c_str());
-    }
-    ImGui::SetNextItemWidth(140.0f);
-    if (ImGui::InputText("##WaypointName", waypointName,
-                         sizeof(waypointName))) {
-      waypointBrush->setWaypointName(waypointName);
-    }
-    if (ImGui::IsItemHovered()) {
-      ImGui::SetTooltip("Waypoint name");
-    }
-    ImGui::SameLine();
-  }
-
-  if (supportsLockDoors(currentBrush) && settingsService_) {
-    bool lockDoors = settingsService_->getLockDoors();
-    if (ImGui::Checkbox("##LockDoors", &lockDoors)) {
-      settingsService_->setLockDoors(lockDoors);
-    }
-    if (ImGui::IsItemHovered()) {
-      ImGui::SetTooltip("Prefer locked door variants while painting");
-    }
-    ImGui::SameLine();
-  }
-
-  if (supportsPreviewBorder(currentBrush) && settingsService_) {
-    bool previewBorder = settingsService_->getPreviewBorder();
-    if (ImGui::Checkbox("##PreviewBorder", &previewBorder)) {
-      settingsService_->setPreviewBorder(previewBorder);
-    }
-    if (ImGui::IsItemHovered()) {
-      ImGui::SetTooltip("Enable outline/autoborder-style preview generation");
-    }
-    ImGui::SameLine();
-  }
-
-  if (supportsRawLikeSimone(currentBrush) && settingsService_) {
-    bool rawLikeSimone = settingsService_->getRawLikeSimone();
-    if (ImGui::Checkbox("##RawLikeSimone", &rawLikeSimone)) {
-      settingsService_->setRawLikeSimone(rawLikeSimone);
-    }
-    if (ImGui::IsItemHovered()) {
-      ImGui::SetTooltip("Enable Simone-compatible replacement behavior");
-    }
-    ImGui::SameLine();
-  }
-
-  Utils::RenderSeparator();
-  ImGui::SameLine();
-  renderShapeControls();
-  ImGui::SameLine();
-  Utils::RenderSeparator();
-  ImGui::SameLine();
-  renderSizeControls();
-}
-
-void BrushesPanel::renderShapeControls() {
-  if (!settingsService_) {
-    ImGui::TextDisabled(ICON_FA_SHAPES " Shape: N/A");
-    return;
-  }
-
-  ImGui::Text(ICON_FA_SHAPES);
-  ImGui::SameLine();
-
-  const auto currentType = settingsService_->getBrushType();
-
-  const bool isSquare = currentType == Services::BrushType::Square;
-  Utils::RenderToggleButton(
-      ICON_FA_VECTOR_SQUARE, isSquare, "Square brush shape",
-      [this]() { settingsService_->setBrushType(Services::BrushType::Square); },
-      "##Square");
-
-  ImGui::SameLine();
-
-  const bool isCircle = currentType == Services::BrushType::Circle;
-  Utils::RenderToggleButton(
-      ICON_FA_CIRCLE, isCircle, "Circle brush shape",
-      [this]() { settingsService_->setBrushType(Services::BrushType::Circle); },
-      "##Circle");
-
-  ImGui::SameLine();
-
-  const bool isCustom = currentType == Services::BrushType::Custom;
-  Utils::RenderToggleButton(
-      ICON_FA_PUZZLE_PIECE, isCustom, "Custom brush shape",
-      [this]() { settingsService_->setBrushType(Services::BrushType::Custom); },
-      "##Custom");
-}
-
-void BrushesPanel::renderSizeControls() {
-  if (!settingsService_) {
-    ImGui::TextDisabled(ICON_FA_CIRCLE_DOT " Size: N/A");
-    return;
-  }
-
-  ImGui::Text(ICON_FA_CIRCLE_DOT " Size:");
-  ImGui::SameLine();
-
-  int brushSize = settingsService_->getStandardSize();
-  const auto progression =
-      Services::BrushSettingsService::getStandardSizeProgression();
-
-  if (ImGui::Button(ICON_FA_MINUS "##BrushMinus")) {
-    settingsService_->decreaseSize();
-    brushSize = settingsService_->getStandardSize();
-  }
-  if (ImGui::IsItemHovered()) {
-    ImGui::SetTooltip("Decrease brush size (-)");
-  }
-
-  ImGui::SameLine();
-
-  std::string currentLabel = std::format("{}x{}", brushSize, brushSize);
-  ImGui::SetNextItemWidth(80.0f);
-  if (ImGui::BeginCombo("##BrushSize", currentLabel.c_str())) {
-    for (const auto size : progression) {
-      const bool selected = size == brushSize;
-      const std::string optionLabel = std::format("{}x{}", size, size);
-      if (ImGui::Selectable(optionLabel.c_str(), selected)) {
-        settingsService_->setStandardSize(size);
-        brushSize = settingsService_->getStandardSize();
-      }
-      if (selected) {
-        ImGui::SetItemDefaultFocus();
-      }
-    }
-    ImGui::EndCombo();
-  }
-  if (ImGui::IsItemHovered()) {
-    ImGui::SetTooltip("Brush Size: %d tiles (%dx%d)", brushSize, brushSize,
-                      brushSize);
-  }
-
-  ImGui::SameLine();
-
-  if (ImGui::Button(ICON_FA_PLUS "##BrushPlus")) {
-    settingsService_->increaseSize();
-  }
-  if (ImGui::IsItemHovered()) {
-    ImGui::SetTooltip("Increase brush size (+)");
-  }
 }
 
 } // namespace Ribbon

@@ -7,22 +7,16 @@ namespace Brushes {
 class BrushController;
 }
 
-namespace Services {
-class BrushSettingsService;
-}
-
 namespace UI {
 namespace Ribbon {
 
 /**
  * Brushes panel for the ribbon.
- * Controls active brush and brush settings (type, size, shape).
+ * Controls active brush selection.
  */
 class BrushesPanel : public IRibbonPanel {
 public:
-  explicit BrushesPanel(
-      Brushes::BrushController *controller,
-      Services::BrushSettingsService *settingsService = nullptr);
+  explicit BrushesPanel(Brushes::BrushController *controller);
   ~BrushesPanel() override = default;
 
   // IRibbonPanel interface
@@ -32,11 +26,7 @@ public:
 
 private:
   Brushes::BrushController *controller_;
-  Services::BrushSettingsService *settingsService_;
   int selected_brush_ = 0;
-
-  void renderShapeControls();
-  void renderSizeControls();
 };
 
 } // namespace Ribbon

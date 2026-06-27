@@ -56,7 +56,7 @@ class BrushSystem;
 
 namespace UI {
 namespace Panels {
-class BrushSizePanel;
+class BrushSettingsPanel;
 } // namespace Panels
 } // namespace UI
 
@@ -110,7 +110,7 @@ public:
 
     // Brush system (for preview rendering)
     Brushes::BrushController *brush_controller = nullptr;
-    UI::Panels::BrushSizePanel *brush_size_panel = nullptr;
+    UI::Panels::BrushSettingsPanel *brush_settings_panel = nullptr;
 
     // Map operations (for compatibility popup)
     AppLogic::MapOperationHandler *map_operations = nullptr;

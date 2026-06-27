@@ -30,8 +30,8 @@ public:
 private:
   std::string name_ = "Eraser";
 
-  // What to erase (all true by default)
-  bool eraseGround_ = true;
+  // What to erase
+  bool eraseGround_ = false;
   bool eraseItems_ = true;
   bool eraseCreatures_ = true;
   bool eraseSpawns_ = true;

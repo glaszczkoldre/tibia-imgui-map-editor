@@ -150,12 +150,18 @@ BrushController::getBrushPositionsForCenter(const Domain::Position &center) cons
   case BrushActionFamily::DoodadLike:
     return {center};
   case BrushActionFamily::WallLike: {
-    auto allPositions = brushSettingsService_->getBrushPositions(center);
+    const bool forceSquare = currentBrush_ && (currentBrush_->getType() == BrushType::Spawn);
+    auto allPositions = brushSettingsService_->getBrushPositions(center, forceSquare);
     if (allPositions.size() <= 1) {
       return allPositions;
     }
 
-    auto allOffsets = brushSettingsService_->getBrushOffsets();
+    if (currentBrush_ && (currentBrush_->getType() == BrushType::Carpet ||
+                          currentBrush_->getType() == BrushType::Table)) {
+      return allPositions;
+    }
+
+    auto allOffsets = brushSettingsService_->getBrushOffsets(forceSquare);
 
     auto hasOffset = [&](int dx, int dy) {
       for (const auto &[ox, oy] : allOffsets) {
@@ -185,7 +191,8 @@ BrushController::getBrushPositionsForCenter(const Domain::Position &center) cons
     break;
   }
 
-  return brushSettingsService_->getBrushPositions(center);
+  const bool forceSquare = currentBrush_ && (currentBrush_->getType() == BrushType::Spawn);
+  return brushSettingsService_->getBrushPositions(center, forceSquare);
 }
 
 std::vector<Domain::Position> BrushController::getPaintedStrokePositions() const {
@@ -540,9 +547,11 @@ void BrushController::continueWallLikeStroke(const Domain::Position &pos) {
         paintTileDirect(p, strokeModifiers_, false);
       }
     }
-    for (const auto &p : intent.positions) {
-      if (auto *wallBrush = dynamic_cast<const WallBrush *>(currentBrush_)) {
-        wallBrush->rebuildAround(*map_, p);
+    if (!brushSettingsService_ || brushSettingsService_->getAutoBorder()) {
+      for (const auto &p : intent.positions) {
+        if (auto *wallBrush = dynamic_cast<const WallBrush *>(currentBrush_)) {
+          wallBrush->rebuildAround(*map_, p);
+        }
       }
     }
   }

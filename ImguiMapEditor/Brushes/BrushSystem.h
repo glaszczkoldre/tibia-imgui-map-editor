@@ -38,7 +38,6 @@ public:
 
   // Persistence wiring
   void setConfigService(Services::ConfigService *configService);
-  void saveBrushes(); // Save custom brushes to JSON
   void saveSettings();
 
   const BrushRegistry &getRegistry() const { return registry_; }
@@ -58,7 +57,6 @@ private:
       settings_service_; // Must be before controller/panel
   Services::Preview::BrushPreviewFactory preview_factory_; // Preview factory
   BrushController controller_;
-  std::string brushPath_; // Path to custom_brushes.json
   Services::ConfigService *config_service_ = nullptr;
 };
 

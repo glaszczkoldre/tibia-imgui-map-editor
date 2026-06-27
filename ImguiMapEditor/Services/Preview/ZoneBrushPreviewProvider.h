@@ -23,7 +23,8 @@ public:
    * @param brushSettings Brush settings service for size/shape
    */
   explicit ZoneBrushPreviewProvider(uint32_t color,
-                                    const BrushSettingsService *brushSettings);
+                                    const BrushSettingsService *brushSettings,
+                                    bool singleTileOnly = false);
 
   // IPreviewProvider interface
   bool isActive() const override;
@@ -37,6 +38,7 @@ public:
 private:
   uint32_t color_;
   const BrushSettingsService *brushSettings_ = nullptr;
+  bool singleTileOnly_ = false;
   Domain::Position anchor_{0, 0, 0};
   mutable std::vector<PreviewTileData> tiles_;
   mutable PreviewBounds bounds_;

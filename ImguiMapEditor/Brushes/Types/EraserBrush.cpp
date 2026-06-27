@@ -1,6 +1,10 @@
 #include "EraserBrush.h"
 #include "Domain/ChunkedMap.h"
 #include "Domain/Tile.h"
+#include "Domain/ItemType.h"
+#include "Brushes/BrushRegistry.h"
+#include "Brushes/Types/GroundBrush.h"
+#include "Services/ClientDataService.h"
 #include <spdlog/spdlog.h>
 
 namespace MapEditor::Brushes {
@@ -20,9 +24,42 @@ void EraserBrush::draw(Domain::ChunkedMap &map, Domain::Tile *tile,
     tile->setOptionalBorderBrushId(InvalidBrushId);
   }
 
-  // Erase stacked items if enabled
+  // Erase stacked items if enabled (preserving ground borders)
   if (eraseItems_) {
-    tile->clearItems();
+    tile->removeItemsIf([&](const Domain::Item *item) {
+      if (!item) {
+        return false;
+      }
+
+      // 1. Check if the ItemType is explicitly marked as a border
+      const auto *type = item->getType();
+      if (!type && ctx.clientData) {
+        type = ctx.clientData->getItemTypeByServerId(item->getServerId());
+      }
+      if (type && type->isBorder()) {
+        return false; // Preserve
+      }
+
+      // 2. Check if the item is a border according to the brush registry/metadata
+      if (ctx.brushRegistry) {
+        if (ctx.brushRegistry->getBorderItemMetadata(item->getServerId()) != nullptr) {
+          return false; // Preserve
+        }
+
+        const GroundBrush *groundBrush = nullptr;
+        for (auto *b : ctx.brushRegistry->getBrushesForItem(item->getServerId())) {
+          if (auto *gb = dynamic_cast<const GroundBrush *>(b)) {
+            groundBrush = gb;
+            break;
+          }
+        }
+        if (groundBrush && groundBrush->isBorderItem(item->getServerId())) {
+          return false; // Preserve
+        }
+      }
+
+      return true; // Erase other items
+    });
   }
 
   // Erase creature if enabled

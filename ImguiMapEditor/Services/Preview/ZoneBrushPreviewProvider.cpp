@@ -4,8 +4,10 @@
 namespace MapEditor::Services::Preview {
 
 ZoneBrushPreviewProvider::ZoneBrushPreviewProvider(
-    uint32_t color, const BrushSettingsService *brushSettings)
-    : color_(color), brushSettings_(brushSettings) {
+    uint32_t color, const BrushSettingsService *brushSettings,
+    bool singleTileOnly)
+    : color_(color), brushSettings_(brushSettings),
+      singleTileOnly_(singleTileOnly) {
   buildPreview();
 }
 
@@ -16,6 +18,9 @@ Domain::Position ZoneBrushPreviewProvider::getAnchorPosition() const {
 }
 
 bool ZoneBrushPreviewProvider::checkSettingsChanged() const {
+  if (singleTileOnly_) {
+    return false;
+  }
   if (!brushSettings_) {
     return false;
   }
@@ -56,7 +61,9 @@ void ZoneBrushPreviewProvider::buildPreview() const {
   // Get brush offsets from settings service, or use single tile
   std::vector<std::pair<int, int>> offsets;
 
-  if (brushSettings_) {
+  if (singleTileOnly_) {
+    offsets.emplace_back(0, 0);
+  } else if (brushSettings_) {
     offsets = brushSettings_->getBrushOffsets();
   } else {
     offsets.emplace_back(0, 0);

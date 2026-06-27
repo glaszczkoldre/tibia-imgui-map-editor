@@ -113,6 +113,7 @@ public:
   }
   void setBrushController(Brushes::BrushController *brush_controller) {
     brush_controller_ = brush_controller;
+    input_.setBrushController(brush_controller);
   }
 
   // Context menu state

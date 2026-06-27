@@ -126,7 +126,7 @@ BrushPreviewFactory::createProvider(const Brushes::IBrush *brush,
   if (auto *houseExitBrush =
           dynamic_cast<const Brushes::HouseExitBrush *>(brush)) {
     (void)houseExitBrush;
-    return std::make_unique<ZoneBrushPreviewProvider>(kHouseExitColor, settings);
+    return std::make_unique<ZoneBrushPreviewProvider>(kHouseExitColor, settings, true);
   }
 
   // Flag Brush -> ZoneBrushPreviewProvider (yellow for zone flags)
@@ -159,7 +159,7 @@ BrushPreviewFactory::createProvider(const Brushes::IBrush *brush,
     spdlog::debug("[BrushPreviewFactory] Creating ZoneBrushPreviewProvider for "
                   "WaypointBrush");
     return std::make_unique<ZoneBrushPreviewProvider>(
-        kWaypointBrushColor, settings); // Semi-transparent green
+        kWaypointBrushColor, settings, true); // Semi-transparent green
   }
 
   // Unknown brush type - no preview

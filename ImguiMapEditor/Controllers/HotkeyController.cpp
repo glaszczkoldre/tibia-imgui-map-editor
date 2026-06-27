@@ -26,6 +26,7 @@ constexpr std::string_view kBrushRestoreAction{"BRUSH_RESTORE_LAST"};
 constexpr std::string_view kBrushVariationPrevAction{"BRUSH_VARIATION_PREV"};
 constexpr std::string_view kBrushVariationNextAction{"BRUSH_VARIATION_NEXT"};
 constexpr std::string_view kRotateItemAction{"ROTATE_ITEM"};
+constexpr std::string_view kToggleAutoborderAction{"TOGGLE_AUTOBORDER"};
 constexpr std::string_view kBrushSlotPrefix{"BRUSH_SLOT_"};
 constexpr std::string_view kBrushStoreSlotPrefix{"BRUSH_STORE_SLOT_"};
 
@@ -106,6 +107,11 @@ bool HotkeyController::handleBrushAction(std::string_view action) {
 
     if (action == kBrushVariationNextAction) {
         brush_controller_->cycleBrushVariation(1);
+        return true;
+    }
+
+    if (action == kToggleAutoborderAction) {
+        brush_controller_->toggleAutoBorder();
         return true;
     }
 

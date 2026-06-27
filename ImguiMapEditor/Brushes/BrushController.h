@@ -148,9 +148,7 @@ public:
   /**
    * Set preview service for brush preview updates.
    */
-  void setPreviewService(Services::Preview::PreviewService *previewService) {
-    previewService_ = previewService;
-  }
+  void setPreviewService(Services::Preview::PreviewService *previewService);
 
   /**
    * Set preview factory for creating preview providers.
@@ -249,6 +247,7 @@ public:
   float getBrushThickness() const;
 
   void adjustBrushSize(int delta);
+  void toggleAutoBorder();
   bool storeBrushSlot(size_t slot);
   bool recallBrushSlot(size_t slot);
 
@@ -269,11 +268,7 @@ public:
   /**
    * Set the brush settings service for size/shape calculations.
    */
-  void setBrushSettingsService(Services::BrushSettingsService *service) {
-    brushSettingsService_ = service;
-    // Wire settings service to spawn brush
-    spawnBrush_.setSettingsService(service);
-  }
+  void setBrushSettingsService(Services::BrushSettingsService *service);
 
   /**
    * Get the brush settings service.
