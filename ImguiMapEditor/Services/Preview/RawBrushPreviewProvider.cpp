@@ -62,8 +62,7 @@ bool RawBrushPreviewProvider::checkSettingsChanged() const {
   if (!brushSettings_) {
     return false;
   }
-  // Compare effective preview offsets so Preview Border changes regenerate too.
-  auto offsets = buildPreviewOffsets(brushSettings_);
+  auto offsets = brushSettings_->getBrushOffsets();
   return offsets != cachedOffsets_;
 }
 
@@ -83,9 +82,7 @@ const std::vector<PreviewTileData> &RawBrushPreviewProvider::getTiles() const {
 PreviewBounds RawBrushPreviewProvider::getBounds() const { return bounds_; }
 
 PreviewStyle RawBrushPreviewProvider::getStyle() const {
-  return brushSettings_ && brushSettings_->getPreviewBorder()
-             ? PreviewStyle::Outline
-             : PreviewStyle::Ghost;
+  return PreviewStyle::Ghost;
 }
 
 void RawBrushPreviewProvider::updateCursorPosition(
@@ -105,7 +102,7 @@ void RawBrushPreviewProvider::buildPreview() const {
     return;
   }
 
-  auto offsets = buildPreviewOffsets(brushSettings_);
+  auto offsets = brushSettings_ ? brushSettings_->getBrushOffsets() : std::vector<std::pair<int, int>>{{0, 0}};
 
   // Cache actual offsets for change detection
   cachedOffsets_ = offsets;

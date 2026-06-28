@@ -68,6 +68,7 @@ bool WallBrush::applyDoor(Domain::ChunkedMap &map, Domain::Tile &tile,
   const auto resolvedOwnerBrushId =
       ownerBrushId != InvalidBrushId ? ownerBrushId : registry_.getBrushId(this);
   auto *baseWallItem = [&]() -> Domain::Item * {
+    Domain::Item *fallback = nullptr;
     for (const auto &item : tile.getItems()) {
       if (!item) {
         continue;
@@ -81,11 +82,16 @@ bool WallBrush::applyDoor(Domain::ChunkedMap &map, Domain::Tile &tile,
 
       if (const auto alignment = findAlignmentForItem(item->getServerId());
           alignment && selectDoorItem(*alignment, type, open, preferLocked).has_value()) {
-        return item.get();
+        const bool isAlreadyDoor = findDoorForItem(item->getServerId()).has_value();
+        if (isAlreadyDoor) {
+          fallback = item.get();
+        } else {
+          return item.get();
+        }
       }
     }
 
-    return nullptr;
+    return fallback;
   }();
 
   if (!baseWallItem) {
@@ -97,9 +103,88 @@ bool WallBrush::applyDoor(Domain::ChunkedMap &map, Domain::Tile &tile,
     return false;
   }
 
-  const auto baseDoor = selectDoorItem(*alignment, type, open, preferLocked);
+  auto baseDoor = selectDoorItem(*alignment, type, open, preferLocked);
   if (!baseDoor.has_value()) {
     return false;
+  }
+
+  if (type == DoorType::Archway) {
+    std::vector<DoorNode> archways;
+    visitWallRedirectChain([&](const WallBrush &brush) {
+      const auto &doors = brush.doorNodes_[static_cast<size_t>(*alignment)];
+      for (const auto &door : doors) {
+        if (door.type == DoorType::Archway) {
+          archways.push_back(door);
+        }
+      }
+      return false;
+    });
+
+    if (archways.size() >= 2) {
+      const auto firstArch = archways[0];
+      const auto secondArch = archways[1];
+      const auto &pos = tile.getPosition();
+
+      baseDoor = firstArch;
+
+      if (*alignment == WallAlign::Horizontal) {
+        const auto *westTile = map.getTile(pos.x - 1, pos.y, pos.z);
+        bool westIsFirst = false;
+        if (westTile) {
+          for (const auto &item : westTile->getItems()) {
+            if (item && std::find(firstArch.items.begin(), firstArch.items.end(), item->getServerId()) != firstArch.items.end()) {
+              westIsFirst = true;
+              break;
+            }
+          }
+        }
+        if (westIsFirst) {
+          baseDoor = secondArch;
+        } else {
+          const auto *eastTile = map.getTile(pos.x + 1, pos.y, pos.z);
+          bool eastIsSecond = false;
+          if (eastTile) {
+            for (const auto &item : eastTile->getItems()) {
+              if (item && std::find(secondArch.items.begin(), secondArch.items.end(), item->getServerId()) != secondArch.items.end()) {
+                eastIsSecond = true;
+                break;
+              }
+            }
+          }
+          if (eastIsSecond) {
+            baseDoor = firstArch;
+          }
+        }
+      } else if (*alignment == WallAlign::Vertical) {
+        const auto *northTile = map.getTile(pos.x, pos.y - 1, pos.z);
+        bool northIsFirst = false;
+        if (northTile) {
+          for (const auto &item : northTile->getItems()) {
+            if (item && std::find(firstArch.items.begin(), firstArch.items.end(), item->getServerId()) != firstArch.items.end()) {
+              northIsFirst = true;
+              break;
+            }
+          }
+        }
+        if (northIsFirst) {
+          baseDoor = secondArch;
+        } else {
+          const auto *southTile = map.getTile(pos.x, pos.y + 1, pos.z);
+          bool southIsSecond = false;
+          if (southTile) {
+            for (const auto &item : southTile->getItems()) {
+              if (item && std::find(secondArch.items.begin(), secondArch.items.end(), item->getServerId()) != secondArch.items.end()) {
+                southIsSecond = true;
+                break;
+              }
+            }
+          }
+          if (southIsSecond) {
+            baseDoor = firstArch;
+          }
+        }
+      }
+    }
   }
 
   Types::updateItemVisuals(*baseWallItem, registry_,
@@ -121,7 +206,6 @@ bool WallBrush::applyDoor(Domain::ChunkedMap &map, Domain::Tile &tile,
       });
 
   tile.markDirty();
-  rebuildAround(map, pos);
   map.markChanged();
   return true;
 }
@@ -158,7 +242,6 @@ bool WallBrush::removeDoor(Domain::ChunkedMap &map, Domain::Tile &tile,
       });
 
   tile.markDirty();
-  rebuildAround(map, tile.getPosition());
   map.markChanged();
   return true;
 }
@@ -205,7 +288,6 @@ bool WallBrush::switchDoor(Domain::ChunkedMap &map, Domain::Tile &tile,
       });
 
   tile.markDirty();
-  rebuildAround(map, tile.getPosition());
   map.markChanged();
   return true;
 }

@@ -115,6 +115,7 @@ BrushController::BrushActionFamily BrushController::getActionFamily() const {
   case BrushType::OptionalBorder:
   case BrushType::Flag:
   case BrushType::Eraser:
+  case BrushType::Raw:
     return BrushActionFamily::GroundLike;
   case BrushType::Wall:
   case BrushType::WallDecoration:
@@ -125,7 +126,6 @@ BrushController::BrushActionFamily BrushController::getActionFamily() const {
     return BrushActionFamily::DoorLike;
   case BrushType::Doodad:
     return BrushActionFamily::DoodadLike;
-  case BrushType::Raw:
   case BrushType::Creature:
   case BrushType::Spawn:
   case BrushType::House:
@@ -236,7 +236,7 @@ bool BrushController::paintRecordedPosition(const Domain::Position &pos,
   }
 
   paintedPositions_.insert(key);
-  historyManager_->recordTileBefore(pos, map_->getTile(pos));
+  historyManager_->recordTileAndNeighborsBefore(map_, pos);
   paintTileDirect(pos, modifiers, specialAction);
   return true;
 }
@@ -276,7 +276,7 @@ bool BrushController::paintRecordedPositions(
 
   if (plannedResult == Services::Autoborder::PlannedMutationResult::Unsupported) {
     for (const auto &pos : intent.positions) {
-      historyManager_->recordTileBefore(pos, map_->getTile(pos));
+      historyManager_->recordTileAndNeighborsBefore(map_, pos);
       paintTileDirect(pos, modifiers, specialAction);
     }
     return true;
@@ -318,11 +318,9 @@ void BrushController::eraseRecordedPosition(const Domain::Position &pos) {
   }
 
   paintedPositions_.insert(key);
-  historyManager_->recordTileBefore(pos, tile);
+  historyManager_->recordTileAndNeighborsBefore(map_, pos);
   currentBrush_->undraw(*map_, tile);
 }
-
-
 
 void BrushController::paintDoodadRecordedPosition(const Domain::Position &pos,
                                                   uint32_t modifiers) {
@@ -357,17 +355,15 @@ void BrushController::paintDoodadRecordedPosition(const Domain::Position &pos,
                                       map_->getTile(affectedPosition));
   }
 
+  auto key = std::make_tuple(pos.x, pos.y, pos.z);
+  paintedPositions_.insert(key);
+
   for (const auto &layoutTile : plan.layout) {
     const Domain::Position absolutePosition(
         pos.x + layoutTile.relativePosition.x, pos.y + layoutTile.relativePosition.y,
         static_cast<int16_t>(pos.z + layoutTile.relativePosition.z));
-    auto key = std::make_tuple(absolutePosition.x, absolutePosition.y,
-                               absolutePosition.z);
-    if (paintedPositions_.contains(key)) {
-      continue;
-    }
-
-    paintedPositions_.insert(key);
+    paintedPositions_.insert(std::make_tuple(absolutePosition.x, absolutePosition.y,
+                                            absolutePosition.z));
   }
 
   auto ctx = createDrawContext(modifiers);
@@ -413,20 +409,19 @@ void BrushController::eraseDoodadRecordedPosition(const Domain::Position &pos,
                                       map_->getTile(affectedPosition));
   }
 
+  auto key = std::make_tuple(pos.x, pos.y, pos.z);
+  paintedPositions_.insert(key);
+
   bool mutated = false;
   for (const auto &absolutePosition : plan.positions) {
-    auto key = std::make_tuple(absolutePosition.x, absolutePosition.y,
-                               absolutePosition.z);
-    if (paintedPositions_.contains(key)) {
-      continue;
-    }
-
+    auto absKey = std::make_tuple(absolutePosition.x, absolutePosition.y,
+                                  absolutePosition.z);
     auto *tile = map_->getTile(absolutePosition);
     if (!tile) {
       continue;
     }
 
-    paintedPositions_.insert(key);
+    paintedPositions_.insert(absKey);
     doodadBrush->undraw(*map_, tile, eraseOptions);
     mutated = true;
   }
@@ -540,7 +535,7 @@ void BrushController::continueWallLikeStroke(const Domain::Position &pos) {
   } else if (plannedResult == Services::Autoborder::PlannedMutationResult::Unsupported) {
     for (const auto &p : intent.positions) {
       paintedPositions_.insert(std::make_tuple(p.x, p.y, p.z));
-      historyManager_->recordTileBefore(p, map_->getTile(p));
+      historyManager_->recordTileAndNeighborsBefore(map_, p);
       if (strokeEraseMode_) {
         currentBrush_->undraw(*map_, map_->getTile(p));
       } else {
@@ -593,6 +588,9 @@ void BrushController::continueDoodadLikeStroke(const Domain::Position &pos) {
   }
 
   for (const auto &linePos : getLinePositions(lastStrokePos_.value(), pos)) {
+    if (linePos == lastStrokePos_.value()) {
+      continue;
+    }
     if (strokeEraseMode_) {
       eraseDoodadRecordedPosition(linePos, strokeModifiers_);
     } else {

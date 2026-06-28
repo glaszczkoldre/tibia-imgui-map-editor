@@ -460,10 +460,13 @@ void MapPanelInput::handleDragState(
                       drag_start_tile_.z);
         input_controller->onLeftDragStart(drag_start_tile_, mods_at_down_, session);
         drag_notified_ = true;
+        // Skip onMouseMove this frame — onLeftDragStart already painted
+        // the starting tile via continueStroke(drag_start_tile_).
+      } else {
+        // Update mouse position for continuous brush painting
+        Domain::Position current_tile = camera.screenToTile(mouse_pos);
+        input_controller->onMouseMove(current_tile, session);
       }
-      // Update mouse position for continuous brush painting
-      Domain::Position current_tile = camera.screenToTile(mouse_pos);
-      input_controller->onMouseMove(current_tile, session);
     }
   }
 

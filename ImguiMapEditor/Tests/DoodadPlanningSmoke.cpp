@@ -1,11 +1,15 @@
+#include "Brushes/BrushController.h"
 #include "Brushes/BrushRegistry.h"
 #include "Brushes/Types/DoodadBrush.h"
 #include "Brushes/Types/DoodadPlacementPlanner.h"
 #include "Domain/ChunkedMap.h"
+#include "Domain/History/HistoryManager.h"
 #include "Domain/Tile.h"
 #include "Domain/Item.h"
 #include "Domain/ItemType.h"
 #include "Services/BrushSettingsService.h"
+#include "Services/ClientDataService.h"
+#include "Services/TilesetService.h"
 #include <iostream>
 #include <stdexcept>
 #include <cassert>

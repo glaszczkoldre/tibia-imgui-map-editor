@@ -411,6 +411,7 @@ void WallBrush::rebuildTile(Domain::ChunkedMap &map,
       currentDoorType = door->type;
       isOpen = door->isOpen;
       isLocked = door->isLocked;
+      currentAlignment = door->alignment;
       if (item->getOwnerBrushId() != InvalidBrushId) {
         currentOwnerBrushId = item->getOwnerBrushId();
       }
@@ -443,35 +444,37 @@ void WallBrush::rebuildTile(Domain::ChunkedMap &map,
   const auto fullAlign = lookupService.getFullType(neighbors);
   const auto halfAlign = lookupService.getHalfType(neighbors);
 
-
-
   auto resolvedAlignment = fullAlign;
   uint16_t replacementId = 0;
 
-  // If the tile has a door, try to find a matching door item
   if (currentDoorType != DoorType::Undefined) {
-    if (currentAlignment) {
-      if (const auto door =
-              selectDoorItem(*currentAlignment, currentDoorType, isOpen, isLocked)) {
-        replacementId = static_cast<uint16_t>(door->getItem());
-        resolvedAlignment = *currentAlignment;
+    if (currentAlignment && (*currentAlignment == fullAlign || *currentAlignment == halfAlign) && baseItem) {
+      replacementId = baseItem->getServerId();
+      resolvedAlignment = *currentAlignment;
+    } else {
+      if (currentAlignment) {
+        if (const auto door =
+                selectDoorItem(*currentAlignment, currentDoorType, isOpen, isLocked)) {
+          replacementId = static_cast<uint16_t>(door->getItem());
+          resolvedAlignment = *currentAlignment;
+        }
       }
-    }
 
-    if (replacementId == 0) {
-      if (const auto door =
-              selectDoorItem(fullAlign, currentDoorType, isOpen, isLocked)) {
-        replacementId = static_cast<uint16_t>(door->getItem());
-        resolvedAlignment = fullAlign;
+      if (replacementId == 0) {
+        if (const auto door =
+                selectDoorItem(fullAlign, currentDoorType, isOpen, isLocked)) {
+          replacementId = static_cast<uint16_t>(door->getItem());
+          resolvedAlignment = fullAlign;
+        }
       }
-    }
 
-    // Half table fallback for doors
-    if (replacementId == 0 && halfAlign != fullAlign) {
-      if (const auto door =
-              selectDoorItem(halfAlign, currentDoorType, isOpen, isLocked)) {
-        replacementId = static_cast<uint16_t>(door->getItem());
-        resolvedAlignment = halfAlign;
+      // Half table fallback for doors
+      if (replacementId == 0 && halfAlign != fullAlign) {
+        if (const auto door =
+                selectDoorItem(halfAlign, currentDoorType, isOpen, isLocked)) {
+          replacementId = static_cast<uint16_t>(door->getItem());
+          resolvedAlignment = halfAlign;
+        }
       }
     }
   }

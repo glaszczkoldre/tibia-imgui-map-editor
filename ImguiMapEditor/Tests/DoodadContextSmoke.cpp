@@ -8,6 +8,7 @@
 #include "Domain/Item.h"
 #include "Domain/Tile.h"
 #include "Services/BrushSettingsService.h"
+#include "Domain/History/HistoryManager.h"
 #include <iostream>
 #include <stdexcept>
 #include <cassert>
@@ -56,6 +57,9 @@ int main() {
 
     // 2. Setup Context-picking test
     auto grassTuftsPtr = std::make_unique<MapEditor::Brushes::DoodadBrush>("grass tufts", 400, registry, false);
+    MapEditor::Brushes::DoodadAlternative alt;
+    alt.addSingleItem({.itemId = 400, .chance = 10});
+    grassTuftsPtr->addAlternative(std::move(alt));
     auto bookcasePtr = std::make_unique<MapEditor::Brushes::TableBrush>("bookcase", 500, registry);
     auto redCarpetPtr = std::make_unique<MapEditor::Brushes::CarpetBrush>("red carpet", 600, registry);
 
@@ -68,8 +72,9 @@ int main() {
     registry.addBrush(std::move(redCarpetPtr));
 
     MapEditor::Services::BrushSettingsService settings;
+    MapEditor::Domain::History::HistoryManager history;
     MapEditor::Brushes::BrushController controller;
-    controller.initialize(&map, nullptr, nullptr);
+    controller.initialize(&map, &history, nullptr);
     controller.setBrushRegistry(&registry);
     controller.setBrushSettingsService(&settings);
 
@@ -99,6 +104,20 @@ int main() {
     const auto doodadCollectionSelection = controller.resolveBrushFromTile(*doodadCollectionTile, MapEditor::Brushes::BrushPickMode::Collection);
     require(doodadCollectionSelection.has_value() && doodadCollectionSelection->brush == &grassTufts,
             "collection context selection did not resolve doodad brush");
+
+    // Duplicate protection verification
+    const MapEditor::Domain::Position dupPos{1, 1, 7};
+    auto *gTile = map.getOrCreateTile(dupPos);
+    gTile->setGround(std::make_unique<MapEditor::Domain::Item>(100));
+    controller.setBrush(&grassTufts);
+    require(controller.applyBrush(dupPos), "first doodad placement failed");
+    const auto *dupTile1 = map.getTile(dupPos);
+    require(dupTile1 != nullptr && dupTile1->getItemCount() == 1, "first doodad placement item count mismatch");
+
+    // Second apply on same tile should be ignored (duplicate own item protection)
+    require(!controller.applyBrush(dupPos), "second doodad placement should have been skipped");
+    const auto *dupTile2 = map.getTile(dupPos);
+    require(dupTile2 != nullptr && dupTile2->getItemCount() == 1, "doodad was duplicated or modified on existing tile");
 
     std::cout << "DoodadContextSmoke passed\n";
     return 0;

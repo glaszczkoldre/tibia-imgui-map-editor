@@ -109,7 +109,8 @@ BrushPreviewFactory::createProvider(const Brushes::IBrush *brush,
   }
 
   if (auto *doorBrush = dynamic_cast<const Brushes::DoorBrush *>(brush)) {
-    return makeSingleItemPreview(static_cast<uint16_t>(doorBrush->getLookId()));
+    (void)doorBrush;
+    return std::make_unique<AutoborderBrushPreviewProvider>(brush, settings, map);
   }
 
   if (auto *doodadBrush = dynamic_cast<const Brushes::DoodadBrush *>(brush)) {

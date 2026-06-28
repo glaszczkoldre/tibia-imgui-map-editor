@@ -167,9 +167,9 @@ DoodadBrush::PlacementPlan DoodadPlacementPlanner::buildPlan(
   for (const auto &tile : rawStamp) {
     const auto absPos = absolutePosition(request.center, tile.relativePosition);
 
-    if (request.map && !request.forcePlace) {
+    if (request.map) {
       const auto *targetTile = request.map->getTile(absPos);
-      if (!request.brush.onBlocking_ && Types::tileHasBlockingContents(targetTile)) {
+      if (!request.forcePlace && !request.brush.onBlocking_ && Types::tileHasBlockingContents(targetTile)) {
         plan.skipped.push_back({.position = absPos, .reason = DoodadBrush::PlacementSkipReason::BlockingTile});
         continue;
       }

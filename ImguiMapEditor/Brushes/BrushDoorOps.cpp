@@ -86,7 +86,7 @@ bool BrushController::switchDoorAt(const Domain::Position &pos,
 
   historyManager_->beginOperation("Switch door",
                                   Domain::History::ActionType::Other, nullptr);
-  historyManager_->recordTileBefore(pos, tile);
+  historyManager_->recordTileAndNeighborsBefore(map_, pos);
 
   const bool preferLocked =
       brushSettingsService_ && brushSettingsService_->getLockDoors();
@@ -147,7 +147,7 @@ bool BrushController::rotateItemAt(const Domain::Position &pos,
 
   historyManager_->beginOperation("Rotate item",
                                   Domain::History::ActionType::Other, nullptr);
-  historyManager_->recordTileBefore(pos, tile);
+  historyManager_->recordTileAndNeighborsBefore(map_, pos);
 
   const auto rotatedId = type->rotateTo;
   item->setServerId(rotatedId);

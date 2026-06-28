@@ -252,10 +252,17 @@ void TileRenderer::queueTile(const Domain::Tile &tile, int tile_x, int tile_y,
     // We already know type->is_on_top is true from the collection pass,
     // and we have the resolved type cached.
 
+    TileColor item_color = ground_color;
+    if (isItemSelected(item)) {
+      item_color.r *= 0.5f;
+      item_color.g *= 0.5f;
+      item_color.b *= 0.5f;
+    }
+
     // IMMEDIATE per-tile rendering (not deferred!)
     item_renderer_.queueWithColor(
         type, screen_x, screen_y, size, tile_x, tile_y, tile_z, anim_ticks,
-        missing_sprites, ground_color.r, ground_color.g, ground_color.b,
+        missing_sprites, item_color.r, item_color.g, item_color.b,
         item_alpha, nullptr, item, 0, tile_has_hook_south, tile_has_hook_east);
 
     // Check tooltip for OnTop items if needed (not covered by queueAll)

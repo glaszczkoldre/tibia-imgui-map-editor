@@ -161,6 +161,7 @@ public:
     
     void addContainerItem(std::unique_ptr<Item> item);
     const std::vector<std::unique_ptr<Item>>& getContainerItems() const { return container_items_; }
+    std::vector<std::unique_ptr<Item>>& getContainerItems() { return container_items_; }
     bool isContainer() const { return !container_items_.empty(); }
     
     // ========== Utility ==========

@@ -428,16 +428,17 @@ private:
     DoodadLike,
     PointLike,
   };
+  BrushActionFamily getActionFamily() const;
 
-  [[nodiscard]] BrushActionFamily getActionFamily() const;
-  [[nodiscard]] std::vector<Domain::Position>
-  getBrushPositionsForCenter(const Domain::Position &center) const;
-  [[nodiscard]] std::vector<Domain::Position> getPaintedStrokePositions() const;
+  void paintRecordedPosition(const Domain::Position &pos);
   bool paintRecordedPosition(const Domain::Position &pos, uint32_t modifiers,
                              bool specialAction = false);
   bool paintRecordedPositions(std::span<const Domain::Position> positions,
                               uint32_t modifiers, bool specialAction = false);
   void eraseRecordedPosition(const Domain::Position &pos);
+  [[nodiscard]] std::vector<Domain::Position>
+  getBrushPositionsForCenter(const Domain::Position &center) const;
+  [[nodiscard]] std::vector<Domain::Position> getPaintedStrokePositions() const;
   void paintExpandedCenter(const Domain::Position &center, uint32_t modifiers);
   void eraseExpandedCenter(const Domain::Position &center);
   void continueGroundLikeStroke(const Domain::Position &pos);

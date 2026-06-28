@@ -133,7 +133,10 @@ void AutoborderBrushPreviewProvider::buildPreview() const {
   intent.context.brushSettings = const_cast<BrushSettingsService*>(brushSettings_);
   intent.positions = getPlacementPositions();
 
-  if (brushSettings_ && !brushSettings_->getAutoBorder()) {
+  const bool useDirectDraw = (brushSettings_ && !brushSettings_->getAutoBorder()) ||
+                             (brush_->getType() == ::MapEditor::Brushes::BrushType::Door);
+
+  if (useDirectDraw) {
     tiles_.reserve(intent.positions.size());
     for (const auto &pos : intent.positions) {
       Domain::Tile tempTile(pos);

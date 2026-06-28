@@ -46,6 +46,11 @@ public:
     void recordTileBefore(const Position& pos, const Tile* tile);
     
     /**
+     * Record a tile and its 8 direct neighbors' BEFORE states.
+     */
+    void recordTileAndNeighborsBefore(ChunkedMap* map, const Position& pos);
+    
+    /**
      * End operation and push to history.
      * Captures AFTER states for all recorded tiles.
      * @param map The map to capture AFTER states from

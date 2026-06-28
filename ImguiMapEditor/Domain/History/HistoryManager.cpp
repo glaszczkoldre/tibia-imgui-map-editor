@@ -44,34 +44,37 @@ void HistoryManager::recordTileBefore(const Position& pos, const Tile* tile) {
     before_states_[pos] = TileSnapshot::capture(tile, pos);
 }
 
+void HistoryManager::recordTileAndNeighborsBefore(ChunkedMap* map, const Position& pos) {
+    if (!operation_active_ || !map) {
+        return;
+    }
+    
+    for (int dy = -1; dy <= 1; ++dy) {
+        for (int dx = -1; dx <= 1; ++dx) {
+            Position neighborPos(pos.x + dx, pos.y + dy, pos.z);
+            recordTileBefore(neighborPos, map->getTile(neighborPos));
+        }
+    }
+}
+
 void HistoryManager::endOperation(ChunkedMap* map, Services::Selection::SelectionService* selection) {
     if (!operation_active_) {
         spdlog::warn("[History] endOperation called without active operation");
         return;
     }
     
-    // Check if we have any changes (tiles or selection)
-    bool has_tile_changes = !before_states_.empty();
-    bool has_selection_changes = selection_before_.has_value();
-    
-    if (!has_tile_changes && !has_selection_changes) {
-        // No changes recorded
-        operation_active_ = false;
-        before_states_.clear();
-        selection_before_.reset();
-        return;
-    }
-    
     // Create history entry
     auto entry = std::make_unique<HistoryEntry>(current_description_, current_type_);
     
-    // Add BEFORE and AFTER tile snapshots
+    // Add BEFORE and AFTER tile snapshots only if they changed
     for (auto& [pos, before_snapshot] : before_states_) {
-        entry->addBeforeSnapshot(std::move(before_snapshot));
-        
-        // Capture AFTER state from current map
         const Tile* current_tile = map->getTile(pos);
-        entry->addAfterSnapshot(TileSnapshot::capture(current_tile, pos));
+        TileSnapshot after_snapshot = TileSnapshot::capture(current_tile, pos);
+        
+        if (before_snapshot.data() != after_snapshot.data()) {
+            entry->addBeforeSnapshot(std::move(before_snapshot));
+            entry->addAfterSnapshot(std::move(after_snapshot));
+        }
     }
     
     // Add selection snapshots if captured
@@ -80,6 +83,15 @@ void HistoryManager::endOperation(ChunkedMap* map, Services::Selection::Selectio
         if (selection) {
             entry->setSelectionAfter(selection->createSnapshot());
         }
+    }
+    
+    // Check if we actually recorded any changes
+    if (!entry->hasChanges() && !entry->hasSelectionChange()) {
+        // No actual changes occurred (all recorded tiles were identical)
+        operation_active_ = false;
+        before_states_.clear();
+        selection_before_.reset();
+        return;
     }
     
     // Push to buffer

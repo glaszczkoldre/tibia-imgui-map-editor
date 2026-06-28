@@ -7,6 +7,7 @@
 #include "Brushes/Types/GroundBrush.h"
 #include "Brushes/Types/RawBrush.h"
 #include "Brushes/Types/WallBrush.h"
+#include "Brushes/Types/BrushUtils.h"
 #include "Application/EditorSession.h"
 #include "Controllers/MapInputController.h"
 #include "Domain/ChunkedMap.h"
@@ -1532,6 +1533,21 @@ void requireRawBrushPlacementAndParity(MapEditor::Brushes::BrushRegistry &regist
   require(selection.has_value(), "smart pick should succeed");
   require(selection->mode == MapEditor::Brushes::BrushPickMode::Raw, "resolved pick mode should be Raw");
   require(selection->rawItemId == 9001, "resolved raw item ID should fall back to ground (9001)");
+
+  // Test 8: RAW brush painting with expanded brush size
+  const MapEditor::Domain::Position areaCenter{5, 5, 7};
+  brushSettings.setBrushSizeX(3);
+  brushSettings.setBrushSizeY(3);
+  controller.setBrush(normalRaw);
+  require(controller.applyBrush(areaCenter), "normalRaw applyBrush with size 3x3 failed");
+
+  // Check that all 9 tiles in 3x3 area around (5,5,7) have the item placed
+  const auto positions = brushSettings.getBrushPositions(areaCenter);
+  require(positions.size() > 1, "brush positions should expand for size 3x3");
+  for (const auto &p : positions) {
+    const auto *t = map.getTile(p);
+    require(t != nullptr && tileContainsItemId(*t, 9002), "RAW item 9002 missing on expanded brush tile");
+  }
 }
 
 void requireDoodadCtrlEraseOnlyRemovesSelectedDoodad() {
@@ -1681,6 +1697,226 @@ void requireSandDuneGroundEquivalentDoesNotOuterBorder(const fs::path &tempDir) 
   }
 }
 
+void requireUndoNeighborRebuildRestoration(const fs::path &dataPath) {
+  MapEditor::Brushes::BrushRegistry localRegistry;
+  MapEditor::Services::TilesetService tilesetService(localRegistry);
+  require(tilesetService.loadMaterials(dataPath), "materials load failed in undo test");
+
+  auto *groundBrush = findBrush(localRegistry, "cave", MapBrushType::Ground);
+  auto *wallBrush = findBrush(localRegistry, "stone wall", MapBrushType::Wall);
+  require(groundBrush != nullptr && wallBrush != nullptr, "brushes lookup failed in undo test");
+
+  MapEditor::Domain::ChunkedMap map;
+  map.createNew(32, 32, 1098);
+  MapEditor::Domain::History::HistoryConfig config;
+  config.enable_compression = false;
+  MapEditor::Domain::History::HistoryManager history(config);
+
+  MapEditor::Brushes::BrushController controller;
+  controller.initialize(&map, &history, nullptr);
+  controller.setBrushRegistry(&localRegistry);
+
+  const MapEditor::Domain::Position p1{10, 10, 7};
+  const MapEditor::Domain::Position p2{11, 10, 7};
+  const MapEditor::Domain::Position p3{12, 10, 7};
+
+  controller.setBrush(groundBrush);
+  require(controller.applyBrush(p1) && controller.applyBrush(p2) && controller.applyBrush(p3),
+          "ground paint failed");
+
+  controller.setBrush(wallBrush);
+  require(controller.applyBrush(p1), "wall p1 paint failed");
+  require(controller.applyBrush(p3), "wall p3 paint failed");
+
+  const auto *tile1 = map.getTile(p1);
+  const auto *tile3 = map.getTile(p3);
+  require(tile1 != nullptr && tile3 != nullptr, "initial wall tiles missing");
+  const uint16_t id1_before = tile1->getItem(tile1->getItemCount() - 1)->getServerId();
+  const uint16_t id3_before = tile3->getItem(tile3->getItemCount() - 1)->getServerId();
+
+  require(controller.applyBrush(p2), "wall p2 paint failed");
+
+  const auto *tile1_after = map.getTile(p1);
+  const auto *tile3_after = map.getTile(p3);
+  const uint16_t id1_after = tile1_after->getItem(tile1_after->getItemCount() - 1)->getServerId();
+  const uint16_t id3_after = tile3_after->getItem(tile3_after->getItemCount() - 1)->getServerId();
+
+  require(!history.undo(&map, nullptr).empty(), "undo failed");
+
+  const auto *tile1_undone = map.getTile(p1);
+  const auto *tile3_undone = map.getTile(p3);
+  require(tile1_undone != nullptr && tile3_undone != nullptr, "tiles missing after undo");
+  require(tile1_undone->getItemCount() > 0 && tile3_undone->getItemCount() > 0, "tiles missing items after undo");
+
+  const uint16_t id1_undone = tile1_undone->getItem(tile1_undone->getItemCount() - 1)->getServerId();
+  const uint16_t id3_undone = tile3_undone->getItem(tile3_undone->getItemCount() - 1)->getServerId();
+  require(id1_before == id1_undone, "neighbor tile 1 did not revert to original ID on undo");
+  require(id3_before == id3_undone, "neighbor tile 3 did not revert to original ID on undo");
+
+  const auto *tile2_undone = map.getTile(p2);
+  require(!tile2_undone || tile2_undone->getItemCount() == 0, "center tile 2 was not undone");
+
+  require(!history.redo(&map, nullptr).empty(), "redo failed");
+
+  const auto *tile1_redone = map.getTile(p1);
+  const auto *tile3_redone = map.getTile(p3);
+  require(tile1_redone != nullptr && tile3_redone != nullptr, "tiles missing after redo");
+  require(tile1_redone->getItemCount() > 0 && tile3_redone->getItemCount() > 0, "tiles missing items after redo");
+
+  const uint16_t id1_redone = tile1_redone->getItem(tile1_redone->getItemCount() - 1)->getServerId();
+  const uint16_t id3_redone = tile3_redone->getItem(tile3_redone->getItemCount() - 1)->getServerId();
+  require(id1_after == id1_redone, "neighbor tile 1 did not redo correctly");
+  require(id3_after == id3_redone, "neighbor tile 3 did not redo correctly");
+}
+
+void requireDoorPlacementWithoutScramblingAndArchCornerMatching(const fs::path &dataPath) {
+  MapEditor::Brushes::BrushRegistry localRegistry;
+  MapEditor::Services::TilesetService tilesetService(localRegistry);
+  require(tilesetService.loadMaterials(dataPath), "materials load failed in door/arch test");
+
+  MapEditor::Domain::ChunkedMap map;
+  map.createNew(32, 32, 1098);
+  MapEditor::Domain::History::HistoryConfig config;
+  config.enable_compression = false;
+  MapEditor::Domain::History::HistoryManager history(config);
+
+  MapEditor::Brushes::BrushController controller;
+  controller.initialize(&map, &history, nullptr);
+  controller.setBrushRegistry(&localRegistry);
+
+  auto *groundBrush = findBrush(localRegistry, "cave", MapBrushType::Ground);
+  auto *doorWallBrush = localRegistry.getBrush("brick wall");
+  auto *archwayBrush = localRegistry.getBrush("Archway");
+  require(groundBrush != nullptr && doorWallBrush != nullptr && archwayBrush != nullptr, "brushes lookup failed in door/arch test");
+
+  auto *doorWallTyped = dynamic_cast<MapEditor::Brushes::WallBrush *>(doorWallBrush);
+  require(doorWallTyped != nullptr, "brick wall is not a WallBrush");
+
+  // --- PART 1: Door Placement Without Scrambling ---
+  const MapEditor::Domain::Position p1{10, 10, 7};
+  const MapEditor::Domain::Position p2{11, 10, 7};
+
+  controller.setBrush(groundBrush);
+  require(controller.applyBrush(p1), "ground p1 paint failed");
+  require(controller.applyBrush(p2), "ground p2 paint failed");
+
+  controller.setBrush(doorWallBrush);
+  require(controller.applyBrush(p1), "wall p1 paint failed");
+  require(controller.applyBrush(p2), "wall p2 paint failed");
+
+  const auto *tile1 = map.getTile(p1);
+  const auto *tile2 = map.getTile(p2);
+  require(tile1 != nullptr && tile2 != nullptr, "wall tiles missing");
+  require(tile1->getItemCount() > 0 && tile2->getItemCount() > 0, "wall items missing");
+
+  const uint16_t id1_before = tile1->getItem(tile1->getItemCount() - 1)->getServerId();
+
+  controller.setBrush(archwayBrush);
+  require(controller.applyBrush(p2), "door/archway p2 paint failed");
+
+  const auto *tile1_after = map.getTile(p1);
+  const uint16_t id1_after = tile1_after->getItem(tile1_after->getItemCount() - 1)->getServerId();
+  require(id1_before == id1_after, "neighbor wall scrambled during door placement");
+
+  // --- PART 2: Arch Corner Matching ---
+  const MapEditor::Domain::Position c_center{20, 20, 7};
+
+  controller.setBrush(groundBrush);
+  require(controller.applyBrush(c_center), "ground c_center paint failed");
+
+  auto *centerTile = map.getTile(c_center);
+  require(centerTile != nullptr, "corner center tile missing");
+
+  const uint16_t horizWallId = doorWallTyped->getWallItemForAlign(WallAlign::Horizontal);
+  const uint16_t vertWallId = doorWallTyped->getWallItemForAlign(WallAlign::Vertical);
+  require(horizWallId != 0 && vertWallId != 0, "failed to get wall item IDs");
+
+  MapEditor::Brushes::DrawContext drawCtx;
+  drawCtx.brushRegistry = &localRegistry;
+  centerTile->addItem(MapEditor::Brushes::Types::createTypedItem(drawCtx, horizWallId));
+  centerTile->addItem(MapEditor::Brushes::Types::createTypedItem(drawCtx, vertWallId));
+
+  size_t wallItemCount = 0;
+  for (const auto &item : centerTile->getItems()) {
+    if (item && doorWallTyped->ownsItem(item.get())) {
+      wallItemCount++;
+    }
+  }
+  require(wallItemCount == 2, "corner tile did not generate 2 wall items");
+
+  controller.setBrush(archwayBrush);
+  require(controller.applyBrush(c_center), "first archway c_center paint failed");
+
+  centerTile = map.getTile(c_center);
+  size_t doorCount1 = 0;
+  size_t wallCount1 = 0;
+  for (const auto &item : centerTile->getItems()) {
+    if (!item) continue;
+    if (doorWallTyped->findDoorForItem(item->getServerId()).has_value()) {
+      doorCount1++;
+    } else if (doorWallTyped->ownsItem(item.get())) {
+      wallCount1++;
+    }
+  }
+  require(doorCount1 == 1, "first click did not place exactly 1 archway");
+  require(wallCount1 == 1, "first click did not leave exactly 1 normal wall");
+
+  require(controller.applyBrush(c_center), "second archway c_center paint failed");
+
+  centerTile = map.getTile(c_center);
+  size_t doorCount2 = 0;
+  size_t wallCount2 = 0;
+  for (const auto &item : centerTile->getItems()) {
+    if (!item) continue;
+    if (doorWallTyped->findDoorForItem(item->getServerId()).has_value()) {
+      doorCount2++;
+    } else if (doorWallTyped->ownsItem(item.get())) {
+      wallCount2++;
+    }
+  }
+  require(doorCount2 == 2, "second click did not match and place the second archway");
+  require(wallCount2 == 0, "second click left normal walls on the corner");
+
+  // --- PART 3: Double Archway Alternation & Door ID Preservation ---
+  const MapEditor::Domain::Position h1{10, 30, 7};
+  const MapEditor::Domain::Position h2{11, 30, 7};
+  const MapEditor::Domain::Position h3{12, 30, 7};
+  const MapEditor::Domain::Position h4{13, 30, 7};
+
+  controller.setBrush(groundBrush);
+  require(controller.applyBrush(h1) && controller.applyBrush(h2) &&
+          controller.applyBrush(h3) && controller.applyBrush(h4), "ground paint failed for alternation test");
+
+  controller.setBrush(doorWallBrush);
+  require(controller.applyBrush(h1) && controller.applyBrush(h2) &&
+          controller.applyBrush(h3) && controller.applyBrush(h4), "wall paint failed for alternation test");
+
+  controller.setBrush(archwayBrush);
+  require(controller.applyBrush(h1), "archway h1 paint failed");
+  require(controller.applyBrush(h2), "archway h2 paint failed");
+  require(controller.applyBrush(h3), "archway h3 paint failed");
+  require(controller.applyBrush(h4), "archway h4 paint failed");
+
+  const auto *th1 = map.getTile(h1);
+  const auto *th2 = map.getTile(h2);
+  const auto *th3 = map.getTile(h3);
+  const auto *th4 = map.getTile(h4);
+  require(th1 && th2 && th3 && th4, "alternation tiles missing");
+
+  uint16_t id_h2 = th2->getItem(th2->getItemCount() - 1)->getServerId();
+  uint16_t id_h3 = th3->getItem(th3->getItemCount() - 1)->getServerId();
+
+  require(id_h2 == 1207, "h2 should have West archway (1207)");
+  require(id_h3 == 1208, "h3 should have East archway (1208)");
+
+  // Rebuild tile h3 and neighbors to ensure the East archway ID is preserved
+  doorWallTyped->rebuildTile(map, h3);
+  const auto *th3_after = map.getTile(h3);
+  require(th3_after != nullptr && th3_after->getItemCount() > 0, "th3_after tile issue");
+  uint16_t id_h3_after = th3_after->getItem(th3_after->getItemCount() - 1)->getServerId();
+  require(id_h3_after == 1208, "rebuildTile did not preserve the East archway (1208) ID");
+}
+
 } // namespace
 
 int main() {
@@ -1751,6 +1987,7 @@ int main() {
     requireRawBrushPlacementAndParity(registry);
     requireDoodadCtrlEraseOnlyRemovesSelectedDoodad();
     requireSandDuneGroundEquivalentDoesNotOuterBorder(tempDir);
+
 
     auto *creatureOthersTileset =
         tilesetService.getTilesetRegistry().getTilesetBySourceFile(
@@ -1962,6 +2199,9 @@ int main() {
     controller.setBrushSettingsService(&settings);
     controller.setPreviewFactory(&previewFactory);
     controller.setPreviewService(&previewService);
+
+    requireUndoNeighborRebuildRestoration(dataPath);
+    requireDoorPlacementWithoutScramblingAndArchCornerMatching(dataPath);
 
     for (const auto *brush : {static_cast<const MapEditor::Brushes::IBrush *>(
                                   controller.getSpawnBrush()),
