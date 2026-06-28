@@ -61,8 +61,9 @@ BrushPreviewFactory::createProvider(const Brushes::IBrush *brush,
     spdlog::debug(
         "[BrushPreviewFactory] Creating CreaturePreviewProvider for: {}",
         creatureBrush->getName());
-    return std::make_unique<CreaturePreviewProvider>(creatureBrush->getName(),
-                                                     settings);
+    return std::make_unique<CreaturePreviewProvider>(
+        creatureBrush->getName(), settings,
+        static_cast<uint8_t>(creatureBrush->getVariation()));
   }
 
   // Spawn Brush -> SpawnPreviewProvider (shows radius circle)

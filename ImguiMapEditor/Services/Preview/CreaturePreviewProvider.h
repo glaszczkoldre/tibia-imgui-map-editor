@@ -24,7 +24,8 @@ public:
    */
   explicit CreaturePreviewProvider(
       const std::string &creatureName,
-      const BrushSettingsService *brushSettings = nullptr);
+      const BrushSettingsService *brushSettings = nullptr,
+      uint8_t direction = 2);
 
   // IPreviewProvider interface
   bool isActive() const override;
@@ -39,6 +40,7 @@ public:
 private:
   std::string creatureName_;
   const BrushSettingsService *brushSettings_ = nullptr;
+  uint8_t direction_ = 2;
   Domain::Position anchor_{0, 0, 0};
   mutable std::vector<PreviewTileData> tiles_;
   mutable PreviewBounds bounds_;

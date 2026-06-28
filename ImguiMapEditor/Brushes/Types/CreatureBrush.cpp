@@ -23,6 +23,7 @@ void CreatureBrush::draw(Domain::ChunkedMap &map, Domain::Tile *tile,
   creature->setName(name_);
   creature->setOutfit(outfit_);
   creature->setPosition(tile->getPosition());
+  creature->direction = direction_;
   if (ctx.brushSettings) {
     creature->spawn_time = ctx.brushSettings->getDefaultSpawnTime();
   }

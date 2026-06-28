@@ -142,8 +142,8 @@ void PreviewOverlay::renderTile(
       // Use static OutfitOverlay instance (DRY - same as SpawnLabelOverlay.cpp)
       static OutfitOverlay s_outfit_renderer;
       s_outfit_renderer.render(drawList, creatureType->outfit, clientData,
-                               spriteManager, spriteCache, screenPos, zoom, 2,
-                               0, tintColor); // direction 2 = South, frame 0
+                               spriteManager, spriteCache, screenPos, zoom,
+                               tile.creature_direction, 0, tintColor);
     }
   }
 

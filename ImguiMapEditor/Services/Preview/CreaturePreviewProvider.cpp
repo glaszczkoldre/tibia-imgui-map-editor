@@ -5,8 +5,9 @@
 namespace MapEditor::Services::Preview {
 
 CreaturePreviewProvider::CreaturePreviewProvider(
-    const std::string &creatureName, const BrushSettingsService *brushSettings)
-    : creatureName_(creatureName), brushSettings_(brushSettings) {
+    const std::string &creatureName, const BrushSettingsService *brushSettings,
+    uint8_t direction)
+    : creatureName_(creatureName), brushSettings_(brushSettings), direction_(direction) {
   buildPreview();
   spdlog::debug("[CreaturePreviewProvider] Created for creature: {}",
                 creatureName);
@@ -59,6 +60,7 @@ void CreaturePreviewProvider::buildPreview() const {
   for (const auto &[dx, dy] : offsets) {
     PreviewTileData tile(dx, dy, 0);
     tile.creature_name = creatureName_;
+    tile.creature_direction = direction_;
     tiles_.push_back(std::move(tile));
     bounds_.expand(dx, dy, 0);
   }

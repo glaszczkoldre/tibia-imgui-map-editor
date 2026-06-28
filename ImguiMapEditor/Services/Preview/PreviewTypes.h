@@ -41,6 +41,7 @@ struct PreviewTileData {
   // Creature name for creature drag preview (outfit looked up from
   // CreatureType)
   std::optional<std::string> creature_name;
+  uint8_t creature_direction = 2; // 0=North, 1=East, 2=South, 3=West
 
   // Spawn indicator for spawn drag preview
   bool has_spawn = false;

@@ -21,9 +21,14 @@ namespace MapEditor::Brushes {
     void draw(Domain::ChunkedMap& map, Domain::Tile* tile, const DrawContext& ctx) override;
     void undraw(Domain::ChunkedMap& map, Domain::Tile* tile) override;
 
-private:
+    size_t getMaxVariation() const override { return 4; }
+    void setVariation(size_t index) override { direction_ = static_cast<uint8_t>(index % 4); }
+    size_t getVariation() const { return direction_; }
+
+  private:
     std::string name_;
     Domain::Outfit outfit_;
+    uint8_t direction_ = 2; // 0=North, 1=East, 2=South, 3=West (default South)
   };
 
 } // namespace MapEditor::Brushes
