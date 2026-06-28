@@ -132,7 +132,9 @@ void MaterialsXmlReader::processCreaturesNode(const pugi::xml_node &node,
             continue;
           }
 
-          auto *brush = brushRegistry_.getBrush(creature->name);
+          // Use creature-specific lookup to avoid name collisions with
+          // non-creature brushes (e.g. creature "Bones" vs doodad "bones")
+          auto *brush = brushRegistry_.getBrushForCreature(creature->name);
           if (!brush) {
             auto creatureBrush = std::make_unique<Brushes::CreatureBrush>(
                 creature->name, creature->outfit);

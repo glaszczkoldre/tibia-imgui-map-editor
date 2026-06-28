@@ -581,24 +581,9 @@ bool MapLoadingService::loadClientData(
   brush_registry_.setClientDataService(client_data_service_.get());
   tileset_service_.setClientDataService(client_data_service_.get());
 
-  if (client_data_service_) {
-    for (const auto &creature : client_data_service_->getCreatures()) {
-      if (!creature) {
-        continue;
-      }
-
-      auto *existingBrush = brush_registry_.getBrush(creature->name);
-      if (!existingBrush) {
-        auto brush = std::make_unique<MapEditor::Brushes::CreatureBrush>(
-            creature->name, creature->outfit);
-        existingBrush = brush.get();
-        brush_registry_.addBrush(std::move(brush));
-      }
-      brush_registry_.registerCreatureBinding(creature->name, existingBrush);
-    }
-  }
-
   // Load tilesets, palettes, brushes from version data directory
+  // NOTE: loadMaterials clears the brush registry, so creature brush
+  // registration must happen AFTER this block.
   if (version_data_path.empty()) {
     spdlog::warn("Data directory '{}' not found. Skipping materials/tilesets/palettes loading.",
                  version_info->getDataDirectory());
@@ -615,6 +600,26 @@ bool MapLoadingService::loadClientData(
       if (!tileset_service_.loadPalettes(version_data_path)) {
         spdlog::warn("No palettes found in '{}'.", version_data_path.string());
       }
+    }
+  }
+
+  // Register creature brushes AFTER materials loading (which clears the
+  // brush registry). This ensures creature brushes and their bindings
+  // persist and are available for tileset/palette resolution.
+  if (client_data_service_) {
+    for (const auto &creature : client_data_service_->getCreatures()) {
+      if (!creature) {
+        continue;
+      }
+
+      auto *existingBrush = brush_registry_.getBrushForCreature(creature->name);
+      if (!existingBrush) {
+        auto brush = std::make_unique<MapEditor::Brushes::CreatureBrush>(
+            creature->name, creature->outfit);
+        existingBrush = brush.get();
+        brush_registry_.addBrush(std::move(brush));
+      }
+      brush_registry_.registerCreatureBinding(creature->name, existingBrush);
     }
   }
 

@@ -173,14 +173,13 @@ void TilesetXmlReader::parseEntries(const pugi::xml_node &node,
         continue;
       }
 
-      // Check if creature brush already exists
-      IBrush *brush = brush_registry_.getBrush(creatureName);
+      // First: check creature-specific brush registry (avoids name collisions
+      // with doodad/wall brushes that happen to share the same name,
+      // e.g. creature "Bones" vs doodad brush "bones")
+      IBrush *brush = brush_registry_.getBrushForCreature(creatureName);
       if (brush) {
         markBrushMetadata(brush, collectionTileset);
         tileset.addBrush(brush);
-        if (brush->getType() == BrushType::Placeholder) {
-          recordPlaceholder(creatureName);
-        }
       } else {
         // Check if inline definition provided
         std::string type = child.attribute("type").as_string();
