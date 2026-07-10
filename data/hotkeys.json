@@ -1,0 +1,433 @@
+{
+  "bindings": {
+    "brush": {
+      "BRUSH_REFRESH_CURRENT": {
+        "is_mouse": false,
+        "key": "Space",
+        "mods": [
+          "Ctrl"
+        ]
+      },
+      "BRUSH_RESTORE_LAST": {
+        "is_mouse": false,
+        "key": "Q",
+        "mods": []
+      },
+      "BRUSH_SLOT_0": {
+        "is_mouse": false,
+        "key": "0",
+        "mods": []
+      },
+      "BRUSH_SLOT_1": {
+        "is_mouse": false,
+        "key": "1",
+        "mods": []
+      },
+      "BRUSH_SLOT_2": {
+        "is_mouse": false,
+        "key": "2",
+        "mods": []
+      },
+      "BRUSH_SLOT_3": {
+        "is_mouse": false,
+        "key": "3",
+        "mods": []
+      },
+      "BRUSH_SLOT_4": {
+        "is_mouse": false,
+        "key": "4",
+        "mods": []
+      },
+      "BRUSH_SLOT_5": {
+        "is_mouse": false,
+        "key": "5",
+        "mods": []
+      },
+      "BRUSH_SLOT_6": {
+        "is_mouse": false,
+        "key": "6",
+        "mods": []
+      },
+      "BRUSH_SLOT_7": {
+        "is_mouse": false,
+        "key": "7",
+        "mods": []
+      },
+      "BRUSH_SLOT_8": {
+        "is_mouse": false,
+        "key": "8",
+        "mods": []
+      },
+      "BRUSH_SLOT_9": {
+        "is_mouse": false,
+        "key": "9",
+        "mods": []
+      },
+      "BRUSH_STORE_SLOT_0": {
+        "is_mouse": false,
+        "key": "0",
+        "mods": [
+          "Ctrl"
+        ]
+      },
+      "BRUSH_STORE_SLOT_1": {
+        "is_mouse": false,
+        "key": "1",
+        "mods": [
+          "Ctrl"
+        ]
+      },
+      "BRUSH_STORE_SLOT_2": {
+        "is_mouse": false,
+        "key": "2",
+        "mods": [
+          "Ctrl"
+        ]
+      },
+      "BRUSH_STORE_SLOT_3": {
+        "is_mouse": false,
+        "key": "3",
+        "mods": [
+          "Ctrl"
+        ]
+      },
+      "BRUSH_STORE_SLOT_4": {
+        "is_mouse": false,
+        "key": "4",
+        "mods": [
+          "Ctrl"
+        ]
+      },
+      "BRUSH_STORE_SLOT_5": {
+        "is_mouse": false,
+        "key": "5",
+        "mods": [
+          "Ctrl"
+        ]
+      },
+      "BRUSH_STORE_SLOT_6": {
+        "is_mouse": false,
+        "key": "6",
+        "mods": [
+          "Ctrl"
+        ]
+      },
+      "BRUSH_STORE_SLOT_7": {
+        "is_mouse": false,
+        "key": "7",
+        "mods": [
+          "Ctrl"
+        ]
+      },
+      "BRUSH_STORE_SLOT_8": {
+        "is_mouse": false,
+        "key": "8",
+        "mods": [
+          "Ctrl"
+        ]
+      },
+      "BRUSH_STORE_SLOT_9": {
+        "is_mouse": false,
+        "key": "9",
+        "mods": [
+          "Ctrl"
+        ]
+      },
+      "BRUSH_TOGGLE_SELECTION_TOOL": {
+        "is_mouse": false,
+        "key": "Space",
+        "mods": []
+      },
+      "BRUSH_VARIATION_NEXT": {
+        "is_mouse": false,
+        "key": "X",
+        "mods": []
+      },
+      "BRUSH_VARIATION_PREV": {
+        "is_mouse": false,
+        "key": "Z",
+        "mods": []
+      },
+      "ROTATE_ITEM": {
+        "is_mouse": false,
+        "key": "R",
+        "mods": []
+      }
+    },
+    "edit": {
+      "COPY": {
+        "is_mouse": false,
+        "key": "C",
+        "mods": [
+          "Ctrl"
+        ]
+      },
+      "CUT": {
+        "is_mouse": false,
+        "key": "X",
+        "mods": [
+          "Ctrl"
+        ]
+      },
+      "DELETE": {
+        "is_mouse": false,
+        "key": "Delete",
+        "mods": []
+      },
+      "PASTE": {
+        "is_mouse": false,
+        "key": "V",
+        "mods": [
+          "Ctrl"
+        ]
+      },
+      "PASTE_REPLACE": {
+        "is_mouse": false,
+        "key": "V",
+        "mods": [
+          "Ctrl",
+          "Shift"
+        ]
+      },
+      "REDO": {
+        "is_mouse": false,
+        "key": "Y",
+        "mods": [
+          "Ctrl"
+        ]
+      },
+      "SAVE": {
+        "is_mouse": false,
+        "key": "S",
+        "mods": [
+          "Ctrl"
+        ]
+      },
+      "UNDO": {
+        "is_mouse": false,
+        "key": "Z",
+        "mods": [
+          "Ctrl"
+        ]
+      }
+    },
+    "file": {
+      "CLOSE": {
+        "is_mouse": false,
+        "key": "Q",
+        "mods": [
+          "Ctrl"
+        ]
+      },
+      "NEW": {
+        "is_mouse": false,
+        "key": "N",
+        "mods": [
+          "Ctrl"
+        ]
+      },
+      "OPEN": {
+        "is_mouse": false,
+        "key": "O",
+        "mods": [
+          "Ctrl"
+        ]
+      },
+      "SAVE_AS": {
+        "is_mouse": false,
+        "key": "S",
+        "mods": [
+          "Ctrl",
+          "Alt"
+        ]
+      }
+    },
+    "map": {
+      "EDIT_TOWNS": {
+        "is_mouse": false,
+        "key": "T",
+        "mods": [
+          "Ctrl"
+        ]
+      },
+      "MAP_PROPERTIES": {
+        "is_mouse": false,
+        "key": "P",
+        "mods": [
+          "Ctrl"
+        ]
+      }
+    },
+    "navigation": {
+      "FLOOR_DOWN": {
+        "is_mouse": false,
+        "key": "PageDown",
+        "mods": []
+      },
+      "FLOOR_UP": {
+        "is_mouse": false,
+        "key": "PageUp",
+        "mods": []
+      }
+    },
+    "overlay": {
+      "HIGHLIGHT_ITEMS": {
+        "is_mouse": false,
+        "key": "V",
+        "mods": []
+      },
+      "HIGHLIGHT_LOCKED_DOORS": {
+        "is_mouse": false,
+        "key": "U",
+        "mods": []
+      },
+      "SHOW_BLOCKING": {
+        "is_mouse": false,
+        "key": "O",
+        "mods": []
+      },
+      "SHOW_CREATURES": {
+        "is_mouse": false,
+        "key": "F",
+        "mods": []
+      },
+      "SHOW_HOUSES": {
+        "is_mouse": false,
+        "key": "H",
+        "mods": [
+          "Ctrl"
+        ]
+      },
+      "SHOW_SPAWNS": {
+        "is_mouse": false,
+        "key": "S",
+        "mods": []
+      },
+      "SHOW_SPECIAL": {
+        "is_mouse": false,
+        "key": "E",
+        "mods": []
+      }
+    },
+    "preview": {
+      "SHOW_BROWSE_TILE": {
+        "is_mouse": false,
+        "key": "B",
+        "mods": [
+          "Ctrl"
+        ]
+      },
+      "SHOW_INGAME_BOX": {
+        "is_mouse": false,
+        "key": "I",
+        "mods": [
+          "Shift"
+        ]
+      },
+      "SHOW_MINIMAP": {
+        "is_mouse": false,
+        "key": "M",
+        "mods": [
+          "Ctrl"
+        ]
+      },
+      "SHOW_PREVIEW": {
+        "is_mouse": false,
+        "key": "L",
+        "mods": []
+      },
+      "SHOW_TOOLTIPS": {
+        "is_mouse": false,
+        "key": "Y",
+        "mods": []
+      }
+    },
+    "search": {
+      "ADVANCED_SEARCH": {
+        "is_mouse": false,
+        "key": "F",
+        "mods": [
+          "Ctrl",
+          "Shift"
+        ]
+      },
+      "QUICK_SEARCH": {
+        "is_mouse": false,
+        "key": "F",
+        "mods": [
+          "Ctrl"
+        ]
+      }
+    },
+    "selection": {
+      "DESELECT": {
+        "is_mouse": false,
+        "key": "Escape",
+        "mods": []
+      }
+    },
+    "view": {
+      "GHOST_HIGHER_FLOORS": {
+        "is_mouse": false,
+        "key": "L",
+        "mods": [
+          "Ctrl"
+        ]
+      },
+      "GHOST_ITEMS": {
+        "is_mouse": false,
+        "key": "G",
+        "mods": []
+      },
+      "GHOST_LOWER_FLOORS": {
+        "is_mouse": false,
+        "key": "L",
+        "mods": [
+          "Ctrl",
+          "Shift"
+        ]
+      },
+      "SHOW_ALL_FLOORS": {
+        "is_mouse": false,
+        "key": "W",
+        "mods": [
+          "Ctrl"
+        ]
+      },
+      "SHOW_GRID": {
+        "is_mouse": false,
+        "key": "G",
+        "mods": [
+          "Shift"
+        ]
+      },
+      "SHOW_SHADE": {
+        "is_mouse": false,
+        "key": "Q",
+        "mods": []
+      },
+      "ZOOM_IN": {
+        "is_mouse": false,
+        "key": "+",
+        "mods": [
+          "Ctrl"
+        ]
+      },
+      "ZOOM_OUT": {
+        "is_mouse": false,
+        "key": "-",
+        "mods": [
+          "Ctrl"
+        ]
+      },
+      "ZOOM_RESET": {
+        "is_mouse": false,
+        "key": "0",
+        "mods": [
+          "Ctrl"
+        ]
+      }
+    }
+  },
+  "version": "1.0"
+}

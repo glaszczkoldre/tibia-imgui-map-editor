@@ -1,0 +1,27 @@
+{
+  "clients": [
+    {
+      "clientPath": "C:\\Users\\karol\\Desktop\\pulpit\\Clients\\1098transparent",
+      "datSignature": "000042A3",
+      "dataDirectory": "1098",
+      "description": "1098",
+      "extended": true,
+      "frameDurations": true,
+      "frameGroups": true,
+      "index": 1,
+      "itemDataSource": "OTB",
+      "itemsDbPath": "C:\\Users\\karol\\Desktop\\pulpit\\Clients\\1098transparent\\items.otb",
+      "metadataFile": "C:\\Users\\karol\\Desktop\\pulpit\\Clients\\1098transparent\\Tibia.dat",
+      "name": "1098",
+      "otbId": 57,
+      "otbMajor": 3,
+      "otbmVersions": [
+        3
+      ],
+      "sprSignature": "57BBD603",
+      "spritesFile": "C:\\Users\\karol\\Desktop\\pulpit\\Clients\\1098transparent\\Tibia.spr",
+      "transparency": true,
+      "version": 1098
+    }
+  ]
+}
