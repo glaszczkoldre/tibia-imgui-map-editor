@@ -2,6 +2,7 @@
 #include "Domain/ChunkedMap.h"
 #include "Domain/Creature.h"
 #include "Domain/Item.h"
+#include "Domain/Selection/SelectionEntry.h"
 #include "Domain/Spawn.h"
 #include "Domain/Tile.h"
 
@@ -9,7 +10,7 @@ namespace MapEditor::Services::Preview {
 
 DragPreviewProvider::DragPreviewProvider(
     const Selection::SelectionService &selectionService,
-    Domain::ChunkedMap *map, const Domain::Position &dragStartPos)
+    const Domain::ChunkedMap *map, const Domain::Position &dragStartPos)
     : selection_service_(&selectionService), map_(map),
       dragStartPos_(dragStartPos), currentPos_(dragStartPos) {
   buildPreview();
@@ -88,10 +89,7 @@ void DragPreviewProvider::addTileItems(const Domain::Position &pos) {
   if (!tile)
     return;
 
-  Domain::Position relPos;
-  relPos.x = pos.x - dragStartPos_.x;
-  relPos.y = pos.y - dragStartPos_.y;
-  relPos.z = static_cast<int16_t>(pos.z - dragStartPos_.z);
+  Domain::Position relPos = relativeToDragStart(pos);
 
   PreviewTileData previewTile;
   previewTile.relativePosition = relPos;
@@ -123,10 +121,7 @@ void DragPreviewProvider::addSingleItem(const Domain::Position &pos,
   if (!item)
     return;
 
-  Domain::Position relPos;
-  relPos.x = pos.x - dragStartPos_.x;
-  relPos.y = pos.y - dragStartPos_.y;
-  relPos.z = static_cast<int16_t>(pos.z - dragStartPos_.z);
+  Domain::Position relPos = relativeToDragStart(pos);
 
   // Check if tile already exists at this position
   for (auto &existingTile : tiles_) {
@@ -152,10 +147,7 @@ void DragPreviewProvider::addCreature(const Domain::Position &pos,
   if (!creature)
     return;
 
-  Domain::Position relPos;
-  relPos.x = pos.x - dragStartPos_.x;
-  relPos.y = pos.y - dragStartPos_.y;
-  relPos.z = static_cast<int16_t>(pos.z - dragStartPos_.z);
+  Domain::Position relPos = relativeToDragStart(pos);
 
   // Check if tile already exists at this position
   for (auto &existingTile : tiles_) {
@@ -175,10 +167,7 @@ void DragPreviewProvider::addCreature(const Domain::Position &pos,
 }
 
 void DragPreviewProvider::addSpawn(const Domain::Position &pos) {
-  Domain::Position relPos;
-  relPos.x = pos.x - dragStartPos_.x;
-  relPos.y = pos.y - dragStartPos_.y;
-  relPos.z = static_cast<int16_t>(pos.z - dragStartPos_.z);
+  Domain::Position relPos = relativeToDragStart(pos);
 
   // Check if tile already exists at this position
   for (auto &existingTile : tiles_) {

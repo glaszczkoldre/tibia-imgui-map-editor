@@ -41,10 +41,11 @@ struct PreviewTileData {
   // Creature name for creature drag preview (outfit looked up from
   // CreatureType)
   std::optional<std::string> creature_name;
+  uint8_t creature_direction = 2; // 0=North, 1=East, 2=South, 3=West
 
   // Spawn indicator for spawn drag preview
   bool has_spawn = false;
-  int spawn_radius = 0; // Radius for drawing spawn border rectangle
+  int32_t spawn_radius = 0; // Radius for drawing spawn border rectangle
 
   // Zone brush color overlay (for Flag, Eraser, House, Waypoint)
   // ARGB format, 0 means no zone overlay
@@ -71,18 +72,13 @@ struct PreviewTileData {
  * All coordinates are relative to anchor.
  */
 struct PreviewBounds {
-  int minX = 0, maxX = 0;
-  int minY = 0, maxY = 0;
-  int minZ = 0, maxZ = 0;
+  int32_t minX = 0, maxX = 0;
+  int32_t minY = 0, maxY = 0;
+  int32_t minZ = 0, maxZ = 0;
 
   PreviewBounds() = default;
 
-  bool contains(int x, int y, int z) const {
-    return x >= minX && x <= maxX && y >= minY && y <= maxY && z >= minZ &&
-           z <= maxZ;
-  }
-
-  void expand(int x, int y, int z) {
+  void expand(int32_t x, int32_t y, int32_t z) noexcept {
     if (x < minX)
       minX = x;
     if (x > maxX)
@@ -97,13 +93,9 @@ struct PreviewBounds {
       maxZ = z;
   }
 
-  void expand(const Domain::Position &pos) { expand(pos.x, pos.y, pos.z); }
+  void expand(const Domain::Position &pos) noexcept { expand(pos.x, pos.y, pos.z); }
 
-  int width() const { return maxX - minX + 1; }
-  int height() const { return maxY - minY + 1; }
-  int depth() const { return maxZ - minZ + 1; }
-
-  static PreviewBounds fromSingle() {
+  static PreviewBounds fromSingle() noexcept {
     return PreviewBounds(); // Default constructor gives all zeros
   }
 };

@@ -49,6 +49,21 @@ void HistoryEntry::compress(bool enable) {
     compressed_ = true;
 }
 
+namespace {
+void resolveItemTypesRecursive(Item* item, Services::ClientDataService* clientData) {
+    if (!item || !clientData) {
+        return;
+    }
+    if (!item->getType()) {
+        const ItemType* type = clientData->getItemTypeByServerId(item->getServerId());
+        item->setType(type);
+    }
+    for (auto& child : item->getContainerItems()) {
+        resolveItemTypesRecursive(child.get(), clientData);
+    }
+}
+}
+
 void HistoryEntry::applySnapshots(ChunkedMap* map, 
                                    const std::vector<TileSnapshot>& snapshots,
                                    const std::vector<size_t>& originalSizes,
@@ -73,20 +88,12 @@ void HistoryEntry::applySnapshots(ChunkedMap* map,
             if (clientData) {
                 // Resolve ground item type
                 if (tile->hasGround()) {
-                    Item* ground = tile->getGround();
-                    if (ground && !ground->getType()) {
-                        const ItemType* type = clientData->getItemTypeByServerId(ground->getServerId());
-                        ground->setType(type);
-                    }
+                    resolveItemTypesRecursive(tile->getGround(), clientData);
                 }
                 
                 // Resolve stacked items types using getItem(index) for non-const access
                 for (size_t j = 0; j < tile->getItemCount(); ++j) {
-                    Item* item = tile->getItem(j);
-                    if (item && !item->getType()) {
-                        const ItemType* type = clientData->getItemTypeByServerId(item->getServerId());
-                        item->setType(type);
-                    }
+                    resolveItemTypesRecursive(tile->getItem(j), clientData);
                 }
             }
             

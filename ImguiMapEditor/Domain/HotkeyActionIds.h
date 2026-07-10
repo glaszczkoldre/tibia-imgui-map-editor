@@ -61,4 +61,13 @@ inline constexpr const char* ADVANCED_SEARCH = "ADVANCED_SEARCH";
 inline constexpr const char* EDIT_TOWNS     = "EDIT_TOWNS";
 inline constexpr const char* MAP_PROPERTIES = "MAP_PROPERTIES";
 
+// Brush actions
+inline constexpr const char* BRUSH_REFRESH_CURRENT      = "BRUSH_REFRESH_CURRENT";
+inline constexpr const char* BRUSH_TOGGLE_SELECTION_TOOL = "BRUSH_TOGGLE_SELECTION_TOOL";
+inline constexpr const char* BRUSH_RESTORE_LAST          = "BRUSH_RESTORE_LAST";
+inline constexpr const char* BRUSH_VARIATION_PREV        = "BRUSH_VARIATION_PREV";
+inline constexpr const char* BRUSH_VARIATION_NEXT        = "BRUSH_VARIATION_NEXT";
+inline constexpr const char* ROTATE_ITEM                 = "ROTATE_ITEM";
+inline constexpr const char* TOGGLE_AUTOBORDER           = "TOGGLE_AUTOBORDER";
+
 } // namespace MapEditor::Domain::Actions

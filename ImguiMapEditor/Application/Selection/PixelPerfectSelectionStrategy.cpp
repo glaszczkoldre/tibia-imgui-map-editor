@@ -198,7 +198,7 @@ bool PixelPerfectSelectionStrategy::hitTestItem(
   bool is_fluid = item_type->isFluidContainer() || item_type->isSplash();
 
   int subtype_index = -1;
-  if (item_type->is_stackable) {
+  if (item_type->isStackable()) {
     int count = item->getSubtype();
     if (count <= 1)
       subtype_index = 0;
@@ -220,10 +220,10 @@ bool PixelPerfectSelectionStrategy::hitTestItem(
     fluid_subtype = item->getSubtype();
   }
 
-  if (item_type->is_hangable) {
-    if (item_type->hook_south)
+  if (item_type->isHangable()) {
+    if (item_type->hookSouth())
       pattern_x = 1;
-    else if (item_type->hook_east)
+    else if (item_type->hookEast())
       pattern_x = 2;
     else
       pattern_x = 0;

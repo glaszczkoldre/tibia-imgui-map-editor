@@ -5,6 +5,7 @@
 #include "Controllers/MapInputController.h"
 #include "Core/Config.h"
 #include "Domain/SelectionSettings.h"
+#include "Brushes/BrushController.h"
 #include <GLFW/glfw3.h>
 #include <algorithm>
 #include <cmath>
@@ -102,6 +103,15 @@ void MapPanelInput::handleMousePan(MapViewCamera &camera, bool is_focused) {
 void MapPanelInput::handleMouseZoom(MapViewCamera &camera) {
   ImGuiIO &io = ImGui::GetIO();
 
+  const bool isAltDown = io.KeyAlt || ImGui::IsKeyDown(ImGuiKey_LeftAlt) || ImGui::IsKeyDown(ImGuiKey_RightAlt);
+  const bool isShiftDown = io.KeyShift || ImGui::IsKeyDown(ImGuiKey_LeftShift) || ImGui::IsKeyDown(ImGuiKey_RightShift);
+
+  if (brush_controller_ && brush_controller_->hasBrush() && (isAltDown || isShiftDown) &&
+      io.MouseWheel != 0.0f) {
+    brush_controller_->adjustBrushSize(io.MouseWheel > 0.0f ? -1 : 1);
+    return;
+  }
+
   if (io.MouseWheel != 0 && !io.KeyCtrl) {
     glm::vec2 mouse_pos(io.MousePos.x, io.MousePos.y);
     camera.adjustZoom(io.MouseWheel, mouse_pos);
@@ -186,18 +196,19 @@ void MapPanelInput::handleTileSelection(
   ImGuiIO &io = ImGui::GetIO();
   glm::vec2 mouse_pos(io.MousePos.x, io.MousePos.y);
 
-  // Right-click for context menu
-  if (is_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
-    handleRightClickInput(camera, session, input_controller, mouse_pos);
-    return;
-  }
-
-  // Convert key modifiers
   int mods = 0;
   if (io.KeyCtrl)
     mods |= GLFW_MOD_CONTROL;
   if (io.KeyShift)
     mods |= GLFW_MOD_SHIFT;
+  if (io.KeyAlt)
+    mods |= GLFW_MOD_ALT;
+
+  // Right-click for context menu
+  if (is_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
+    handleRightClickInput(camera, session, input_controller, mouse_pos, mods);
+    return;
+  }
 
   // Update current mouse position for preview line rendering
   current_mouse_pos_ = mouse_pos;
@@ -211,7 +222,8 @@ void MapPanelInput::handleTileSelection(
 
   // Handle Lasso Start with Alt Key
   if (is_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
-    if (io.KeyAlt) {
+    if (io.KeyAlt && !io.KeyCtrl &&
+        !(brush_controller_ && brush_controller_->hasBrush())) {
       lasso_mode_ = LassoMode::Drawing;
       lasso_points_.clear();
       lasso_points_.push_back(mouse_pos);
@@ -233,11 +245,14 @@ void MapPanelInput::handleTileSelection(
 void MapPanelInput::handleRightClickInput(
     const MapViewCamera &camera, AppLogic::EditorSession *session,
     AppLogic::MapInputController *input_controller,
-    const glm::vec2 &mouse_pos) {
+    const glm::vec2 &mouse_pos, int mods) {
   Domain::Position pos = camera.screenToTile(mouse_pos);
+  const glm::vec2 click_tile_screen = camera.tileToScreen(pos);
+  const glm::vec2 pixel_offset =
+      (mouse_pos - click_tile_screen) / camera.getZoom();
 
   if (input_controller && session) {
-    input_controller->onRightClick(pos, session);
+    input_controller->onRightClick(pos, mods, pixel_offset, session);
     show_context_menu_ = input_controller->shouldShowContextMenu();
     context_menu_pos_ = input_controller->getContextMenuPosition();
     input_controller->clearContextMenuFlag();
@@ -360,13 +375,15 @@ void MapPanelInput::handleSelectionMouseDown(const MapViewCamera &camera,
                                              AppLogic::EditorSession *session,
                                              AppLogic::MapInputController *input_controller,
                                              const glm::vec2 &mouse_pos,
-                                             const Domain::Position &tile_pos, int mods,
+                                             const Domain::Position &tile_pos,
+                                             [[maybe_unused]] int mods,
                                              const ImGuiIO &io) {
     is_drag_selecting_ = true;
     drag_start_screen_ = mouse_pos;
-    drag_start_tile_ = camera.screenToTile(mouse_pos);
+    drag_start_tile_ = tile_pos;
     drag_start_time_ = ImGui::GetTime();
-    started_with_shift_ = io.KeyShift; // Box selection
+    const bool has_brush = input_controller && input_controller->hasBrush();
+    started_with_shift_ = io.KeyShift && !has_brush; // Box selection only without brush
 
     // FIX #1: Save modifiers at mouse-down time (not at release)
     mods_at_down_ = 0;
@@ -374,11 +391,12 @@ void MapPanelInput::handleSelectionMouseDown(const MapViewCamera &camera,
       mods_at_down_ |= GLFW_MOD_CONTROL;
     if (io.KeyShift)
       mods_at_down_ |= GLFW_MOD_SHIFT;
+    if (io.KeyAlt)
+      mods_at_down_ |= GLFW_MOD_ALT;
 
     // Immediate selection on mouse down (if not box selection)
     // IMPORTANT: For brush mode, do NOT paint here - let the drag stroke handle
     // it so the entire stroke is one atomic undo entry
-    bool has_brush = input_controller && input_controller->hasBrush();
     if (!started_with_shift_ && input_controller && session && !has_brush) {
       glm::vec2 click_tile_screen = camera.tileToScreen(drag_start_tile_);
       glm::vec2 click_pixel_offset =
@@ -393,8 +411,8 @@ void MapPanelInput::handleSelectionMouseDown(const MapViewCamera &camera,
       if (!is_selected) {
         // Only call onLeftClick on down if NOT Ctrl (Ctrl should only toggle on
         // UP)
-        if (!(mods & GLFW_MOD_CONTROL)) {
-          input_controller->onLeftClick(drag_start_tile_, mods,
+        if (!(mods_at_down_ & GLFW_MOD_CONTROL)) {
+          input_controller->onLeftClick(drag_start_tile_, mods_at_down_,
                                         click_pixel_offset, session);
         }
         // Enable drag for newly selected item (RME parity)
@@ -426,8 +444,12 @@ void MapPanelInput::handleDragState(
     // STRICT: Drag requires BOTH time (0.1s) AND distance (10px) - no
     // exceptions
     bool distance_met = dist_sq > Config::Input::DRAG_THRESHOLD_SQ;
+    const bool smart_pick_chord =
+        (mods_at_down_ & GLFW_MOD_CONTROL) != 0 &&
+        (mods_at_down_ & GLFW_MOD_ALT) != 0;
     bool should_trigger_drag =
-        has_brush ? distance_met : (distance_met && time_met);
+        has_brush && !smart_pick_chord ? distance_met
+                                       : (distance_met && time_met);
 
     // Item drag/brush (not box selection)
     if (should_trigger_drag && !started_with_shift_ && input_controller &&
@@ -436,12 +458,15 @@ void MapPanelInput::handleDragState(
         spdlog::debug("[DRAG] Calling onLeftDragStart at ({},{},{})",
                       drag_start_tile_.x, drag_start_tile_.y,
                       drag_start_tile_.z);
-        input_controller->onLeftDragStart(drag_start_tile_, session);
+        input_controller->onLeftDragStart(drag_start_tile_, mods_at_down_, session);
         drag_notified_ = true;
+        // Skip onMouseMove this frame — onLeftDragStart already painted
+        // the starting tile via continueStroke(drag_start_tile_).
+      } else {
+        // Update mouse position for continuous brush painting
+        Domain::Position current_tile = camera.screenToTile(mouse_pos);
+        input_controller->onMouseMove(current_tile, session);
       }
-      // Update mouse position for continuous brush painting
-      Domain::Position current_tile = camera.screenToTile(mouse_pos);
-      input_controller->onMouseMove(current_tile, session);
     }
   }
 
@@ -513,7 +538,8 @@ void MapPanelInput::handleDragRelease(
       if (input_controller && session) {
         if (!drag_notified_) {
           spdlog::debug("[DRAG] Late onLeftDragStart at release");
-          input_controller->onLeftDragStart(drag_start_tile_, session);
+          input_controller->onLeftDragStart(drag_start_tile_, mods_at_down_,
+                                            session);
         }
         spdlog::debug("[DRAG] Calling onLeftDragEnd at ({},{},{})", end_tile.x,
                       end_tile.y, end_tile.z);
@@ -524,9 +550,18 @@ void MapPanelInput::handleDragRelease(
       // painting
       if (input_controller && session) {
         bool has_brush = input_controller->hasBrush();
-        if (has_brush) {
+        const bool smart_pick_chord =
+            (mods_at_down_ & GLFW_MOD_CONTROL) != 0 &&
+            (mods_at_down_ & GLFW_MOD_ALT) != 0;
+        if (smart_pick_chord) {
+          glm::vec2 click_tile_screen = camera.tileToScreen(drag_start_tile_);
+          glm::vec2 click_pixel_offset =
+              (drag_start_screen_ - click_tile_screen) / camera.getZoom();
+          input_controller->onLeftClick(drag_start_tile_, mods_at_down_,
+                                        click_pixel_offset, session);
+        } else if (has_brush) {
           // Brush single-click: treat as minimal stroke
-          input_controller->onLeftDragStart(drag_start_tile_, session);
+          input_controller->onLeftDragStart(drag_start_tile_, mods_at_down_, session);
           input_controller->onLeftDragEnd(drag_start_tile_, session);
         } else if (started_with_shift_ || skipped_selection_on_down_) {
           glm::vec2 click_tile_screen = camera.tileToScreen(drag_start_tile_);

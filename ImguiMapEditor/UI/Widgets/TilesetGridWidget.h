@@ -2,6 +2,7 @@
 #include "../../Brushes/BrushRegistry.h"
 #include "../../Domain/Tileset/Tileset.h"
 #include "../../Domain/Tileset/TilesetRegistry.h"
+#include <imgui.h>
 #include <cstdint>
 #include <functional>
 #include <set>
@@ -28,6 +29,10 @@ class SpriteManager;
 namespace Brushes {
 class BrushController;
 } // namespace Brushes
+
+namespace UI::Utils {
+struct ResolvedBrushPreview;
+}
 
 namespace UI {
 
@@ -86,7 +91,7 @@ public:
   /**
    * Set the tileset to display (directly from Tileset entries).
    */
-  void setTileset(const std::string &tilesetName);
+  void setTileset(Domain::Tileset::Tileset *tileset);
 
   /**
    * Set callback for brush selection.
@@ -152,12 +157,30 @@ public:
   void selectBrush(const std::string &brushName, bool scrollTo = true,
                    bool pulse = false) {
     pendingSelectBrushName_ = brushName;
+    pendingSelectBrush_ = nullptr;
     if (scrollTo) {
       scrollToBrushName_ = brushName;
+      scrollToBrush_ = nullptr;
     }
     if (pulse) {
       pulseBrushName_ = brushName;
+      pulseBrush_ = nullptr;
       pulseStartTime_ = -1.0f; // Will be set on first render
+    }
+  }
+
+  void selectBrush(const Brushes::IBrush *brush, bool scrollTo = true,
+                   bool pulse = false) {
+    pendingSelectBrush_ = brush;
+    pendingSelectBrushName_ = brush ? brush->getName() : std::string{};
+    if (scrollTo) {
+      scrollToBrush_ = brush;
+      scrollToBrushName_ = brush ? brush->getName() : std::string{};
+    }
+    if (pulse) {
+      pulseBrush_ = brush;
+      pulseBrushName_ = brush ? brush->getName() : std::string{};
+      pulseStartTime_ = -1.0f;
     }
   }
 
@@ -165,7 +188,7 @@ public:
    * Callback for tileset modifications (triggers save).
    */
   using TilesetModifiedCallback =
-      std::function<void(const std::string &tileset)>;
+      std::function<void(const Domain::Tileset::Tileset &tileset)>;
 
   void setOnTilesetModified(TilesetModifiedCallback cb) {
     onTilesetModified_ = std::move(cb);
@@ -175,26 +198,25 @@ private:
   void renderFilterInput();
   void renderBrushGrid();
   void applyFilter();
+  void syncActiveBrushSelection();
 
-  /**
-   * Render a rounded card with sprite and optional selection/pulse border.
-   * Used by both cross-tileset and single-tileset rendering paths.
-   */
-  void renderBrushCard(ImVec2 cursorPos, ImVec2 size, Rendering::Texture *tex,
+  [[nodiscard]] Utils::ResolvedBrushPreview
+  getBrushPreview(const Brushes::IBrush *brush) const;
+
+  void renderBrushCard(ImVec2 cursorPos, ImVec2 size,
+                       const Utils::ResolvedBrushPreview &preview,
                        bool isSelected, bool isHovered,
-                       bool isPulsing = false, float pulseElapsed = 0.0f);
+                       bool isPulsing = false, float pulseElapsed = 0.0f,
+                       Brushes::BrushType brushType = Brushes::BrushType::Raw);
 
-  /**
-   * Get preview texture for a brush (RawBrush or CreatureBrush).
-   * Uses PreviewUtils for consistent texture retrieval.
-   */
-  Rendering::Texture *getBrushTexture(const Brushes::IBrush *brush) const;
-
+  // Returns {isPulsing, pulseElapsed}. Clears stale pulse state when duration expires.
+  std::pair<bool, float> computePulseState(const Brushes::IBrush *brush);
   // Services (non-owning)
   Services::ClientDataService *clientData_ = nullptr;
   Services::SpriteManager *spriteManager_ = nullptr;
   Brushes::BrushController *brushController_ = nullptr;
   Domain::Tileset::TilesetRegistry *tilesetRegistry_ = nullptr;
+  Domain::Tileset::Tileset *currentTileset_ = nullptr;
 
   // Current tileset name
   std::string tilesetName_;
@@ -215,9 +237,12 @@ private:
   Services::AppSettings *appSettings_ = nullptr;
 
   // Selection
-  std::string selectedBrushName_; // Currently selected (index-suffixed key)
-  std::string pendingSelectBrushName_; // Brush name to find and select
-  std::string scrollToBrushName_;      // Brush name to scroll to on next render
+  const Brushes::IBrush *selectedBrush_ = nullptr;
+  const Brushes::IBrush *pendingSelectBrush_ = nullptr;
+  const Brushes::IBrush *scrollToBrush_ = nullptr;
+  const Brushes::IBrush *pulseBrush_ = nullptr;
+  std::string pendingSelectBrushName_; // Fallback for name-driven jumps
+  std::string scrollToBrushName_;      // Fallback for name-driven scrolling
 
   // All brushes for cross-tileset search
   std::vector<BrushWithSource> allBrushes_;
@@ -246,9 +271,11 @@ private:
   std::unordered_map<size_t, bool> collapsedSections_;
 
   // Pulse animation state for jump-to-selection highlight
-  std::string pulseBrushName_;   // Brush to pulse
+  std::string pulseBrushName_;   // Brush name fallback for pulse animation
   float pulseStartTime_ = -1.0f; // When pulse started (-1 = not set)
   static constexpr float PULSE_DURATION = 2.0f; // Seconds to pulse
+
+  const Brushes::IBrush *syncedActiveBrush_ = nullptr;
 };
 
 } // namespace UI

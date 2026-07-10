@@ -7,7 +7,8 @@
 #include "Domain/Search/SearchFilterTypes.h"
 namespace MapEditor {
 namespace Domain { 
-    class ItemType; 
+    class ItemDefinition;
+    using ItemType = ItemDefinition;
     class CreatureType;
 }
 namespace Services { 

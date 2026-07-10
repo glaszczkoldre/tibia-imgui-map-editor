@@ -16,10 +16,6 @@ bool PreviewService::hasPreview() const {
     return provider_ && provider_->isActive();
 }
 
-IPreviewProvider* PreviewService::getProvider() const {
-    return provider_.get();
-}
-
 const std::vector<PreviewTileData>& PreviewService::getPreviewTiles() const {
     if (provider_) {
         return provider_->getTiles();
@@ -54,10 +50,23 @@ void PreviewService::updateCursor(const Domain::Position& cursor) {
     }
 }
 
+void PreviewService::updateFractional(float fracX, float fracY) {
+    if (provider_) {
+        provider_->updateFractionalPosition(fracX, fracY);
+    }
+}
+
 void PreviewService::regenerate() {
-    if (provider_ && provider_->needsRegeneration()) {
+    if (provider_) {
         provider_->regenerate();
     }
+}
+
+std::optional<uint32_t> PreviewService::getCurrentSeed() const {
+    if (provider_) {
+        return provider_->getCurrentSeed();
+    }
+    return std::nullopt;
 }
 
 } // namespace MapEditor::Services::Preview

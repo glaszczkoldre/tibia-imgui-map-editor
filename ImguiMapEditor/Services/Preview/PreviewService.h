@@ -1,6 +1,7 @@
 #pragma once
 #include "IPreviewProvider.h"
 #include <memory>
+#include <optional>
 
 namespace MapEditor::Services::Preview {
 
@@ -51,12 +52,6 @@ public:
     bool hasPreview() const;
     
     /**
-     * Get the active provider (may be null).
-     * @return Raw pointer to provider, or nullptr
-     */
-    IPreviewProvider* getProvider() const;
-    
-    /**
      * Get preview tiles from active provider.
      * @return Reference to tiles, or empty vector if no provider
      */
@@ -86,12 +81,27 @@ public:
      * @param cursor World position of cursor
      */
     void updateCursor(const Domain::Position& cursor);
+
+    /**
+     * Update fractional position within tile for sub-tile precision.
+     * @param fracX Horizontal fraction (0..1)
+     * @param fracY Vertical fraction (0..1)
+     */
+    void updateFractional(float fracX, float fracY);
     
     /**
      * Trigger regeneration on active provider.
      * Used when brush parameters change (size, shape).
      */
     void regenerate();
+
+    /**
+     * Get the current deterministic seed from the active provider.
+     * Providers that produce preview results deterministically from a seed
+     * expose it here so placement code can reproduce the exact preview result.
+     * @return Seed value, or std::nullopt if provider doesn't support it
+     */
+    std::optional<uint32_t> getCurrentSeed() const;
 
 private:
     std::unique_ptr<IPreviewProvider> provider_;

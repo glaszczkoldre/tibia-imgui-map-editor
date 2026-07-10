@@ -71,7 +71,7 @@ void TileRenderer::queueTile(const Domain::Tile &tile, int tile_x, int tile_y,
         const auto &items = tile.getItems();
         const auto *topmost = items.back().get();
         if (topmost && topmost->getType()) {
-          topmost_is_border = topmost->getType()->is_border;
+          topmost_is_border = topmost->getType()->isBorder();
         }
       }
 
@@ -118,10 +118,13 @@ void TileRenderer::queueTile(const Domain::Tile &tile, int tile_x, int tile_y,
   if (tile.hasGround()) {
     const auto *ground = tile.getGround();
     if (ground) {
-      // Conciseness fix: Use C++17 if-init and logical OR
-      if (const auto *type = ground->getType()) {
-        tile_has_hook_south |= type->hook_south;
-        tile_has_hook_east |= type->hook_east;
+      const auto *type = ground->getType();
+      if (!type && client_data_) {
+        type = client_data_->getItemTypeByServerId(ground->getServerId());
+      }
+      if (type) {
+        tile_has_hook_south |= type->hookSouth();
+        tile_has_hook_east |= type->hookEast();
       }
     }
 
@@ -178,12 +181,12 @@ void TileRenderer::queueTile(const Domain::Tile &tile, int tile_x, int tile_y,
 
       if (type) {
         // Conciseness fix: logical OR assignment
-        tile_has_hook_south |= type->hook_south;
-        tile_has_hook_east |= type->hook_east;
+        tile_has_hook_south |= type->hookSouth();
+        tile_has_hook_east |= type->hookEast();
 
         // Collect OnTop items for deferred rendering
         // Optimization: Cache the type with the item to avoid re-lookup
-        if (type->is_on_top) {
+        if (type->isOnTop()) {
           on_top_item_cache_.push_back({item.get(), type});
         }
       }
@@ -249,10 +252,17 @@ void TileRenderer::queueTile(const Domain::Tile &tile, int tile_x, int tile_y,
     // We already know type->is_on_top is true from the collection pass,
     // and we have the resolved type cached.
 
+    TileColor item_color = ground_color;
+    if (isItemSelected(item)) {
+      item_color.r *= 0.5f;
+      item_color.g *= 0.5f;
+      item_color.b *= 0.5f;
+    }
+
     // IMMEDIATE per-tile rendering (not deferred!)
     item_renderer_.queueWithColor(
         type, screen_x, screen_y, size, tile_x, tile_y, tile_z, anim_ticks,
-        missing_sprites, ground_color.r, ground_color.g, ground_color.b,
+        missing_sprites, item_color.r, item_color.g, item_color.b,
         item_alpha, nullptr, item, 0, tile_has_hook_south, tile_has_hook_east);
 
     // Check tooltip for OnTop items if needed (not covered by queueAll)

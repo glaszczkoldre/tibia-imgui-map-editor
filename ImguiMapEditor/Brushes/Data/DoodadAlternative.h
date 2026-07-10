@@ -5,8 +5,8 @@
  */
 
 #include <cstdint>
-#include <random>
 #include <vector>
+#include <random>
 
 
 namespace MapEditor::Brushes {
@@ -30,9 +30,9 @@ struct CompositeItem {
    * Tile offset within the composite.
    */
   struct TileOffset {
-    int dx = 0;
-    int dy = 0;
-    int dz = 0;
+    int32_t dx = 0;
+    int32_t dy = 0;
+    int32_t dz = 0;
     std::vector<SingleItem> items;
   };
 
@@ -66,21 +66,18 @@ public:
   bool isComposite() const { return !composites_.empty(); }
 
   /**
-   * Get total chance weight for selection.
-   */
-  uint32_t getTotalChance() const;
-
-  /**
    * Select a random single item using weighted selection.
+   * @param rng The random number generator
    * @return The selected item, or a default SingleItem if empty
    */
-  SingleItem selectRandomSingle() const;
+  SingleItem selectRandomSingle(std::mt19937 &rng) const;
 
   /**
    * Select a random composite using weighted selection.
+   * @param rng The random number generator
    * @return Pointer to the selected composite, or nullptr if empty
    */
-  const CompositeItem *selectRandomComposite() const;
+  const CompositeItem *selectRandomComposite(std::mt19937 &rng) const;
 
   const std::vector<SingleItem> &getSingleItems() const { return singles_; }
   const std::vector<CompositeItem> &getComposites() const {
@@ -90,7 +87,6 @@ public:
 private:
   std::vector<SingleItem> singles_;
   std::vector<CompositeItem> composites_;
-  mutable std::mt19937 rng_{std::random_device{}()};
 };
 
 } // namespace MapEditor::Brushes

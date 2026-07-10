@@ -5,8 +5,9 @@
 namespace MapEditor::Services::Preview {
 
 CreaturePreviewProvider::CreaturePreviewProvider(
-    const std::string &creatureName, BrushSettingsService *brushSettings)
-    : creatureName_(creatureName), brushSettings_(brushSettings) {
+    const std::string &creatureName, const BrushSettingsService *brushSettings,
+    uint8_t direction)
+    : creatureName_(creatureName), brushSettings_(brushSettings), direction_(direction) {
   buildPreview();
   spdlog::debug("[CreaturePreviewProvider] Created for creature: {}",
                 creatureName);
@@ -23,7 +24,8 @@ Domain::Position CreaturePreviewProvider::getAnchorPosition() const {
 const std::vector<PreviewTileData> &CreaturePreviewProvider::getTiles() const {
   // Check for changes in brush settings before returning
   if (checkSettingsChanged()) {
-    const_cast<CreaturePreviewProvider *>(this)->regenerate();
+    buildPreview();
+    needsRegen_ = false;
   }
   return tiles_;
 }
@@ -40,7 +42,7 @@ void CreaturePreviewProvider::regenerate() {
   needsRegen_ = false;
 }
 
-void CreaturePreviewProvider::buildPreview() {
+void CreaturePreviewProvider::buildPreview() const {
   tiles_.clear();
   bounds_ = PreviewBounds{};
 
@@ -48,18 +50,8 @@ void CreaturePreviewProvider::buildPreview() {
     return;
   }
 
-  // Get brush positions from settings service
-  std::vector<std::pair<int, int>> offsets;
-  if (brushSettings_) {
-    // Use center position (0,0,0) as reference to get relative offsets
-    auto positions = brushSettings_->getBrushPositions({0, 0, 0});
-    for (const auto &pos : positions) {
-      offsets.emplace_back(pos.x, pos.y);
-    }
-  } else {
-    // Default: single tile at cursor
-    offsets.emplace_back(0, 0);
-  }
+  // Creature brush is always 1x1
+  std::vector<std::pair<int, int>> offsets = {{0, 0}};
 
   // Cache offsets for change detection
   cachedOffsets_ = offsets;
@@ -68,6 +60,7 @@ void CreaturePreviewProvider::buildPreview() {
   for (const auto &[dx, dy] : offsets) {
     PreviewTileData tile(dx, dy, 0);
     tile.creature_name = creatureName_;
+    tile.creature_direction = direction_;
     tiles_.push_back(std::move(tile));
     bounds_.expand(dx, dy, 0);
   }
@@ -77,24 +70,6 @@ void CreaturePreviewProvider::buildPreview() {
 }
 
 bool CreaturePreviewProvider::checkSettingsChanged() const {
-  if (!brushSettings_) {
-    return false;
-  }
-
-  // Get current offsets
-  auto positions = brushSettings_->getBrushPositions({0, 0, 0});
-
-  if (positions.size() != cachedOffsets_.size()) {
-    return true;
-  }
-
-  for (size_t i = 0; i < positions.size(); ++i) {
-    if (positions[i].x != cachedOffsets_[i].first ||
-        positions[i].y != cachedOffsets_[i].second) {
-      return true;
-    }
-  }
-
   return false;
 }
 

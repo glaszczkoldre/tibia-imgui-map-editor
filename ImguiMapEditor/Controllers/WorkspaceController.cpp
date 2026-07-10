@@ -88,10 +88,15 @@ void WorkspaceController::bindSession(
 
     // Wire preview service
     brush_controller_.setPreviewService(&session->getPreviewService());
+    brush_controller_.refreshPreviewProvider();
 
     // Clear selection when brush is activated
     brush_controller_.setOnBrushActivatedCallback(
-        [session]() { session->getSelectionService().clear(); });
+        [this]() {
+          if (auto *activeSession = map_panel_.getEditorSession()) {
+            activeSession->getSelectionService().clear();
+          }
+        });
   }
 }
 
@@ -117,6 +122,8 @@ void WorkspaceController::unbindSession() {
 
   // Reset controllers that hold pointers to session/client data
   brush_controller_.initialize(nullptr, nullptr, nullptr);
+  brush_controller_.refreshPreviewProvider();
+  brush_controller_.setPreviewService(nullptr);
   // Note: tileset_widget_ keeps its registry reference; it just doesn't have
   // session-specific data to clear
 }

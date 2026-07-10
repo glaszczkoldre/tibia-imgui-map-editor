@@ -7,13 +7,15 @@
 #include <variant>
 #include <unordered_map>
 #include <optional>
+#include "../Brushes/Core/BrushId.h"
 #include "Position.h"
 
 namespace MapEditor {
 namespace Domain {
 
 // Forward declaration
-class ItemType;
+class ItemDefinition;
+using ItemType = ItemDefinition;
 
 // Position struct is now included directly
 
@@ -151,11 +153,15 @@ public:
     
     const ItemType* getType() const { return type_; }
     void setType(const ItemType* type) { type_ = type; }
+
+    Brushes::BrushId getOwnerBrushId() const { return owner_brush_id_; }
+    void setOwnerBrushId(Brushes::BrushId brushId) { owner_brush_id_ = brushId; }
     
     // ========== Container Support ==========
     
     void addContainerItem(std::unique_ptr<Item> item);
     const std::vector<std::unique_ptr<Item>>& getContainerItems() const { return container_items_; }
+    std::vector<std::unique_ptr<Item>>& getContainerItems() { return container_items_; }
     bool isContainer() const { return !container_items_.empty(); }
     
     // ========== Utility ==========
@@ -180,6 +186,7 @@ public:
     }
     
     std::unique_ptr<Item> clone() const;
+    bool hasSameState(const Item* other) const;
 
 private:
     void ensureExtended();  // Allocate extended attributes if needed
@@ -197,6 +204,7 @@ private:
     
     // Container items
     std::vector<std::unique_ptr<Item>> container_items_;
+    Brushes::BrushId owner_brush_id_ = Brushes::InvalidBrushId;
 };
 
 } // namespace Domain

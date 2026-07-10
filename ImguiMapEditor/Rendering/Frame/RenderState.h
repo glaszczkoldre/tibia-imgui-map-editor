@@ -3,8 +3,13 @@
 #include "Rendering/Overlays/OverlayCollector.h"
 #include "Rendering/Tile/ChunkSpriteCache.h"
 #include <memory>
+#include <span>
 
 namespace MapEditor {
+
+namespace Domain {
+struct Position;
+}
 
 namespace Services {
 class ClientDataService;
@@ -64,6 +69,11 @@ public:
    * Invalidate light at a specific position.
    */
   void invalidateLight(int32_t x, int32_t y);
+
+  /**
+   * Invalidate render data touched by concrete tile positions.
+   */
+  void invalidateTiles(std::span<const Domain::Position> positions);
 };
 
 } // namespace Rendering

@@ -9,6 +9,46 @@ namespace Domain {
 
 Tile::Tile(const Position &pos) : position_(pos) {}
 
+Brushes::BrushId Tile::getZoneBrushId(TileFlag flag) const {
+  switch (flag) {
+  case TileFlag::ProtectionZone:
+    return protection_zone_brush_id_;
+  case TileFlag::NoPvp:
+    return no_pvp_brush_id_;
+  case TileFlag::NoLogout:
+    return no_logout_brush_id_;
+  case TileFlag::PvpZone:
+    return pvp_zone_brush_id_;
+  case TileFlag::Refresh:
+    return refresh_brush_id_;
+  case TileFlag::None:
+    return Brushes::InvalidBrushId;
+  }
+  return Brushes::InvalidBrushId;
+}
+
+void Tile::setZoneBrushId(TileFlag flag, Brushes::BrushId brushId) {
+  switch (flag) {
+  case TileFlag::ProtectionZone:
+    protection_zone_brush_id_ = brushId;
+    break;
+  case TileFlag::NoPvp:
+    no_pvp_brush_id_ = brushId;
+    break;
+  case TileFlag::NoLogout:
+    no_logout_brush_id_ = brushId;
+    break;
+  case TileFlag::PvpZone:
+    pvp_zone_brush_id_ = brushId;
+    break;
+  case TileFlag::Refresh:
+    refresh_brush_id_ = brushId;
+    break;
+  case TileFlag::None:
+    break;
+  }
+}
+
 Tile::~Tile() = default;
 
 void Tile::setOpaqueData(std::unique_ptr<IO::InvalidZoneState> data) {
@@ -17,10 +57,12 @@ void Tile::setOpaqueData(std::unique_ptr<IO::InvalidZoneState> data) {
 
 void Tile::setGround(std::unique_ptr<Item> item) {
   ground_ = std::move(item);
+  ground_brush_id_ = ground_ ? ground_->getOwnerBrushId() : Brushes::InvalidBrushId;
   markDirty();
 }
 
 std::unique_ptr<Item> Tile::removeGround() {
+  ground_brush_id_ = Brushes::InvalidBrushId;
   markDirty();
   return std::move(ground_);
 }
@@ -43,16 +85,12 @@ void Tile::addItem(std::unique_ptr<Item> item) {
   if (!item)
     return;
 
-  // Check if this is a ground item (first item or has ground flag)
+  // Check if this is a ground item using the final resolved item definition.
   const ItemType *type = item->getType();
   bool is_ground = false;
-  uint16_t sid = item->getServerId();
 
   if (type) {
-    // Use OTB's ItemGroup::Ground for classification (like original RME)
-    // DAT's is_ground is a visual property, OTB's group is the server
-    // classification
-    is_ground = (type->group == ItemGroup::Ground);
+    is_ground = type->isGround();
   }
 
   if (is_ground) {
@@ -63,7 +101,7 @@ void Tile::addItem(std::unique_ptr<Item> item) {
     // - Items without always_on_bottom are appended at the end
     // - Items WITHOUT type info are placed at the beginning (bottom)
     //   since they are likely corrupted bottom items like borders
-    if (type && type->always_on_bottom) {
+    if (type && type->isOnBottom()) {
       // Find insertion point: iterate through existing always_on_bottom items
       // Insert BEFORE the first item with higher top_order or without
       // always_on_bottom
@@ -74,11 +112,11 @@ void Tile::addItem(std::unique_ptr<Item> item) {
           // No type info - stop here (items without type are at start)
           break;
         }
-        if (!it_type->always_on_bottom) {
+        if (!it_type->isOnBottom()) {
           // Reached non-bottom items - insert here
           break;
         }
-        if (type->top_order < it_type->top_order) {
+        if (type->alwaysOnTopOrder() < it_type->alwaysOnTopOrder()) {
           // Current item has lower priority - insert before
           break;
         }
@@ -94,6 +132,21 @@ void Tile::addItem(std::unique_ptr<Item> item) {
       items_.push_back(std::move(item));
     }
   }
+  markDirty();
+}
+
+void Tile::insertItem(size_t index, std::unique_ptr<Item> item) {
+  if (!item) {
+    return;
+  }
+
+  if (index >= items_.size()) {
+    items_.push_back(std::move(item));
+  } else {
+    items_.insert(items_.begin() + static_cast<ptrdiff_t>(index),
+                  std::move(item));
+  }
+
   markDirty();
 }
 
@@ -154,6 +207,20 @@ std::unique_ptr<Tile> Tile::clone() const {
 
   tile->flags_ = flags_;
   tile->house_id_ = house_id_;
+  tile->optional_border_ = optional_border_;
+  tile->ground_brush_id_ = ground_brush_id_;
+  tile->optional_border_brush_id_ = optional_border_brush_id_;
+  tile->spawn_brush_id_ = spawn_brush_id_;
+  tile->creature_brush_id_ = creature_brush_id_;
+  tile->house_brush_id_ = house_brush_id_;
+  tile->house_exit_brush_id_ = house_exit_brush_id_;
+  tile->house_exit_house_id_ = house_exit_house_id_;
+  tile->waypoint_brush_id_ = waypoint_brush_id_;
+  tile->protection_zone_brush_id_ = protection_zone_brush_id_;
+  tile->no_pvp_brush_id_ = no_pvp_brush_id_;
+  tile->no_logout_brush_id_ = no_logout_brush_id_;
+  tile->pvp_zone_brush_id_ = pvp_zone_brush_id_;
+  tile->refresh_brush_id_ = refresh_brush_id_;
 
   if (spawn_) {
     // Spawn is a simple struct, copy it
@@ -171,16 +238,67 @@ std::unique_ptr<Tile> Tile::clone() const {
   return tile;
 }
 
+bool Tile::hasSameState(const Tile* other) const {
+  if (!other) return false;
+  if (this == other) return true;
+
+  if (position_ != other->position_ ||
+      flags_ != other->flags_ ||
+      house_id_ != other->house_id_ ||
+      optional_border_ != other->optional_border_ ||
+      ground_brush_id_ != other->ground_brush_id_ ||
+      optional_border_brush_id_ != other->optional_border_brush_id_ ||
+      spawn_brush_id_ != other->spawn_brush_id_ ||
+      creature_brush_id_ != other->creature_brush_id_ ||
+      house_brush_id_ != other->house_brush_id_ ||
+      house_exit_brush_id_ != other->house_exit_brush_id_ ||
+      house_exit_house_id_ != other->house_exit_house_id_ ||
+      waypoint_brush_id_ != other->waypoint_brush_id_ ||
+      protection_zone_brush_id_ != other->protection_zone_brush_id_ ||
+      no_pvp_brush_id_ != other->no_pvp_brush_id_ ||
+      no_logout_brush_id_ != other->no_logout_brush_id_ ||
+      pvp_zone_brush_id_ != other->pvp_zone_brush_id_ ||
+      refresh_brush_id_ != other->refresh_brush_id_) {
+    return false;
+  }
+
+  // Ground item comparison
+  if (ground_ || other->ground_) {
+    if (!ground_ || !other->ground_) return false;
+    if (!ground_->hasSameState(other->ground_.get())) return false;
+  }
+
+  // Stacked items comparison
+  if (items_.size() != other->items_.size()) return false;
+  for (size_t i = 0; i < items_.size(); ++i) {
+    if (!items_[i]->hasSameState(other->items_[i].get())) return false;
+  }
+
+  // Spawn comparison
+  if (spawn_ || other->spawn_) {
+    if (!spawn_ || !other->spawn_) return false;
+    if (spawn_->radius != other->spawn_->radius) return false;
+  }
+
+  // Creature comparison
+  if (creature_ || other->creature_) {
+    if (!creature_ || !other->creature_) return false;
+    if (creature_->name != other->creature_->name) return false;
+  }
+
+  return true;
+}
+
 bool Tile::hasHookSouth() const {
   // Check all items (including ground) for hook_south property
   if (ground_) {
     const ItemType *type = ground_->getType();
-    if (type && type->hook_south)
+    if (type && type->hookSouth())
       return true;
   }
   for (const auto &item : items_) {
     const ItemType *type = item->getType();
-    if (type && type->hook_south)
+    if (type && type->hookSouth())
       return true;
   }
   return false;
@@ -190,12 +308,12 @@ bool Tile::hasHookEast() const {
   // Check all items (including ground) for hook_east property
   if (ground_) {
     const ItemType *type = ground_->getType();
-    if (type && type->hook_east)
+    if (type && type->hookEast())
       return true;
   }
   for (const auto &item : items_) {
     const ItemType *type = item->getType();
-    if (type && type->hook_east)
+    if (type && type->hookEast())
       return true;
   }
   return false;
@@ -205,6 +323,9 @@ void Tile::setSpawn(std::unique_ptr<Spawn> spawn) {
   bool had_spawn = (spawn_ != nullptr);
   spawn_ = std::move(spawn);
   bool has_spawn = (spawn_ != nullptr);
+  if (!has_spawn) {
+    spawn_brush_id_ = Brushes::InvalidBrushId;
+  }
 
   if (parent_chunk_) {
     parent_chunk_->invalidateSpawns();
@@ -222,6 +343,7 @@ std::unique_ptr<Spawn> Tile::removeSpawn() {
     parent_chunk_->invalidateSpawns();
     parent_chunk_->updateSpawnCount(-1);
   }
+  spawn_brush_id_ = Brushes::InvalidBrushId;
   return std::move(spawn_);
 }
 
@@ -229,6 +351,9 @@ void Tile::setCreature(std::unique_ptr<Creature> creature) {
   bool had_creature = (creature_ != nullptr);
   creature_ = std::move(creature);
   bool has_creature = (creature_ != nullptr);
+  if (!has_creature) {
+    creature_brush_id_ = Brushes::InvalidBrushId;
+  }
 
   if (parent_chunk_) {
     // Only update count if existence changed

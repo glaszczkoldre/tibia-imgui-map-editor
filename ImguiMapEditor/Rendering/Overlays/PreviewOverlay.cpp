@@ -2,6 +2,10 @@
 #include "OutfitOverlay.h"
 #include "OverlaySpriteCache.h"
 #include "Services/SpriteManager.h"
+#include "Domain/ChunkedMap.h"
+#include "Domain/Tile.h"
+#include "Domain/Item.h"
+#include "Domain/ItemType.h"
 #include <algorithm>
 #include <cmath>
 
@@ -13,7 +17,8 @@ void PreviewOverlay::render(
     const std::vector<Services::Preview::PreviewTileData> &tiles,
     const Domain::Position &anchorWorldPos, const glm::vec2 &cameraPos,
     const glm::vec2 &viewportPos, const glm::vec2 &viewportSize, float zoom,
-    Services::Preview::PreviewStyle style) {
+    Services::Preview::PreviewStyle style,
+    const Domain::ChunkedMap *map) {
 
   if (!drawList || !clientData || !spriteCache || tiles.empty()) {
     return;
@@ -21,6 +26,19 @@ void PreviewOverlay::render(
 
   ImU32 tintColor = getStyleColor(style);
   float tileSizePx = Config::Rendering::TILE_SIZE * zoom;
+  const bool drawOutlineBorder = style == Services::Preview::PreviewStyle::Outline;
+  const float outlineThickness = std::max(1.0f, zoom * 1.5f);
+
+  const auto hasRelativeTile =
+      [&tiles](int x, int y, int z) {
+        return std::any_of(
+            tiles.begin(), tiles.end(),
+            [x, y, z](const Services::Preview::PreviewTileData &candidate) {
+              return candidate.relativePosition.x == x &&
+                     candidate.relativePosition.y == y &&
+                     candidate.relativePosition.z == z;
+            });
+      };
 
   for (const auto &tile : tiles) {
     // Calculate world position from anchor + relative
@@ -44,7 +62,35 @@ void PreviewOverlay::render(
     }
 
     renderTile(drawList, clientData, spriteManager, spriteCache, tile, worldPos,
-               cameraPos, viewportPos, viewportSize, zoom, tintColor);
+               cameraPos, viewportPos, viewportSize, zoom, tintColor, map);
+
+    if (!drawOutlineBorder) {
+      continue;
+    }
+
+    const auto &relativePosition = tile.relativePosition;
+    const ImVec2 topLeft(screenPos.x, screenPos.y);
+    const ImVec2 topRight(screenPos.x + tileSizePx, screenPos.y);
+    const ImVec2 bottomLeft(screenPos.x, screenPos.y + tileSizePx);
+    const ImVec2 bottomRight(screenPos.x + tileSizePx,
+                             screenPos.y + tileSizePx);
+
+    if (!hasRelativeTile(relativePosition.x, relativePosition.y - 1,
+                         relativePosition.z)) {
+      drawList->AddLine(topLeft, topRight, tintColor, outlineThickness);
+    }
+    if (!hasRelativeTile(relativePosition.x + 1, relativePosition.y,
+                         relativePosition.z)) {
+      drawList->AddLine(topRight, bottomRight, tintColor, outlineThickness);
+    }
+    if (!hasRelativeTile(relativePosition.x, relativePosition.y + 1,
+                         relativePosition.z)) {
+      drawList->AddLine(bottomLeft, bottomRight, tintColor, outlineThickness);
+    }
+    if (!hasRelativeTile(relativePosition.x - 1, relativePosition.y,
+                         relativePosition.z)) {
+      drawList->AddLine(topLeft, bottomLeft, tintColor, outlineThickness);
+    }
   }
 }
 
@@ -55,12 +101,13 @@ void PreviewOverlay::renderCulled(
     const Domain::Position &anchorWorldPos,
     const Services::Preview::PreviewBounds &bounds, const glm::vec2 &cameraPos,
     const glm::vec2 &viewportPos, const glm::vec2 &viewportSize, float zoom,
-    Services::Preview::PreviewStyle style) {
+    Services::Preview::PreviewStyle style,
+    const Domain::ChunkedMap *map) {
 
   // For now, just use regular render with viewport culling
   // Bounds parameter can be used for additional optimization later
   render(drawList, clientData, spriteManager, spriteCache, tiles,
-         anchorWorldPos, cameraPos, viewportPos, viewportSize, zoom, style);
+         anchorWorldPos, cameraPos, viewportPos, viewportSize, zoom, style, map);
 }
 
 void PreviewOverlay::renderTile(
@@ -69,7 +116,8 @@ void PreviewOverlay::renderTile(
     const Services::Preview::PreviewTileData &tile,
     const Domain::Position &worldPos, const glm::vec2 &cameraPos,
     const glm::vec2 &viewportPos, const glm::vec2 &viewportSize, float zoom,
-    ImU32 tintColor) {
+    ImU32 tintColor,
+    const Domain::ChunkedMap *map) {
 
   float accumulatedElevation = 0.0f;
   float tileSizePx = Config::Rendering::TILE_SIZE * zoom;
@@ -78,7 +126,7 @@ void PreviewOverlay::renderTile(
   for (const auto &item : tile.items) {
     renderItem(drawList, clientData, spriteCache, item, worldPos,
                accumulatedElevation, cameraPos, viewportPos, viewportSize, zoom,
-               tintColor);
+               tintColor, map);
   }
 
   // Render creature if present - lookup outfit from CreatureType by name
@@ -94,8 +142,8 @@ void PreviewOverlay::renderTile(
       // Use static OutfitOverlay instance (DRY - same as SpawnLabelOverlay.cpp)
       static OutfitOverlay s_outfit_renderer;
       s_outfit_renderer.render(drawList, creatureType->outfit, clientData,
-                               spriteManager, spriteCache, screenPos, zoom, 2,
-                               0, tintColor); // direction 2 = South, frame 0
+                               spriteManager, spriteCache, screenPos, zoom,
+                               tile.creature_direction, 0, tintColor);
     }
   }
 
@@ -164,7 +212,8 @@ void PreviewOverlay::renderItem(
     const Services::Preview::PreviewItemData &item,
     const Domain::Position &worldPos, float &accumulatedElevation,
     const glm::vec2 &cameraPos, const glm::vec2 &viewportPos,
-    const glm::vec2 &viewportSize, float zoom, ImU32 tintColor) {
+    const glm::vec2 &viewportSize, float zoom, ImU32 tintColor,
+    const Domain::ChunkedMap *map) {
 
   if (item.itemId == 0)
     return;
@@ -187,7 +236,7 @@ void PreviewOverlay::renderItem(
   int fluidSubtype = -1;
   bool isFluid = itemType->isFluidContainer() || itemType->isSplash();
 
-  if (itemType->is_stackable) {
+  if (itemType->isStackable()) {
     int count = item.subtype;
     if (count <= 1)
       subtypeIndex = 0;
@@ -253,6 +302,47 @@ void PreviewOverlay::renderItem(
     patternX = worldPos.x % pat_x;
     patternY = worldPos.y % pat_y;
     patternZ = worldPos.z % pat_z;
+
+    if (itemType->isHangable()) {
+      bool tile_has_hook_south = false;
+      bool tile_has_hook_east = false;
+      if (map) {
+        if (const auto *mapTile = map->getTile(worldPos)) {
+          if (mapTile->hasGround()) {
+            if (const auto *ground = mapTile->getGround()) {
+              const auto *type = ground->getType();
+              if (!type) {
+                type = clientData->getItemTypeByServerId(ground->getServerId());
+              }
+              if (type) {
+                tile_has_hook_south |= type->hookSouth();
+                tile_has_hook_east |= type->hookEast();
+              }
+            }
+          }
+          for (const auto &tileItem : mapTile->getItems()) {
+            if (tileItem) {
+              const auto *type = tileItem->getType();
+              if (!type) {
+                type = clientData->getItemTypeByServerId(tileItem->getServerId());
+              }
+              if (type) {
+                tile_has_hook_south |= type->hookSouth();
+                tile_has_hook_east |= type->hookEast();
+              }
+            }
+          }
+        }
+      }
+
+      if (tile_has_hook_south) {
+        patternX = 1;
+      } else if (tile_has_hook_east) {
+        patternX = 2;
+      } else {
+        patternX = 0;
+      }
+    }
   }
 
   float elevOffset = accumulatedElevation + item.elevationOffset;
@@ -328,7 +418,7 @@ ImU32 PreviewOverlay::getStyleColor(Services::Preview::PreviewStyle style) {
     return IM_COL32(180, 200, 255, 153); // ~60% alpha
 
   case Services::Preview::PreviewStyle::Outline:
-    return IM_COL32(255, 255, 0, 200); // Yellow outline
+    return IM_COL32(240, 245, 255, 180); // Soft clean light white outline
 
   case Services::Preview::PreviewStyle::Tinted:
     return IM_COL32(160, 255, 160, 180); // Green tint

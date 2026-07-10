@@ -26,19 +26,19 @@ bool FloorVisibilityCalculator::tileLimitsFloorsView(const Domain::Tile* tile, b
     if (!ground_type) return false;
     
     // Items with isDontHide never block view
-    if (ground_type->is_dont_hide) return false;
+    if (ground_type->isDontHide()) return false;
     
     // Ground tiles block view
-    if (ground_type->is_ground) return true;
+    if (ground_type->isGround()) return true;
     
     // isOnBottom items (walls) block view
-    if (ground_type->is_on_bottom) {
+    if (ground_type->isOnBottom()) {
         if (is_free_view) {
             // Free view: any wall blocks
             return true;
         } else {
             // Player view: only walls that block projectiles
-            return ground_type->blocks_projectile;
+            return ground_type->blocksProjectile();
         }
     }
     
@@ -47,15 +47,15 @@ bool FloorVisibilityCalculator::tileLimitsFloorsView(const Domain::Tile* tile, b
         const Domain::ItemType* item_type = getItemType(item.get());
         if (!item_type) continue;
         
-        if (item_type->is_dont_hide) continue;
+        if (item_type->isDontHide()) continue;
         
-        if (item_type->is_ground) return true;
+        if (item_type->isGround()) return true;
         
-        if (item_type->is_on_bottom) {
+        if (item_type->isOnBottom()) {
             if (is_free_view) {
                 return true;
             } else {
-                if (item_type->blocks_projectile) return true;
+                if (item_type->blocksProjectile()) return true;
             }
         }
     }
@@ -70,14 +70,14 @@ bool FloorVisibilityCalculator::isLookPossible(const Domain::Tile* tile) const {
     const Domain::Item* ground = tile->getGround();
     if (ground) {
         const Domain::ItemType* ground_type = getItemType(ground);
-        if (ground_type && ground_type->blocks_projectile) {
+        if (ground_type && ground_type->blocksProjectile()) {
             return false;
         }
     }
     
     for (const auto& item : tile->getItems()) {
         const Domain::ItemType* item_type = getItemType(item.get());
-        if (item_type && item_type->blocks_projectile) {
+        if (item_type && item_type->blocksProjectile()) {
             return false;
         }
     }

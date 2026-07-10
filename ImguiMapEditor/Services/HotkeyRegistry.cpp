@@ -86,6 +86,19 @@ std::string HotkeyRegistry::formatShortcut(const Domain::HotkeyBinding& binding)
     return oss.str();
 }
 
+namespace {
+
+void mergeMissingBindings(HotkeyRegistry &registry,
+                          const HotkeyRegistry &defaults) {
+    for (const auto &[action_id, binding] : defaults.getAllBindings()) {
+        if (!registry.findByAction(action_id)) {
+            registry.registerBinding(binding);
+        }
+    }
+}
+
+} // namespace
+
 HotkeyRegistry HotkeyRegistry::createDefaults() {
     HotkeyRegistry registry;
     using namespace Domain::Actions;
@@ -137,6 +150,31 @@ HotkeyRegistry HotkeyRegistry::createDefaults() {
     registry.registerBinding({FLOOR_UP, GLFW_KEY_PAGE_UP, 0, "navigation"});
     registry.registerBinding({FLOOR_DOWN, GLFW_KEY_PAGE_DOWN, 0, "navigation"});
 
+    // Brush actions
+    registry.registerBinding({BRUSH_REFRESH_CURRENT, GLFW_KEY_SPACE, GLFW_MOD_CONTROL, "brush"});
+    registry.registerBinding({BRUSH_TOGGLE_SELECTION_TOOL, GLFW_KEY_SPACE, 0, "brush"});
+    registry.registerBinding({BRUSH_RESTORE_LAST, GLFW_KEY_Q, 0, "brush"});
+    registry.registerBinding({BRUSH_VARIATION_PREV, GLFW_KEY_Z, 0, "brush"});
+    registry.registerBinding({BRUSH_VARIATION_NEXT, GLFW_KEY_X, 0, "brush"});
+    registry.registerBinding({ROTATE_ITEM, GLFW_KEY_R, 0, "brush"});
+    registry.registerBinding({TOGGLE_AUTOBORDER, GLFW_KEY_A, 0, "brush"});
+
+    for (int slot = 0; slot < 10; ++slot) {
+        const auto slot_suffix = std::to_string(slot);
+        registry.registerBinding({
+            "BRUSH_SLOT_" + slot_suffix,
+            GLFW_KEY_0 + slot,
+            0,
+            "brush",
+        });
+        registry.registerBinding({
+            "BRUSH_STORE_SLOT_" + slot_suffix,
+            GLFW_KEY_0 + slot,
+            GLFW_MOD_CONTROL,
+            "brush",
+        });
+    }
+
     // Selection
     // SELECT_ALL intentionally removed per user feedback
     registry.registerBinding({DESELECT, GLFW_KEY_ESCAPE, 0, "selection"});
@@ -158,7 +196,7 @@ HotkeyRegistry HotkeyRegistry::loadOrCreateDefaults(const std::vector<std::strin
         if (std::filesystem::exists(path)) {
             HotkeyRegistry registry;
             if (IO::HotkeyJsonReader::load(path, registry.bindings_)) {
-                // IO::HotkeyJsonReader::load handles its own logging
+                mergeMissingBindings(registry, createDefaults());
                 return registry;
             }
         }

@@ -71,7 +71,7 @@ void ItemRenderer::queueWithColor(
   // Stackable/Fluid Subtype Logic
   int subtype_index = -1;
   if (item_inst) {
-    if (item_type->is_stackable) {
+    if (item_type->isStackable()) {
       int count = item_inst->getSubtype();
       if (count <= 1)
         subtype_index = 0;
@@ -150,7 +150,7 @@ void ItemRenderer::queueWithColor(
   int pattern_y = tile_y % pat_y;
   int pattern_z = tile_z % pat_z;
 
-  if (item_type->is_hangable) {
+  if (item_type->isHangable()) {
     // RME checks TILE properties (wall items on the tile), not item type flags.
     // pattern_x determines which sprite variant:
     //   0 = free-standing (no wall to hang on)

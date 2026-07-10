@@ -158,7 +158,7 @@ bool writeItem(NodeFileWriteHandle& writer, const Domain::Item* item, OtbmVersio
     const auto* item_type = item->getType();
     uint16_t subtype = item->getCount();
     
-    bool is_stackable = item_type && item_type->is_stackable;
+    bool is_stackable = item_type && item_type->isStackable();
     bool is_splash = item_type && item_type->isSplash();
     bool is_fluid = item_type && item_type->isFluidContainer();
     bool type_unknown = (item_type == nullptr && subtype > 0);

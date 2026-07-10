@@ -9,6 +9,7 @@
 namespace MapEditor {
 
 namespace Services {
+class BrushSettingsService;
 class HotkeyRegistry;
 class OtbmSettings;
 class SecondaryClientData;
@@ -74,6 +75,10 @@ public:
     otbm_settings_ = settings;
   }
 
+  void setBrushSettings(Services::BrushSettingsService *settings) {
+    brush_settings_ = settings;
+  }
+
   void setThemePtr(ThemeType* theme_ptr) {
     theme_ptr_ = theme_ptr;
   }
@@ -98,6 +103,7 @@ private:
 
   // OTBM settings
   Services::OtbmSettings *otbm_settings_ = nullptr;
+  Services::BrushSettingsService *brush_settings_ = nullptr;
   bool otbm_destructive_ack_ = false;
   int selected_otbm_type_ = 0;
   bool otbm_tab_active_ = false;

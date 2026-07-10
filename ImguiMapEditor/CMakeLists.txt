@@ -96,6 +96,7 @@ set(DOMAIN_SOURCES
     Domain/MapInstance.cpp
     Domain/ChunkedMap.cpp
     Domain/CopyBuffer.cpp
+    Domain/ItemDefinitionStore.cpp
     Domain/Selection/SelectionBucket.cpp
     Domain/History/TileSnapshot.cpp
     Domain/History/TileSnapshotCodec.cpp
@@ -206,6 +207,8 @@ set(IO_SOURCES
     IO/Sec/SecItemParser.cpp
     # Phase 0: Brush XML Parser
     IO/BrushXmlReader.cpp
+    IO/DoodadXmlHelper.cpp
+    IO/DoodadXmlHelper.h
 )
 
 set(SERVICES_SOURCES
@@ -217,6 +220,7 @@ set(SERVICES_SOURCES
     Services/ClientSignatureDetector.cpp
     Services/ClientAssetDetector.cpp
     Services/ClientDataService.cpp
+    Services/ItemDefinitionResolver.cpp
     Services/SpriteManager.cpp
     Services/SpriteAsyncLoader.cpp
     Services/SpriteLoadQueue.cpp
@@ -224,6 +228,9 @@ set(SERVICES_SOURCES
     Services/CreatureSpriteService.cpp
     Services/RecentLocationsService.cpp
     Services/ViewSettings.cpp
+    Services/Autoborder/AutoborderEngine.cpp
+    Services/Autoborder/PlannedMutation.cpp
+    Services/Autoborder/TileDiff.cpp
     Services/ClientVersionValidator.cpp
     Services/SecondaryClientData.cpp
     Services/CreatureSimulator.cpp
@@ -235,9 +242,12 @@ set(SERVICES_SOURCES
     Services/Preview/PastePreviewProvider.cpp
     Services/Preview/DragPreviewProvider.cpp
     Services/Preview/BrushPreviewFactory.cpp
+    Services/Preview/AutoborderBrushPreviewProvider.cpp
     Services/Preview/CreaturePreviewProvider.cpp
+    Services/Preview/DoodadBrushPreviewProvider.cpp
     Services/Preview/SpawnPreviewProvider.cpp
     Services/Preview/ZoneBrushPreviewProvider.cpp
+    Services/Preview/MultiItemBrushPreviewProvider.cpp
     Services/Map/MapLoadingService.cpp
     Services/Map/MapSavingService.cpp
     Services/Map/MapCleanupService.cpp
@@ -283,7 +293,9 @@ set(UI_SOURCES
     UI/Map/SelectionMenu.cpp
     UI/Panels/NewMapPanel.cpp
     UI/Panels/MapPropertiesPanel.cpp
-    UI/Panels/BrushSizePanel.cpp
+    UI/Panels/BrushSettingsPanel.cpp
+    UI/Utils/IconTextureCache.cpp
+    UI/Helpers/BrushToolOptionsModel.cpp
     UI/PreferencesDialog.cpp
     UI/Ribbon/Panels/BrushesPanel.cpp
     UI/Ribbon/Panels/EditPanel.cpp
@@ -305,6 +317,8 @@ set(UI_SOURCES
     UI/Windows/MinimapWindow.cpp
     UI/Windows/PaletteWindow.cpp
     UI/Windows/PaletteWindowManager.cpp
+    UI/Utils/BrushPreviewRenderer.cpp
+    UI/Utils/BrushPreviewResolver.cpp
     UI/Utils/PreviewUtils.cpp
 )
 
@@ -356,14 +370,32 @@ set(BRUSHES_SOURCES
     Brushes/BrushSystem.cpp
     Brushes/BrushRegistry.cpp
     Brushes/BrushController.cpp
-    Brushes/Behaviors/ItemPlacement.cpp
+    Brushes/BrushResolutionOps.cpp
+    Brushes/BrushDoorOps.cpp
+    Brushes/BrushStroke.cpp
+    Brushes/BrushVariationOps.cpp
     Brushes/Behaviors/WeightedSelection.cpp
     Brushes/Types/RawBrush.cpp
+    Brushes/Types/BrushUtils.cpp
+    Brushes/Types/GroundBrush.cpp
+    Brushes/Types/GroundBorderUpdater.cpp
+    Brushes/Types/DoodadBrush.cpp
+    Brushes/Types/DoodadPlacementPlanner.cpp
+    Brushes/Types/DoodadRedoBorderPlanner.cpp
+    Brushes/Types/WallBrush.cpp
+    Brushes/Types/WallBrushDoor.cpp
+    Brushes/Types/WallBrushPreview.cpp
+    Brushes/Types/WallDecorationBrush.cpp
+    Brushes/Types/TableBrush.cpp
+    Brushes/Types/CarpetBrush.cpp
+    Brushes/Types/DoorBrush.cpp
     Brushes/Types/CreatureBrush.cpp
     Brushes/Types/SpawnBrush.cpp
     Brushes/Types/FlagBrush.cpp
     Brushes/Types/EraserBrush.cpp
     Brushes/Types/HouseBrush.cpp
+    Brushes/Types/HouseExitBrush.cpp
+    Brushes/Types/OptionalBorderBrush.cpp
     Brushes/Types/WaypointBrush.cpp
     # Phase 0: Enumerations
     Brushes/Enums/BrushEnums.cpp
@@ -394,7 +426,29 @@ add_executable(${PROJECT_NAME}
     ${IMGUI_SOURCES}
 )
 
+set(COMMON_TEST_SOURCES
+    ${DOMAIN_SOURCES}
+    ${RENDERING_SOURCES}
+    ${IO_SOURCES}
+    ${SERVICES_SOURCES}
+    ${UI_SOURCES}
+    ${PLATFORM_SOURCES}
+    ${APPLICATION_SOURCES}
+    ${CONTROLLER_SOURCES}
+    ${PRESENTATION_SOURCES}
+    ${RIBBON_SOURCES}
+    ${BRUSHES_SOURCES}
+    Application.cpp
+    ${IMGUI_SOURCES}
+)
+
+set(BRUSH_SMOKE_SOURCES
+    ${COMMON_TEST_SOURCES}
+    Tests/BrushSmoke.cpp
+)
+
 set_target_properties(${PROJECT_NAME} PROPERTIES UNITY_BUILD ${TME_UNITY_BUILD})
+set_target_properties(${PROJECT_NAME} PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "$<TARGET_FILE_DIR:${PROJECT_NAME}>")
 
 # Include directories
 target_include_directories(${PROJECT_NAME} PRIVATE
@@ -408,45 +462,253 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${Stb_INCLUDE_DIR}
 )
 
-# Link libraries
-target_link_libraries(${PROJECT_NAME} PRIVATE
-    glad::glad
-    glfw
-    glm::glm
-    spdlog::spdlog
-    nlohmann_json::nlohmann_json
-    pugixml::pugixml
-    lz4::lz4
-    Boost::boost
-    fmt::fmt
-    ZLIB::ZLIB
-    # stb is header-only - included via find_package(stb) which sets up include paths
+add_executable(BrushSmoke
+    ${BRUSH_SMOKE_SOURCES}
 )
 
-# Link nfd (vcpkg uses nfd::nfd, local build uses nfd)
-if(NFD_LOCAL)
-    target_link_libraries(${PROJECT_NAME} PRIVATE nfd)
-else()
-    target_link_libraries(${PROJECT_NAME} PRIVATE nfd::nfd)
-endif()
+add_executable(BrushSettingsTests
+    ${COMMON_TEST_SOURCES}
+    Tests/BrushSettingsTests.cpp
+)
 
-# Platform-specific settings
-if(WIN32)
-    target_compile_definitions(${PROJECT_NAME} PRIVATE
-        NOMINMAX
-        WIN32_LEAN_AND_MEAN
+add_executable(AutoborderSmoke
+    ${DOMAIN_SOURCES}
+    ${RENDERING_SOURCES}
+    ${IO_SOURCES}
+    ${SERVICES_SOURCES}
+    ${UI_SOURCES}
+    ${PLATFORM_SOURCES}
+    ${APPLICATION_SOURCES}
+    ${CONTROLLER_SOURCES}
+    ${PRESENTATION_SOURCES}
+    ${RIBBON_SOURCES}
+    ${BRUSHES_SOURCES}
+    Application.cpp
+    Tests/AutoborderSmoke.cpp
+    ${IMGUI_SOURCES}
+)
+
+add_executable(DoodadPreviewSmoke
+    ${DOMAIN_SOURCES}
+    ${RENDERING_SOURCES}
+    ${IO_SOURCES}
+    ${SERVICES_SOURCES}
+    ${UI_SOURCES}
+    ${PLATFORM_SOURCES}
+    ${APPLICATION_SOURCES}
+    ${CONTROLLER_SOURCES}
+    ${PRESENTATION_SOURCES}
+    ${RIBBON_SOURCES}
+    ${BRUSHES_SOURCES}
+    Application.cpp
+    Tests/DoodadPreviewSmoke.cpp
+    ${IMGUI_SOURCES}
+)
+
+add_executable(CarpetSmoke
+    ${DOMAIN_SOURCES}
+    ${RENDERING_SOURCES}
+    ${IO_SOURCES}
+    ${SERVICES_SOURCES}
+    ${UI_SOURCES}
+    ${PLATFORM_SOURCES}
+    ${APPLICATION_SOURCES}
+    ${CONTROLLER_SOURCES}
+    ${PRESENTATION_SOURCES}
+    ${RIBBON_SOURCES}
+    ${BRUSHES_SOURCES}
+    Application.cpp
+    Tests/CarpetSmoke.cpp
+    ${IMGUI_SOURCES}
+)
+
+add_executable(WallBrushSmoke
+    ${DOMAIN_SOURCES}
+    ${RENDERING_SOURCES}
+    ${IO_SOURCES}
+    ${SERVICES_SOURCES}
+    ${UI_SOURCES}
+    ${PLATFORM_SOURCES}
+    ${APPLICATION_SOURCES}
+    ${CONTROLLER_SOURCES}
+    ${PRESENTATION_SOURCES}
+    ${RIBBON_SOURCES}
+    ${BRUSHES_SOURCES}
+    Application.cpp
+    Tests/WallBrushSmoke.cpp
+    ${IMGUI_SOURCES}
+)
+
+add_executable(DoodadXmlSmoke
+    ${DOMAIN_SOURCES}
+    ${RENDERING_SOURCES}
+    ${IO_SOURCES}
+    ${SERVICES_SOURCES}
+    ${UI_SOURCES}
+    ${PLATFORM_SOURCES}
+    ${APPLICATION_SOURCES}
+    ${CONTROLLER_SOURCES}
+    ${PRESENTATION_SOURCES}
+    ${RIBBON_SOURCES}
+    ${BRUSHES_SOURCES}
+    Application.cpp
+    Tests/DoodadXmlSmoke.cpp
+    ${IMGUI_SOURCES}
+)
+
+add_executable(DoodadPlanningSmoke
+    ${DOMAIN_SOURCES}
+    ${RENDERING_SOURCES}
+    ${IO_SOURCES}
+    ${SERVICES_SOURCES}
+    ${UI_SOURCES}
+    ${PLATFORM_SOURCES}
+    ${APPLICATION_SOURCES}
+    ${CONTROLLER_SOURCES}
+    ${PRESENTATION_SOURCES}
+    ${RIBBON_SOURCES}
+    ${BRUSHES_SOURCES}
+    Application.cpp
+    Tests/DoodadPlanningSmoke.cpp
+    ${IMGUI_SOURCES}
+)
+
+add_executable(DoodadBorderSmoke
+    ${DOMAIN_SOURCES}
+    ${RENDERING_SOURCES}
+    ${IO_SOURCES}
+    ${SERVICES_SOURCES}
+    ${UI_SOURCES}
+    ${PLATFORM_SOURCES}
+    ${APPLICATION_SOURCES}
+    ${CONTROLLER_SOURCES}
+    ${PRESENTATION_SOURCES}
+    ${RIBBON_SOURCES}
+    ${BRUSHES_SOURCES}
+    Application.cpp
+    Tests/DoodadBorderSmoke.cpp
+    ${IMGUI_SOURCES}
+)
+
+add_executable(DoodadContextSmoke
+    ${DOMAIN_SOURCES}
+    ${RENDERING_SOURCES}
+    ${IO_SOURCES}
+    ${SERVICES_SOURCES}
+    ${UI_SOURCES}
+    ${PLATFORM_SOURCES}
+    ${APPLICATION_SOURCES}
+    ${CONTROLLER_SOURCES}
+    ${PRESENTATION_SOURCES}
+    ${RIBBON_SOURCES}
+    ${BRUSHES_SOURCES}
+    Application.cpp
+    Tests/DoodadContextSmoke.cpp
+    ${IMGUI_SOURCES}
+)
+
+add_executable(ItemDatabaseResolverTest
+    ${DOMAIN_SOURCES}
+    ${RENDERING_SOURCES}
+    ${IO_SOURCES}
+    ${SERVICES_SOURCES}
+    ${UI_SOURCES}
+    ${PLATFORM_SOURCES}
+    ${APPLICATION_SOURCES}
+    ${CONTROLLER_SOURCES}
+    ${PRESENTATION_SOURCES}
+    ${RIBBON_SOURCES}
+    ${BRUSHES_SOURCES}
+    Application.cpp
+    Tests/ItemDatabaseResolverTest.cpp
+    ${IMGUI_SOURCES}
+)
+
+function(configure_tme_target target_name)
+    target_include_directories(${target_name} PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/..
+        ${IMGUI_DIR}
+        ${IMGUI_DIR}/backends
+        ${CMAKE_CURRENT_SOURCE_DIR}/ext/fontawesome6
+        ${CMAKE_CURRENT_SOURCE_DIR}/ext/imguinotify
+        ${CMAKE_CURRENT_SOURCE_DIR}/ext/stb
+        ${Stb_INCLUDE_DIR}
     )
-    # Hide console window in release builds (disabled - using main() not WinMain)
-    # if(CMAKE_BUILD_TYPE STREQUAL "Release")
-    #     set_target_properties(${PROJECT_NAME} PROPERTIES
-    #         WIN32_EXECUTABLE TRUE
-    #     )
-    # endif()
-endif()
 
-if(MSVC)
-    target_compile_options(${PROJECT_NAME} PRIVATE /FS)
-endif()
+    target_link_libraries(${target_name} PRIVATE
+        glad::glad
+        glfw
+        glm::glm
+        spdlog::spdlog
+        nlohmann_json::nlohmann_json
+        pugixml::pugixml
+        lz4::lz4
+        Boost::boost
+        fmt::fmt
+        ZLIB::ZLIB
+    )
+
+    if(NFD_LOCAL)
+        target_link_libraries(${target_name} PRIVATE nfd)
+    else()
+        target_link_libraries(${target_name} PRIVATE nfd::nfd)
+    endif()
+
+    if(WIN32)
+        target_compile_definitions(${target_name} PRIVATE
+            NOMINMAX
+            WIN32_LEAN_AND_MEAN
+        )
+    endif()
+
+    if(MSVC)
+        target_compile_options(${target_name} PRIVATE /FS /W0)
+    endif()
+endfunction()
+
+configure_tme_target(${PROJECT_NAME})
+configure_tme_target(BrushSmoke)
+configure_tme_target(AutoborderSmoke)
+configure_tme_target(DoodadPreviewSmoke)
+configure_tme_target(DoodadXmlSmoke)
+configure_tme_target(DoodadPlanningSmoke)
+configure_tme_target(DoodadBorderSmoke)
+configure_tme_target(DoodadContextSmoke)
+configure_tme_target(CarpetSmoke)
+configure_tme_target(WallBrushSmoke)
+configure_tme_target(ItemDatabaseResolverTest)
+configure_tme_target(BrushSettingsTests)
+target_compile_definitions(BrushSmoke PRIVATE
+    BRUSH_SMOKE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+)
+target_compile_definitions(BrushSettingsTests PRIVATE
+    BRUSH_SETTINGS_TESTS_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+)
+target_compile_definitions(AutoborderSmoke PRIVATE
+    AUTOBORDER_SMOKE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+)
+target_compile_definitions(DoodadPreviewSmoke PRIVATE
+    DOODAD_SMOKE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+)
+target_compile_definitions(DoodadXmlSmoke PRIVATE
+    DOODAD_SMOKE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+)
+target_compile_definitions(DoodadPlanningSmoke PRIVATE
+    DOODAD_SMOKE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+)
+target_compile_definitions(DoodadBorderSmoke PRIVATE
+    DOODAD_SMOKE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+)
+target_compile_definitions(DoodadContextSmoke PRIVATE
+    DOODAD_SMOKE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+)
+target_compile_definitions(CarpetSmoke PRIVATE
+    CARPET_SMOKE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+)
+target_compile_definitions(WallBrushSmoke PRIVATE
+    WALL_SMOKE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+)
 
 if(TME_ENABLE_PCH)
     target_precompile_headers(${PROJECT_NAME} PRIVATE
@@ -485,7 +747,7 @@ if(TME_ENABLE_ARCH_OPTIMIZATIONS)
 endif()
 
 # Copy data files
-set(COPY_DATA_COMMANDS
+add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${PROJECT_NAME}>/data"
     COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${PROJECT_NAME}>/data/shaders"
     COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${PROJECT_NAME}>/data/fonts"
@@ -493,30 +755,29 @@ set(COPY_DATA_COMMANDS
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${CMAKE_CURRENT_SOURCE_DIR}/clients_templates.json"
         "$<TARGET_FILE_DIR:${PROJECT_NAME}>/data/clients_templates.json"
-    # Copy entire sample_data directory tree (includes tilesets/, creatures/, items/, etc.)
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-        "${CMAKE_CURRENT_SOURCE_DIR}/sample_data"
-        "$<TARGET_FILE_DIR:${PROJECT_NAME}>/data"
     # Copy shaders
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         "${CMAKE_CURRENT_SOURCE_DIR}/shaders"
         "$<TARGET_FILE_DIR:${PROJECT_NAME}>/data/shaders"
-)
-
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/ext/fontawesome6/fa-solid-900.ttf")
-    list(APPEND COPY_DATA_COMMANDS
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${CMAKE_CURRENT_SOURCE_DIR}/ext/fontawesome6/fa-solid-900.ttf"
-            "$<TARGET_FILE_DIR:${PROJECT_NAME}>/data/fonts/fa-solid-900.ttf"
-    )
-else()
-    message(WARNING "Missing fontawesome6 TTF: ext/fontawesome6/fa-solid-900.ttf (skipping copy).")
-endif()
-
-add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-    ${COPY_DATA_COMMANDS}
+    # Copy fonts
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_CURRENT_SOURCE_DIR}/ext/fontawesome6/fa-solid-900.ttf"
+        "$<TARGET_FILE_DIR:${PROJECT_NAME}>/data/fonts/fa-solid-900.ttf"
     COMMENT "Copying data files..."
 )
+
+# Copy version-specific data directory (guarded — only if it exists)
+set(TME_DATA_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/../data")
+if(EXISTS "${TME_DATA_SOURCE}")
+    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${TME_DATA_SOURCE}"
+            "$<TARGET_FILE_DIR:${PROJECT_NAME}>/data"
+        COMMENT "Copying version data folders..."
+    )
+else()
+    message(WARNING "Data directory not found at ${TME_DATA_SOURCE} — version-specific data will not be copied to build output")
+endif()
 
 # Installation
 install(TARGETS ${PROJECT_NAME}

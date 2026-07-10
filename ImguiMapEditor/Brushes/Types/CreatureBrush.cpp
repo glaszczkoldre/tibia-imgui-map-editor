@@ -23,9 +23,14 @@ void CreatureBrush::draw(Domain::ChunkedMap &map, Domain::Tile *tile,
   creature->setName(name_);
   creature->setOutfit(outfit_);
   creature->setPosition(tile->getPosition());
+  creature->direction = direction_;
+  if (ctx.brushSettings) {
+    creature->spawn_time = ctx.brushSettings->getDefaultSpawnTime();
+  }
 
   // Add to tile (Tile takes ownership)
   tile->setCreature(std::move(creature));
+  tile->setCreatureBrushId(ctx.ownerBrushId);
 
   // Auto-create spawn if enabled in settings
   if (ctx.brushSettings && ctx.brushSettings->getAutoCreateSpawn()) {
@@ -34,10 +39,10 @@ void CreatureBrush::draw(Domain::ChunkedMap &map, Domain::Tile *tile,
 
     // Search nearby tiles for spawns that cover this position
     Domain::Position pos = tile->getPosition();
-    int maxRadius = 10; // Max possible spawn radius
+    constexpr int kMaxSpawnSearchRadius = 10;
 
-    for (int dy = -maxRadius; dy <= maxRadius && !withinExistingSpawn; ++dy) {
-      for (int dx = -maxRadius; dx <= maxRadius && !withinExistingSpawn; ++dx) {
+    for (int dy = -kMaxSpawnSearchRadius; dy <= kMaxSpawnSearchRadius && !withinExistingSpawn; ++dy) {
+      for (int dx = -kMaxSpawnSearchRadius; dx <= kMaxSpawnSearchRadius && !withinExistingSpawn; ++dx) {
         Domain::Tile *nearbyTile = map.getTile(pos.x + dx, pos.y + dy, pos.z);
         if (nearbyTile && nearbyTile->hasSpawn()) {
           const Domain::Spawn *spawn = nearbyTile->getSpawn();
@@ -57,19 +62,24 @@ void CreatureBrush::draw(Domain::ChunkedMap &map, Domain::Tile *tile,
       int radius = ctx.brushSettings->getDefaultSpawnRadius();
       auto spawn = std::make_unique<Domain::Spawn>(tile->getPosition(), radius);
       tile->setSpawn(std::move(spawn));
+      tile->setSpawnBrushId(ctx.ownerBrushId);
       spdlog::debug(
           "[CreatureBrush] Auto-created spawn at ({},{},{}) with radius {}",
           tile->getPosition().x, tile->getPosition().y, tile->getPosition().z,
           radius);
     }
   }
+
+  map.markChanged();
 }
 
-void CreatureBrush::undraw(Domain::ChunkedMap &map, Domain::Tile *tile) {
+void CreatureBrush::undraw(Domain::ChunkedMap& map, Domain::Tile* tile) {
   if (!tile)
     return;
   // Remove creature from tile
   tile->removeCreature();
+  tile->setCreatureBrushId(InvalidBrushId);
+  map.markChanged();
 }
 
 } // namespace MapEditor::Brushes

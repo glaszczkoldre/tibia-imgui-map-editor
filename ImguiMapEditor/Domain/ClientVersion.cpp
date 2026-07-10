@@ -12,21 +12,33 @@ ClientVersion::ClientVersion(uint32_t index, uint32_t version, const std::string
 }
 
 std::filesystem::path ClientVersion::getItemMetadataPath() const {
+    // 1. User-provided path from preferences (explicit override)
     if (!custom_items_db_path_.empty()) {
         return custom_items_db_path_;
     }
-    if (client_path_.empty()) {
-        return {};
+
+    // 2. Default: data/[dataDirectory]/items.otb (or items.srv)
+    auto data_dir = resolveDataPath();
+    if (!data_dir.empty()) {
+        switch (data_source_) {
+        case ItemDataSource::SRV: {
+            auto srv = data_dir / "items.srv";
+            if (std::filesystem::exists(srv)) return srv;
+            break;
+        }
+        case ItemDataSource::OTB: {
+            auto otb = data_dir / "items.otb";
+            if (std::filesystem::exists(otb)) return otb;
+            break;
+        }
+        case ItemDataSource::DAT:
+        default:
+            break;
+        }
     }
-    switch (data_source_) {
-    case ItemDataSource::SRV:
-        return client_path_ / "items.srv";
-    case ItemDataSource::OTB:
-        return client_path_ / "items.otb";
-    case ItemDataSource::DAT:
-    default:
-        return {};
-    }
+
+    // 3. No fallback — client_path_ is not used for items.otb
+    return {};
 }
 
 bool ClientVersion::hasValidPaths() const {

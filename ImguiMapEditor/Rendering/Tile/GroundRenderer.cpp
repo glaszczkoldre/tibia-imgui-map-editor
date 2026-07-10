@@ -47,13 +47,7 @@ bool GroundRenderer::queue(const Domain::Item *ground, float screen_x,
     // Check for blocking ground transparency
     float final_alpha = alpha;
     if (view_settings && view_settings->show_wall_outline) {
-      bool is_blocking_ground =
-          item_type->hasFlag(Domain::ItemFlag::Unpassable) &&
-          item_type->hasFlag(Domain::ItemFlag::BlockMissiles) &&
-          !item_type->hasFlag(Domain::ItemFlag::Moveable) &&
-          item_type->top_order == 0 &&
-          !item_type->hasFlag(Domain::ItemFlag::FullTile);
-      if (is_blocking_ground) {
+      if (item_type->isBlockingGround()) {
         final_alpha = 0.5f;
       }
     }

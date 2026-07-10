@@ -314,18 +314,18 @@ std::vector<const Domain::ItemType*> MapSearchService::searchItemDatabase(
         
         // === PROPERTY FILTER (AND logic) ===
             if (properties.hasAnySelected()) {
-                if (properties.unpassable && !item_type.hasFlag(Domain::ItemFlag::Unpassable)) continue;
-                if (properties.unmovable && item_type.is_moveable) continue;  // Inverse logic
-                if (properties.block_missiles && !item_type.hasFlag(Domain::ItemFlag::BlockMissiles)) continue;
+                if (properties.unpassable && !item_type.isBlocking()) continue;
+                if (properties.unmovable && !item_type.isMoveable()) continue;  // Inverse logic
+                if (properties.block_missiles && !item_type.blocksProjectile()) continue;
                 if (properties.block_pathfinder && !item_type.hasFlag(Domain::ItemFlag::BlockPathfinder)) continue;
                 if (properties.readable && !item_type.isReadable()) continue;
                 if (properties.writeable && !item_type.isWriteable()) continue;
-                if (properties.pickupable && !item_type.is_pickupable) continue;
-                if (properties.stackable && !item_type.is_stackable) continue;
+                if (properties.pickupable && !item_type.isPickupable()) continue;
+                if (properties.stackable && !item_type.isStackable()) continue;
                 if (properties.rotatable && !item_type.isRotatable()) continue;
-                if (properties.hangable && !item_type.is_hangable) continue;
-                if (properties.hook_east && !item_type.hook_east) continue;
-                if (properties.hook_south && !item_type.hook_south) continue;
+                if (properties.hangable && !item_type.hasFlag(Domain::ItemFlag::IsHangable)) continue;
+                if (properties.hook_east && !item_type.hasFlag(Domain::ItemFlag::HookEast)) continue;
+                if (properties.hook_south && !item_type.hasFlag(Domain::ItemFlag::HookSouth)) continue;
                 if (properties.has_elevation && !item_type.hasElevation()) continue;
                 if (properties.ignore_look && !item_type.hasFlag(Domain::ItemFlag::IgnoreLook)) continue;
 
@@ -335,11 +335,11 @@ std::vector<const Domain::ItemType*> MapSearchService::searchItemDatabase(
                 if (properties.full_tile && !item_type.hasFlag(Domain::ItemFlag::FullTile)) continue;
                 if (properties.client_charges && !item_type.hasFlag(Domain::ItemFlag::ClientCharges)) continue;
                 if (properties.animation && !item_type.hasFlag(Domain::ItemFlag::Animation)) continue;
-                if (properties.always_on_top && !item_type.hasFlag(Domain::ItemFlag::AlwaysOnTop)) continue;
+                if (properties.always_on_top && !item_type.hasFlag(Domain::ItemFlag::AlwaysOnBottom)) continue;
                 
                 if (properties.has_light && item_type.light_level == 0) continue;
                 if (properties.has_speed && item_type.speed == 0) continue;
-                if (properties.decays && item_type.decayTo == 0 && !item_type.decays) continue;
+                if (properties.decays && item_type.decayTo == 0 && !item_type.decays()) continue;
                 
                 if (properties.has_charges && 
                     item_type.charges == 0 && 

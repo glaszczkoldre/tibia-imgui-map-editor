@@ -3,9 +3,12 @@
 #include "../Brushes/BrushRegistry.h"
 #include "../Brushes/Types/CreatureBrush.h"
 #include "../Brushes/Types/PlaceholderBrush.h"
+#include "../Brushes/Core/IBrush.h"
 #include "../Domain/Outfit.h"
 #include "../Domain/Tileset/TilesetRegistry.h"
 #include "XmlUtils.h"
+#include <algorithm>
+#include <cctype>
 #include <spdlog/spdlog.h>
 
 namespace MapEditor::IO {
@@ -14,10 +17,34 @@ namespace fs = std::filesystem;
 using namespace Domain::Tileset;
 using namespace Brushes;
 
+namespace {
+
+bool isCollectionSourceFile(const fs::path &sourceFile) {
+  std::string filename = sourceFile.filename().string();
+  std::transform(filename.begin(), filename.end(), filename.begin(),
+                 [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+  return filename.find("collection") != std::string::npos;
+}
+
+void markBrushMetadata(IBrush *brush, bool collectionTileset) {
+  if (!brush) {
+    return;
+  }
+
+  brush->flagAsVisible();
+  if (collectionTileset) {
+    brush->setCollection();
+  }
+}
+
+} // namespace
+
 TilesetXmlReader::TilesetXmlReader(
     Brushes::BrushRegistry &brushRegistry,
     Domain::Tileset::TilesetRegistry &tilesetRegistry)
     : brush_registry_(brushRegistry), tileset_registry_(tilesetRegistry) {}
+
+TilesetXmlReader::~TilesetXmlReader() = default;
 
 bool TilesetXmlReader::loadTilesetFile(const fs::path &path) {
   if (!fs::exists(path)) {
@@ -55,8 +82,9 @@ void TilesetXmlReader::parseTilesetNode(const pugi::xml_node &node,
     return;
   }
 
-  // Use injected registry instead of singleton
-  Tileset *tileset = tileset_registry_.getTileset(name);
+  const auto absoluteSourceFile = fs::absolute(sourceFile);
+  Tileset *tileset =
+      tileset_registry_.getTilesetBySourceFile(absoluteSourceFile);
 
   if (tileset) {
     // Tileset already loaded — skip re-parsing to prevent entry duplication
@@ -68,20 +96,23 @@ void TilesetXmlReader::parseTilesetNode(const pugi::xml_node &node,
   } else {
     // Create new tileset
     auto newTileset = std::make_unique<Tileset>(name);
-    newTileset->setSourceFile(fs::absolute(sourceFile));
+    newTileset->setSourceFile(absoluteSourceFile);
     tileset = newTileset.get();
     tileset_registry_.registerTileset(std::move(newTileset));
     spdlog::debug("[TilesetXmlReader] Created new tileset: {}", name);
   }
 
-  parseEntries(node, *tileset);
+  const bool collectionTileset = isCollectionSourceFile(sourceFile);
+  parseEntries(node, *tileset, collectionTileset);
+  resolvePlaceholders(collectionTileset);
 
   spdlog::info("[TilesetXmlReader] Loaded tileset '{}' with {} entries from {}",
                name, tileset->size(), sourceFile.filename().string());
 }
 
 void TilesetXmlReader::parseEntries(const pugi::xml_node &node,
-                                    Tileset &tileset) {
+                                    Tileset &tileset,
+                                    bool collectionTileset) {
   for (pugi::xml_node child : node.children()) {
     std::string childName = child.name();
 
@@ -91,12 +122,15 @@ void TilesetXmlReader::parseEntries(const pugi::xml_node &node,
       if (!brushName.empty()) {
         IBrush *brush = brush_registry_.getBrush(brushName);
         if (brush) {
+          markBrushMetadata(brush, collectionTileset);
           tileset.addBrush(brush);
+          if (brush->getType() == BrushType::Placeholder) {
+            recordPlaceholder(brushName);
+          }
         } else {
-          // Create placeholder for missing brush
-          auto placeholder = std::make_unique<PlaceholderBrush>(brushName);
-          IBrush *ptr = placeholder.get();
-          brush_registry_.addBrush(std::move(placeholder));
+          IBrush *ptr = brush_registry_.getOrCreatePlaceholderBrush(brushName);
+          markBrushMetadata(ptr, collectionTileset);
+          recordPlaceholder(brushName);
           tileset.addBrush(ptr);
           spdlog::debug("[TilesetXmlReader] Created placeholder brush: {}",
                         brushName);
@@ -119,6 +153,7 @@ void TilesetXmlReader::parseEntries(const pugi::xml_node &node,
           IBrush *brush =
               brush_registry_.getOrCreateRAWBrush(static_cast<uint16_t>(i));
           if (brush) {
+            markBrushMetadata(brush, collectionTileset);
             tileset.addBrush(brush);
           }
         }
@@ -127,6 +162,7 @@ void TilesetXmlReader::parseEntries(const pugi::xml_node &node,
         IBrush *brush =
             brush_registry_.getOrCreateRAWBrush(static_cast<uint16_t>(id));
         if (brush) {
+          markBrushMetadata(brush, collectionTileset);
           tileset.addBrush(brush);
         }
       }
@@ -137,9 +173,12 @@ void TilesetXmlReader::parseEntries(const pugi::xml_node &node,
         continue;
       }
 
-      // Check if creature brush already exists
-      IBrush *brush = brush_registry_.getBrush(creatureName);
+      // First: check creature-specific brush registry (avoids name collisions
+      // with doodad/wall brushes that happen to share the same name,
+      // e.g. creature "Bones" vs doodad brush "bones")
+      IBrush *brush = brush_registry_.getBrushForCreature(creatureName);
       if (brush) {
+        markBrushMetadata(brush, collectionTileset);
         tileset.addBrush(brush);
       } else {
         // Check if inline definition provided
@@ -165,15 +204,16 @@ void TilesetXmlReader::parseEntries(const pugi::xml_node &node,
 
           IBrush *ptr = creatureBrush.get();
           brush_registry_.addBrush(std::move(creatureBrush));
+          markBrushMetadata(ptr, collectionTileset);
           tileset.addBrush(ptr);
           spdlog::debug("[TilesetXmlReader] Created creature brush: {}",
                         creatureName);
         } else {
           // Create placeholder - will be resolved later when creatures are
           // loaded
-          auto placeholder = std::make_unique<PlaceholderBrush>(creatureName);
-          IBrush *ptr = placeholder.get();
-          brush_registry_.addBrush(std::move(placeholder));
+          IBrush *ptr = brush_registry_.getOrCreatePlaceholderBrush(creatureName);
+          markBrushMetadata(ptr, collectionTileset);
+          recordPlaceholder(creatureName);
           tileset.addBrush(ptr);
           spdlog::debug("[TilesetXmlReader] Created placeholder creature: {}",
                         creatureName);
@@ -185,6 +225,74 @@ void TilesetXmlReader::parseEntries(const pugi::xml_node &node,
       tileset.addSeparator(separatorName);
       spdlog::debug("[TilesetXmlReader] Added separator: {}",
                     separatorName.empty() ? "(unnamed)" : separatorName);
+    }
+  }
+}
+
+void TilesetXmlReader::recordPlaceholder(std::string name) {
+  if (name.empty()) {
+    return;
+  }
+
+  ++placeholder_usage_[std::move(name)];
+}
+
+void TilesetXmlReader::decrementPlaceholderUsage(const std::string &name) {
+  if (name.empty()) {
+    return;
+  }
+
+  const auto it = placeholder_usage_.find(name);
+  if (it == placeholder_usage_.end()) {
+    return;
+  }
+
+  if (it->second <= 1) {
+    placeholder_usage_.erase(it);
+    return;
+  }
+
+  --it->second;
+}
+
+void TilesetXmlReader::resolvePlaceholders(bool collectionTileset) {
+  if (placeholder_usage_.empty()) {
+    return;
+  }
+
+  for (const auto &tilesetPtr : tileset_registry_.getAllTilesets()) {
+    if (!tilesetPtr) {
+      continue;
+    }
+
+    auto &entries = tilesetPtr->getEntriesMutable();
+    for (auto &entry : entries) {
+      if (!isBrush(entry)) {
+        continue;
+      }
+
+      const auto *brush = getBrush(entry);
+      if (!brush) {
+        continue;
+      }
+
+      if (brush->getType() != BrushType::Placeholder) {
+        continue;
+      }
+
+      const auto &placeholderName = brush->getName();
+      auto *resolvedBrush = brush_registry_.getBrush(placeholderName);
+      if (!resolvedBrush || resolvedBrush == brush ||
+          resolvedBrush->getType() == BrushType::Placeholder) {
+        continue;
+      }
+
+      resolvedBrush->flagAsVisible();
+      if (collectionTileset || brush->hasCollection()) {
+        resolvedBrush->setCollection();
+      }
+      entry = resolvedBrush;
+      decrementPlaceholderUsage(placeholderName);
     }
   }
 }

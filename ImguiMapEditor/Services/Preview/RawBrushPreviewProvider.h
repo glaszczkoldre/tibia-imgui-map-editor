@@ -29,16 +29,7 @@ public:
    */
   explicit RawBrushPreviewProvider(
       uint32_t itemId, uint16_t subtype = 0,
-      BrushSettingsService *brushSettings = nullptr);
-
-  /**
-   * Set brush settings service for size/shape.
-   * Called if settings weren't available at construction.
-   */
-  void setBrushSettingsService(BrushSettingsService *service) {
-    brushSettings_ = service;
-    needsRegen_ = true;
-  }
+      const BrushSettingsService *brushSettings = nullptr);
 
   // IPreviewProvider interface
   bool isActive() const override;
@@ -46,40 +37,24 @@ public:
   const std::vector<PreviewTileData> &getTiles() const override;
   PreviewBounds getBounds() const override;
   void updateCursorPosition(const Domain::Position &cursor) override;
+  PreviewStyle getStyle() const override;
 
   // Regeneration support for brush size changes
-  bool needsRegeneration() const override { return needsRegen_; }
   void regenerate() override;
-
-  /**
-   * Get the item ID being previewed.
-   */
-  uint32_t getItemId() const { return itemId_; }
-
-  /**
-   * Get the subtype being previewed.
-   */
-  uint16_t getSubtype() const { return subtype_; }
-
-  /**
-   * Mark preview as needing regeneration.
-   * Called by BrushSettingsService when settings change.
-   */
-  void markNeedsRegeneration() { needsRegen_ = true; }
 
 private:
   uint32_t itemId_;
   uint16_t subtype_;
-  BrushSettingsService *brushSettings_ = nullptr;
+  const BrushSettingsService *brushSettings_ = nullptr;
   Domain::Position anchor_{0, 0, 0};
-  std::vector<PreviewTileData> tiles_;
-  PreviewBounds bounds_;
+  mutable std::vector<PreviewTileData> tiles_;
+  mutable PreviewBounds bounds_;
   mutable bool needsRegen_ = false;
 
   // Cached settings for change detection (actual offsets, not just count)
   mutable std::vector<std::pair<int, int>> cachedOffsets_;
 
-  void buildPreview();
+  void buildPreview() const;
   bool checkSettingsChanged() const;
 };
 

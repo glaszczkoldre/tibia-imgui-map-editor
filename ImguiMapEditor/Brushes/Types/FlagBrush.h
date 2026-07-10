@@ -29,9 +29,6 @@ public:
   BrushType getType() const override { return BrushType::Flag; }
   uint32_t getLookId() const override { return 0; }
 
-  // Get the flag this brush sets
-  Domain::TileFlag getFlag() const { return flag_; }
-
 private:
   Domain::TileFlag flag_;
   std::string name_;

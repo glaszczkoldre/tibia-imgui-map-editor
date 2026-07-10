@@ -1,11 +1,13 @@
 // Prevent GLFW from including OpenGL headers (glad provides them)
 #define GLFW_INCLUDE_NONE
 #include "PreferencesDialog.h"
+#include "../Utils/StringCopy.h"
 #include "UI/Core/Theme.h"
 #include "../ext/imhotkey/imHotKey.h"
 #include "IO/HotkeyJsonReader.h"
 #include "Presentation/NotificationHelper.h"
 #include "Services/AppSettings.h"
+#include "Services/BrushSettingsService.h"
 #include "Services/HotkeyRegistry.h"
 #include "Services/OtbmSettings.h"
 #include "Services/SecondaryClientData.h"
@@ -182,6 +184,31 @@ void PreferencesDialog::renderEditorTab() {
 
     ImGui::Spacing();
   }
+
+  if (ImGui::CollapsingHeader(ICON_FA_PAINTBRUSH " Brushes",
+                              ImGuiTreeNodeFlags_DefaultOpen)) {
+    ImGui::Spacing();
+
+    if (!brush_settings_) {
+      ImGui::TextDisabled("Brush settings are unavailable.");
+    } else {
+      bool eraserLeaveUnique = brush_settings_->getEraserLeaveUniqueItems();
+      if (ImGui::Checkbox("Eraser leaves unique items",
+                          &eraserLeaveUnique)) {
+        brush_settings_->setEraserLeaveUniqueItems(eraserLeaveUnique);
+        if (on_apply_settings_) {
+          on_apply_settings_();
+        }
+      }
+      if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip(
+            "Preserve complex stacked doodad items such as containers with "
+            "contents and items carrying action or unique ids.");
+      }
+    }
+
+    ImGui::Spacing();
+  }
 }
 
 void PreferencesDialog::renderSecondaryClientTab() {
@@ -280,8 +307,7 @@ void PreferencesDialog::renderSecondaryClientTab() {
     if (ImGui::Button(ICON_FA_FOLDER_OPEN "##BrowseFolder")) {
       NFD::UniquePath outPath;
       if (NFD::PickFolder(outPath) == NFD_OKAY) {
-        strncpy(secondary_folder_path_, outPath.get(),
-                sizeof(secondary_folder_path_) - 1);
+        ::MapEditor::Utils::copyTruncate(secondary_folder_path_, outPath.get());
       }
     }
 

@@ -45,10 +45,10 @@ static Domain::ItemFlag parseFlags(uint32_t flags) {
     if (flags & (1 << 10)) result = result | Domain::ItemFlag::FloorChangeEast;
     if (flags & (1 << 11)) result = result | Domain::ItemFlag::FloorChangeSouth;
     if (flags & (1 << 12)) result = result | Domain::ItemFlag::FloorChangeWest;
-    if (flags & (1 << 13)) result = result | Domain::ItemFlag::AlwaysOnTop;
-    if (flags & (1 << 14)) result = result | Domain::ItemFlag::Readable;
+    if (flags & (1 << 13)) result = result | Domain::ItemFlag::AlwaysOnBottom;
+    if (flags & (1 << 14)) result = result | Domain::ItemFlag::CanReadText;
     if (flags & (1 << 15)) result = result | Domain::ItemFlag::Rotatable;
-    if (flags & (1 << 16)) result = result | Domain::ItemFlag::Hangable;
+    if (flags & (1 << 16)) result = result | Domain::ItemFlag::IsHangable;
     if (flags & (1 << 17)) result = result | Domain::ItemFlag::HookEast;
     if (flags & (1 << 18)) result = result | Domain::ItemFlag::HookSouth;
     if (flags & (1 << 19)) result = result | Domain::ItemFlag::CanNotDecay;
@@ -106,7 +106,7 @@ OtbResult OtbReader::read(const std::filesystem::path& path) {
     
     for (BinaryNode* node = root->getChild(); node != nullptr; node = node->advance()) {
         try {
-            Domain::ItemType item;
+            ServerItemFragment item;
             
             // Read group
             uint8_t group;
@@ -117,20 +117,6 @@ OtbResult OtbReader::read(const std::filesystem::path& path) {
             uint32_t flags;
             if (!node->getU32(flags)) continue;
             item.flags = parseFlags(flags);
-            
-            // Derive properties from flags
-            item.is_blocking = Domain::hasFlag(item.flags, Domain::ItemFlag::Unpassable);
-            item.is_moveable = !Domain::hasFlag(item.flags, Domain::ItemFlag::Moveable);
-            item.is_pickupable = Domain::hasFlag(item.flags, Domain::ItemFlag::Pickupable);
-            item.is_stackable = Domain::hasFlag(item.flags, Domain::ItemFlag::Stackable);
-            
-            // Rendering order flags (note: AlwaysOnTop in OTB actually means "always on bottom")
-            item.always_on_bottom = Domain::hasFlag(item.flags, Domain::ItemFlag::AlwaysOnTop);
-            
-            // Hangable/hook properties (used for wall-mounted items)
-            item.is_hangable = Domain::hasFlag(item.flags, Domain::ItemFlag::Hangable);
-            item.hook_east = Domain::hasFlag(item.flags, Domain::ItemFlag::HookEast);
-            item.hook_south = Domain::hasFlag(item.flags, Domain::ItemFlag::HookSouth);
             
             // Read attributes
             uint8_t attr_type;
@@ -160,11 +146,17 @@ OtbResult OtbReader::read(const std::filesystem::path& path) {
                         }
                         break;
                     }
+                    case OtbAttribute::Description: {
+                        std::string desc;
+                        if (node->getString(desc)) {
+                            item.description = desc;
+                        }
+                        break;
+                    }
                     case OtbAttribute::Speed: {
                         uint16_t speed;
                         if (node->getU16(speed)) {
                             item.speed = speed;
-                            item.ground_speed = static_cast<uint8_t>(std::min(speed, uint16_t(255)));
                         }
                         break;
                     }

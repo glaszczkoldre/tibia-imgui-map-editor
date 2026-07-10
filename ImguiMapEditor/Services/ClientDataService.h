@@ -2,6 +2,7 @@
 #include "Domain/ClientVersion.h"
 #include "Domain/ClientVersionTypes.h"
 #include "Domain/ItemType.h"
+#include "Domain/ItemDefinitionStore.h"
 #include "Domain/CreatureType.h"
 #include "IO/OtbReader.h"
 #include "IO/SrvReader.h"
@@ -9,7 +10,6 @@
 #include "IO/Readers/DatReaderFactory.h"
 #include "IO/CreatureXmlReader.h"
 #include "IO/ItemXmlReader.h"
-// NOTE: TilesetXmlReader include moved to TilesetService
 #include <filesystem>
 #include <memory>
 #include <unordered_map>
@@ -40,7 +40,7 @@ struct ClientDataResult {
     size_t effect_count = 0;
     size_t missile_count = 0;
     size_t sprite_count = 0;
-    size_t creature_count = 0; // [NEW]
+    size_t creature_count = 0;
 };
 
 /**
@@ -89,8 +89,6 @@ public:
      */
     bool loadItemData(const std::filesystem::path& items_xml_path);
 
-    // NOTE: loadTilesetData moved to TilesetService
-
     /**
      * Check if data is loaded
      */
@@ -105,19 +103,23 @@ public:
      * Check if server ID support is available (loaded from items.srv)
      * Required for SEC map loading.
      */
-    bool hasServerIdSupport() const { return !server_id_index_.empty(); }
+    bool hasServerIdSupport() const { return max_server_id_ > 0; }
     
     /**
      * Get item type by server ID
      * @return nullptr if not found
      */
-    const Domain::ItemType* getItemTypeByServerId(uint16_t server_id) const;
+    const Domain::ItemType* getItemTypeByServerId(uint16_t server_id) const {
+        return item_store_.getItemTypeByServerId(server_id);
+    }
     
     /**
      * Get item type by client ID
      * @return nullptr if not found
      */
-    const Domain::ItemType* getItemTypeByClientId(uint16_t client_id) const;
+    const Domain::ItemType* getItemTypeByClientId(uint16_t client_id) const {
+        return item_store_.getItemTypeByClientId(client_id);
+    }
     
     /**
      * Get creature type by name (case insensitive)
@@ -149,12 +151,12 @@ public:
     /**
      * Get all item types (const)
      */
-    const std::vector<Domain::ItemType>& getItemTypes() const { return items_; }
+    const std::vector<Domain::ItemType>& getItemTypes() const { return item_store_.getItemTypes(); }
     
     /**
      * Get all item types (mutable - for sprite caching optimization)
      */
-    std::vector<Domain::ItemType>& getItemTypes() { return items_; }
+    std::vector<Domain::ItemType>& getItemTypes() { return item_store_.getItemTypes(); }
     
     /**
      * Get maximum server ID
@@ -192,23 +194,18 @@ public:
     void clear();
 
 private:
-    // Merges item metadata (OTB/SRV items, or DAT-generated stubs) with DAT item definitions.
-    // The name is historical; "otb_items" may contain SRV items or DAT-generated stubs.
-    void mergeOtbWithDat(const std::vector<Domain::ItemType>& otb_items,
-                         const IO::DatResult& dat_result,
-                         const Domain::ClientVersion& client_version);
-    
-    // NOTE: generateCreatureTileset moved to TilesetService
-
     bool loaded_ = false;
     uint32_t client_version_ = 0;
     uint16_t max_server_id_ = 0;
     uint16_t max_client_id_ = 0;
+    Domain::ItemDataSource data_source_ = Domain::ItemDataSource::OTB;
     
     // Item type storage
-    std::vector<Domain::ItemType> items_;
-    std::unordered_map<uint16_t, size_t> server_id_index_;  // server_id → items_ index
-    std::unordered_map<uint16_t, size_t> client_id_index_;  // client_id → items_ index
+    Domain::ItemDefinitionStore item_store_;
+    std::vector<IO::ServerItemFragment> server_item_fragments_;
+    std::unordered_map<uint16_t, size_t> server_item_fragment_index_;
+    std::vector<IO::ClientItem> client_item_fragments_;
+    std::unordered_map<uint16_t, size_t> client_item_fragment_index_;
     
     // Creature storage
     std::vector<std::unique_ptr<Domain::CreatureType>> creatures_;

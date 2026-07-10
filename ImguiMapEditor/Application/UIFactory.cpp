@@ -32,6 +32,10 @@
 #include "UI/Windows/IngameBoxWindow.h"
 #include "UI/Windows/MinimapWindow.h"
 #include "UI/Windows/PaletteWindowManager.h"
+#include "UI/Widgets/TilesetWidget.h"
+#include "UI/Panels/BrushSettingsPanel.h"
+#include "UI/Utils/IconTextureCache.h"
+#include "Brushes/BrushSystem.h"
 
 
 namespace MapEditor {
@@ -51,9 +55,17 @@ UIComponentContainer UIFactory::create(const UIFactoryContext &ctx) {
   components.minimap_window = std::make_unique<UI::MinimapWindow>();
   components.browse_tile_window = std::make_unique<UI::BrowseTileWindow>();
 
+  components.tileset_widget = std::make_unique<UI::TilesetWidget>();
+  components.icon_texture_cache = std::make_unique<UI::IconTextureCache>();
+  components.icon_texture_cache->loadAll("assets/png");
+  components.brush_settings_panel = std::make_unique<UI::Panels::BrushSettingsPanel>(
+      &ctx.brush_system.getSettingsService(), &ctx.brush_controller,
+      &ctx.brush_registry, components.icon_texture_cache.get());
+
   components.hotkey_controller = std::make_unique<AppLogic::HotkeyController>(
       ctx.hotkey_registry, ctx.view_settings, components.map_panel.get(),
       *components.ingame_box_window, ctx.tab_manager);
+  components.hotkey_controller->setBrushController(&ctx.brush_controller);
 
   components.menu_bar = std::make_unique<Presentation::MenuBar>(
       ctx.view_settings, ctx.selection_settings, components.map_panel.get(),
@@ -105,7 +117,7 @@ UIComponentContainer UIFactory::create(const UIFactoryContext &ctx) {
   auto selection_panel = std::make_unique<UI::Ribbon::SelectionPanel>(
       ctx.selection_settings, &ctx.tab_manager);
   auto brushes_panel = std::make_unique<UI::Ribbon::BrushesPanel>(
-      &ctx.brush_controller, ctx.brush_controller.getBrushSettingsService());
+      &ctx.brush_controller);
 
   // Create PaletteWindowManager (initialized later when services available)
   components.palette_window_manager =
@@ -138,7 +150,7 @@ UIComponentContainer UIFactory::create(const UIFactoryContext &ctx) {
   components.workspace_controller =
       std::make_unique<Presentation::WorkspaceController>(
           *components.map_panel, *components.minimap_window,
-          *components.browse_tile_window, ctx.tileset_widget,
+          *components.browse_tile_window, *components.tileset_widget,
           components.palette_window_manager.get(), ctx.brush_controller,
           *components.search_controller, *components.input_controller);
 

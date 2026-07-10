@@ -160,15 +160,17 @@ private:
                                   Services::ClientDataService &client_data);
 
   bool tryLoadCreatures(const std::filesystem::path &map_dir,
-                        const std::filesystem::path &client_path);
+                        const std::filesystem::path &client_path,
+                        const std::filesystem::path &version_data_path);
   bool tryLoadItems(const std::filesystem::path &map_dir,
-                    const std::filesystem::path &client_path);
+                    const std::filesystem::path &client_path,
+                    const std::filesystem::path &version_data_path);
 
   void loadWaypoints(const std::filesystem::path &otbm_path,
                      Domain::ChunkedMap &map);
 
   template <typename LoaderFunc>
-  bool tryLoadResource(std::string_view filename,
+  bool tryLoadResource(const std::filesystem::path &filename,
                        const std::filesystem::path &map_dir,
                        const std::filesystem::path &client_path,
                        LoaderFunc loader) {
@@ -192,7 +194,7 @@ private:
     for (const auto &loc : search_locations) {
       if (std::filesystem::exists(loc.path) && loader(loc.path)) {
         // Use runtime formatting to allow variable format string
-        spdlog::info(fmt::runtime(loc.message_format), filename);
+        spdlog::info(fmt::runtime(loc.message_format), filename.string());
         return true;
       }
     }
@@ -202,7 +204,7 @@ private:
 
   Services::ClientVersionRegistry &version_registry_;
   Services::ViewSettings &view_settings_;
-  Brushes::BrushRegistry &brush_registry_;
+  MapEditor::Brushes::BrushRegistry &brush_registry_;
   Services::TilesetService &tileset_service_;
   const OtbmSettings &otbm_settings_;
 

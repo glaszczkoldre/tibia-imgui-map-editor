@@ -136,12 +136,12 @@ private:
     // Check if tile has blocking items
     if (tile.hasGround()) {
       const auto *ground = tile.getGround();
-      if (ground && ground->getType() && ground->getType()->is_blocking) {
+      if (ground && ground->getType() && ground->getType()->isBlocking()) {
         return true;
       }
     }
     for (const auto &item : tile.getItems()) {
-      if (item->getType() && item->getType()->is_blocking) {
+      if (item->getType() && item->getType()->isBlocking()) {
         return true;
       }
     }

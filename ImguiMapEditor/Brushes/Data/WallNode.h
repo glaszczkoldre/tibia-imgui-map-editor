@@ -4,10 +4,10 @@
  * @brief Data structures for wall and door item storage.
  */
 
-#include "../Enums/BrushEnums.h"
+#include "Brushes/Enums/BrushEnums.h"
 #include <cstdint>
-#include <random>
 #include <vector>
+#include <random>
 
 
 namespace MapEditor::Brushes {
@@ -29,8 +29,9 @@ public:
 
   /**
    * Get a random item using weighted selection.
+   * @param rng The random number generator
    */
-  uint32_t getRandomItem() const;
+  uint32_t getRandomItem(std::mt19937 &rng) const;
 
   /**
    * Get all items.
@@ -40,8 +41,7 @@ public:
   }
 
 private:
-  std::vector<std::pair<uint32_t, uint32_t>> items_; // (itemId, chance)
-  mutable std::mt19937 rng_{std::random_device{}()};
+  std::vector<std::pair<uint32_t, uint32_t>> items_;
 };
 
 /**
@@ -54,10 +54,7 @@ struct DoorNode {
   bool isOpen = false;
   bool isLocked = false;
 
-  /**
-   * Get the first door item (doors typically have one item).
-   */
-  uint32_t getItem() const { return items.empty() ? 0 : items.front(); }
+  [[nodiscard]] uint32_t getItem() const { return items.empty() ? 0 : items.front(); }
 };
 
 } // namespace MapEditor::Brushes

@@ -4,6 +4,7 @@
 #include "ClientVersionManager.h"
 #include "Controllers/HotkeyController.h"
 #include "Controllers/MapInputController.h"
+#include "Domain/Item.h"
 #include "Controllers/SearchController.h"
 #include "Core/Config.h"
 #include "Domain/ClientVersionTypes.h"
@@ -32,9 +33,12 @@
 #include "UI/PreferencesDialog.h"
 #include "UI/Ribbon/Panels/FilePanel.h"
 #include "UI/Widgets/SearchResultsWidget.h"
+#include <memory>
+#include <vector>
 #include "UI/Windows/BrowseTile/BrowseTileWindow.h"
 #include "UI/Windows/IngameBoxWindow.h"
 #include "UI/Windows/MinimapWindow.h"
+#include <optional>
 #include <nfd.hpp>
 #include <format>
 #include <spdlog/spdlog.h>
@@ -42,6 +46,52 @@
 namespace MapEditor {
 
 namespace {
+
+Brushes::BrushPickMode toBrushPickMode(UI::BrushPickMode mode) {
+  switch (mode) {
+  case UI::BrushPickMode::Smart:
+    return Brushes::BrushPickMode::Smart;
+  case UI::BrushPickMode::Raw:
+    return Brushes::BrushPickMode::Raw;
+  case UI::BrushPickMode::Ground:
+    return Brushes::BrushPickMode::Ground;
+  case UI::BrushPickMode::Doodad:
+    return Brushes::BrushPickMode::Doodad;
+  case UI::BrushPickMode::Collection:
+    return Brushes::BrushPickMode::Collection;
+  case UI::BrushPickMode::Door:
+    return Brushes::BrushPickMode::Door;
+  case UI::BrushPickMode::Wall:
+    return Brushes::BrushPickMode::Wall;
+  case UI::BrushPickMode::Carpet:
+    return Brushes::BrushPickMode::Carpet;
+  case UI::BrushPickMode::Table:
+    return Brushes::BrushPickMode::Table;
+  case UI::BrushPickMode::Creature:
+    return Brushes::BrushPickMode::Creature;
+  case UI::BrushPickMode::Spawn:
+    return Brushes::BrushPickMode::Spawn;
+  case UI::BrushPickMode::House:
+    return Brushes::BrushPickMode::House;
+  case UI::BrushPickMode::HouseExit:
+    return Brushes::BrushPickMode::HouseExit;
+  case UI::BrushPickMode::Waypoint:
+    return Brushes::BrushPickMode::Waypoint;
+  case UI::BrushPickMode::OptionalBorder:
+    return Brushes::BrushPickMode::OptionalBorder;
+  case UI::BrushPickMode::ProtectionZone:
+    return Brushes::BrushPickMode::ProtectionZone;
+  case UI::BrushPickMode::NoPvp:
+    return Brushes::BrushPickMode::NoPvp;
+  case UI::BrushPickMode::NoLogout:
+    return Brushes::BrushPickMode::NoLogout;
+  case UI::BrushPickMode::PvpZone:
+    return Brushes::BrushPickMode::PvpZone;
+  }
+
+  return Brushes::BrushPickMode::Smart;
+}
+
 void createInstantUnnamedMap(const CallbackMediator::Context &ctx) {
   if (!ctx.tab_manager || !ctx.map_operations)
     return;
@@ -153,6 +203,32 @@ void CallbackMediator::wirePlatformCallbacks(Context &ctx) {
 }
 
 void CallbackMediator::wireTabCallbacks(Context &ctx) {
+  auto suppressModifiedInvalidation = std::make_shared<bool>(false);
+
+  if (ctx.brush_controller) {
+    ctx.brush_controller->setTilesMutatedCallback(
+        [ctx, suppressModifiedInvalidation](
+            const std::vector<Domain::Position> &positions) {
+          if (positions.empty() || !ctx.tab_manager) {
+            return;
+          }
+
+          auto *session = ctx.tab_manager->getActiveSession();
+          if (!session) {
+            return;
+          }
+
+          if (ctx.rendering_manager) {
+            ctx.rendering_manager->invalidateTiles(session->getID(),
+                                                   positions);
+          }
+
+          *suppressModifiedInvalidation = true;
+          session->setModified(true);
+          *suppressModifiedInvalidation = false;
+        });
+  }
+
   // Wire MainWindow close callback
   if (ctx.main_window) {
     ctx.main_window->setCloseTabCallback(
@@ -161,14 +237,111 @@ void CallbackMediator::wireTabCallbacks(Context &ctx) {
     ctx.main_window->setBrowseTileCallback(
         [ctx](const Domain::Position &pos, uint16_t item_server_id) {
           if (auto *session = ctx.tab_manager->getActiveSession()) {
-            session->clearSelection();
-            session->getSelectionService().selectTile(session->getMap(), pos);
             ctx.view_settings->show_browse_tile = true;
 
-            // Auto-select the clicked item in Browse Tile widget
+            // Preserve the existing context selection and only focus the
+            // browser on the requested item when one is provided.
             if (ctx.browse_tile && item_server_id > 0) {
               ctx.browse_tile->selectItemByServerId(item_server_id);
             }
+          }
+        });
+
+    ctx.main_window->setSelectBrushCallback(
+        [ctx](const Domain::Position &pos, const Domain::Item *item,
+              UI::BrushPickMode mode) -> std::string {
+          if (!ctx.tab_manager || !ctx.brush_controller) {
+            return {};
+          }
+
+          auto *session = ctx.tab_manager->getActiveSession();
+          if (!session || !session->getMap()) {
+            return {};
+          }
+
+          const auto *tile = session->getMap()->getTile(pos);
+          if (!tile) {
+            return {};
+          }
+
+          if (!ctx.brush_controller->selectBrushFromTile(
+                  *tile, toBrushPickMode(mode), item)) {
+            return {};
+          }
+
+          const auto *brush = ctx.brush_controller->getCurrentBrush();
+          return brush ? brush->getName() : std::string{};
+        });
+
+    ctx.main_window->setRotateItemCallback(
+        [ctx](const Domain::Position &pos, const Domain::Item *item) -> bool {
+          return ctx.brush_controller &&
+                 ctx.brush_controller->rotateItemAt(pos, item);
+        });
+
+    ctx.main_window->setCanRotateItemCallback(
+        [ctx](const Domain::Position &pos, const Domain::Item *item) -> bool {
+          return ctx.brush_controller &&
+                 ctx.brush_controller->canRotateItemAt(pos, item);
+        });
+
+    ctx.main_window->setSwitchDoorCallback(
+        [ctx](const Domain::Position &pos, const Domain::Item *item) -> bool {
+          return ctx.brush_controller &&
+                 ctx.brush_controller->switchDoorAt(pos, item);
+        });
+
+    ctx.main_window->setCanSwitchDoorCallback(
+        [ctx](const Domain::Position &pos, const Domain::Item *item) -> bool {
+          return ctx.brush_controller &&
+                 ctx.brush_controller->canSwitchDoorAt(pos, item);
+        });
+
+    ctx.main_window->setDoorStateCallback(
+        [ctx](const Domain::Position &pos,
+              const Domain::Item *item) -> std::optional<bool> {
+          if (!ctx.brush_controller) {
+            return std::nullopt;
+          }
+
+          return ctx.brush_controller->getDoorOpenStateAt(pos, item);
+        });
+
+    ctx.main_window->setCanSelectBrushCallback(
+        [ctx](const Domain::Position &pos, const Domain::Item *item,
+              UI::BrushPickMode mode) -> bool {
+          if (!ctx.tab_manager || !ctx.brush_controller) {
+            return false;
+          }
+
+          auto *session = ctx.tab_manager->getActiveSession();
+          if (!session || !session->getMap()) {
+            return false;
+          }
+
+          const auto *tile = session->getMap()->getTile(pos);
+          if (!tile) {
+            return false;
+          }
+
+          return ctx.brush_controller
+              ->resolveBrushFromTile(*tile, toBrushPickMode(mode), item)
+              .has_value();
+        });
+
+    ctx.main_window->setSpawnPropertiesCallback(
+        [ctx](Domain::Spawn *spawn, const Domain::Position &pos) {
+          if (ctx.main_window) {
+            ctx.main_window->openSpawnPropertiesDialog(spawn, pos);
+          }
+        });
+
+    ctx.main_window->setCreaturePropertiesCallback(
+        [ctx](Domain::Creature *creature, const std::string &name,
+              const Domain::Position &creature_pos) {
+          if (ctx.main_window) {
+            ctx.main_window->openCreaturePropertiesDialog(creature, name,
+                                                          creature_pos);
           }
         });
   }
@@ -271,8 +444,11 @@ void CallbackMediator::wireTabCallbacks(Context &ctx) {
   });
 
   // Session modification callback
-  // Session modification callback
-  ctx.tab_manager->setSessionModifiedCallback([ctx](bool modified) {
+  ctx.tab_manager->setSessionModifiedCallback(
+      [ctx, suppressModifiedInvalidation](bool modified) {
+    if (*suppressModifiedInvalidation) {
+      return;
+    }
     if (auto *session = ctx.tab_manager->getActiveSession()) {
       if (ctx.rendering_manager) {
         if (auto *state =

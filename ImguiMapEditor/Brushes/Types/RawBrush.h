@@ -1,7 +1,8 @@
 #pragma once
 #include "Brushes/Core/BrushBase.h"
 namespace MapEditor::Domain {
-    class ItemType;
+    class ItemDefinition;
+    using ItemType = ItemDefinition;
 }
 
 namespace MapEditor::Brushes {
@@ -25,7 +26,7 @@ public:
      * @param itemId Server item ID to place
      * @param type Optional cached ItemType for efficiency
      */
-    explicit RawBrush(uint32_t itemId, const Domain::ItemType* type = nullptr);
+    explicit RawBrush(uint16_t itemId, const Domain::ItemType* type = nullptr);
     
     // ─── IBrush Implementation ────────────────────────────────────────────
     
@@ -45,7 +46,7 @@ public:
     /**
      * Get the item ID this brush places.
      */
-    uint32_t getItemId() const { return itemId_; }
+    uint16_t getItemId() const { return itemId_; }
     
     /**
      * Get the cached ItemType, if available.
@@ -58,7 +59,7 @@ public:
     void setCachedType(const Domain::ItemType* type) { cachedType_ = type; }
     
 private:
-    uint32_t itemId_;
+    uint16_t itemId_;
     const Domain::ItemType* cachedType_;
 };
 

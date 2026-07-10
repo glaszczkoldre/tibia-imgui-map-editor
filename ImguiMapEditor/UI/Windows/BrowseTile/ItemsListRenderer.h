@@ -10,7 +10,8 @@ namespace Domain {
 class Tile;
 class ChunkedMap;
 class Item;
-class ItemType;
+class ItemDefinition;
+using ItemType = ItemDefinition;
 } // namespace Domain
 
 namespace Services {

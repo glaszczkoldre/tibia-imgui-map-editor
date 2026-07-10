@@ -22,9 +22,10 @@ public:
   const std::string &getName() const override { return name_; }
   BrushType getType() const override { return BrushType::Waypoint; }
   uint32_t getLookId() const override { return 0; }
+  bool isDraggable() const override { return false; }
 
   // Waypoint name configuration
-  void setWaypointName(const std::string &name) { waypointName_ = name; }
+  void setWaypointName(std::string name) { waypointName_ = std::move(name); }
   const std::string &getWaypointName() const { return waypointName_; }
 
 private:

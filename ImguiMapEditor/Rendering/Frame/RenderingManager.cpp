@@ -79,4 +79,11 @@ RenderState *RenderingManager::getRenderState(SessionID session_id) const {
   return nullptr;
 }
 
+void RenderingManager::invalidateTiles(
+    SessionID session_id, std::span<const Domain::Position> positions) {
+  if (auto *state = getRenderState(session_id)) {
+    state->invalidateTiles(positions);
+  }
+}
+
 } // namespace MapEditor::Rendering

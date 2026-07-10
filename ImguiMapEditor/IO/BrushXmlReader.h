@@ -20,13 +20,6 @@ namespace MapEditor::Services {
 class ClientDataService;
 }
 
-namespace MapEditor::Services::Brushes {
-class BorderLookupService;
-class WallLookupService;
-class TableLookupService;
-class CarpetLookupService;
-} // namespace MapEditor::Services::Brushes
-
 namespace MapEditor::IO {
 
 /**
@@ -53,10 +46,7 @@ class BrushXmlReader {
 public:
   struct Dependencies {
     MapEditor::Brushes::BrushRegistry *brushRegistry = nullptr;
-    Services::Brushes::BorderLookupService *borderLookup = nullptr;
-    Services::Brushes::WallLookupService *wallLookup = nullptr;
-    Services::Brushes::TableLookupService *tableLookup = nullptr;
-    Services::Brushes::CarpetLookupService *carpetLookup = nullptr;
+
     Services::ClientDataService *clientData = nullptr;
   };
 
@@ -84,19 +74,28 @@ public:
 private:
   void parseBrushesRoot(const pugi::xml_node &root,
                         const std::filesystem::path &sourceFile);
-  void parseBrush(const pugi::xml_node &node);
+  void parseBrush(const pugi::xml_node &node,
+                  const std::filesystem::path &sourceFile);
 
   // Type-specific parsers
   void parseGroundBrush(const pugi::xml_node &node, const std::string &name,
-                        uint32_t lookId);
+                        uint32_t lookId,
+                        const std::filesystem::path &sourceFile);
   void parseWallBrush(const pugi::xml_node &node, const std::string &name,
-                      uint32_t lookId);
+                      uint32_t lookId,
+                      const std::filesystem::path &sourceFile);
+  void parseWallDecorationBrush(const pugi::xml_node &node,
+                                const std::string &name, uint32_t lookId,
+                                const std::filesystem::path &sourceFile);
   void parseDoodadBrush(const pugi::xml_node &node, const std::string &name,
-                        uint32_t lookId);
+                        uint32_t lookId,
+                        const std::filesystem::path &sourceFile);
   void parseTableBrush(const pugi::xml_node &node, const std::string &name,
-                       uint32_t lookId);
+                       uint32_t lookId,
+                       const std::filesystem::path &sourceFile);
   void parseCarpetBrush(const pugi::xml_node &node, const std::string &name,
-                        uint32_t lookId);
+                        uint32_t lookId,
+                        const std::filesystem::path &sourceFile);
 
   Dependencies deps_;
   std::unordered_set<std::string> loadedFiles_;

@@ -1,15 +1,11 @@
 #pragma once
 #include "IPreviewProvider.h"
 
-namespace MapEditor {
-namespace Services {
+namespace MapEditor::Services {
 class BrushSettingsService;
-} // namespace Services
-} // namespace MapEditor
+} // namespace MapEditor::Services
 
-namespace MapEditor {
-namespace Services {
-namespace Preview {
+namespace MapEditor::Services::Preview {
 
 /**
  * Preview provider for Spawn brush placement.
@@ -25,15 +21,7 @@ public:
    * Create spawn brush preview.
    * @param brushSettings Brush settings service for spawn radius
    */
-  explicit SpawnPreviewProvider(BrushSettingsService *brushSettings = nullptr);
-
-  /**
-   * Set brush settings service.
-   */
-  void setBrushSettingsService(BrushSettingsService *service) {
-    brushSettings_ = service;
-    needsRegen_ = true;
-  }
+  explicit SpawnPreviewProvider(const BrushSettingsService *brushSettings = nullptr);
 
   // IPreviewProvider interface
   bool isActive() const override;
@@ -44,24 +32,21 @@ public:
   PreviewStyle getStyle() const override { return PreviewStyle::Outline; }
 
   // Regeneration support
-  bool needsRegeneration() const override { return needsRegen_; }
   void regenerate() override;
 
-  void markNeedsRegeneration() { needsRegen_ = true; }
-
 private:
-  BrushSettingsService *brushSettings_ = nullptr;
+  const BrushSettingsService *brushSettings_ = nullptr;
   Domain::Position anchor_{0, 0, 0};
-  std::vector<PreviewTileData> tiles_;
-  PreviewBounds bounds_;
+  mutable std::vector<PreviewTileData> tiles_;
+  mutable PreviewBounds bounds_;
   mutable bool needsRegen_ = true;
 
-  // Cached radius for change detection
-  mutable int cachedRadius_ = 3;
+  static constexpr int kDefaultSpawnRadius = 3;
 
-  void buildSquarePreview();
+  // Cached radius for change detection
+  mutable int cachedRadius_ = kDefaultSpawnRadius;
+
+  void buildSquarePreview() const;
 };
 
-} // namespace Preview
-} // namespace Services
-} // namespace MapEditor
+} // namespace MapEditor::Services::Preview

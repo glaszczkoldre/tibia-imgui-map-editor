@@ -121,6 +121,7 @@ MapPropertiesDialog::Result MapPropertiesDialog::render() {
   return result;
 }
 
+
 void MapPropertiesDialog::applyToMap() {
   if (!map_)
     return;

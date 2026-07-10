@@ -1,5 +1,7 @@
 #pragma once
 #include "PreviewTypes.h"
+#include <cstdint>
+#include <optional>
 #include <vector>
 
 namespace MapEditor::Services::Preview {
@@ -50,24 +52,38 @@ public:
      * @param cursor New world position of cursor
      */
     virtual void updateCursorPosition(const Domain::Position& cursor) = 0;
-    
+
+    /**
+     * Update the fractional position within the tile (0..1 range).
+     * Used by wall brush preview for sub-tile alignment detection.
+     * Default is no-op. Override to use.
+     * @param fracX Horizontal fraction (0=left edge, 1=right edge)
+     * @param fracY Vertical fraction (0=top edge, 1=bottom edge)
+     */
+    virtual void updateFractionalPosition(float fracX, float fracY) {}
+
     /**
      * Get the preview style for rendering.
      * Default is Ghost (semi-transparent blue tint).
      */
     virtual PreviewStyle getStyle() const { return PreviewStyle::Ghost; }
     
-    /**
-     * Check if preview needs regeneration after parameter change.
-     * Default returns false (static preview data).
-     */
-    virtual bool needsRegeneration() const { return false; }
+
     
     /**
      * Regenerate preview tiles if content depends on parameters.
      * Called when brush size/shape changes for example.
      */
     virtual void regenerate() {}
+
+    /**
+     * Get the current deterministic seed used by the preview.
+     * Providers that use seeded randomness should return the seed
+     * so that the placement operation produces the exact same result
+     * as the preview.
+     * @return Seed value, or std::nullopt if not applicable
+     */
+    virtual std::optional<uint32_t> getCurrentSeed() const { return std::nullopt; }
 };
 
 } // namespace MapEditor::Services::Preview

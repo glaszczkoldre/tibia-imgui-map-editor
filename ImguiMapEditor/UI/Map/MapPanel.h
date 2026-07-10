@@ -101,6 +101,7 @@ public:
     view_settings_ = &settings;
   }
   void setEditorSession(AppLogic::EditorSession *session);
+  AppLogic::EditorSession *getEditorSession() const { return session_; }
   void setInputController(AppLogic::MapInputController *controller) {
     input_controller_ = controller;
   }
@@ -112,6 +113,7 @@ public:
   }
   void setBrushController(Brushes::BrushController *brush_controller) {
     brush_controller_ = brush_controller;
+    input_.setBrushController(brush_controller);
   }
 
   // Context menu state

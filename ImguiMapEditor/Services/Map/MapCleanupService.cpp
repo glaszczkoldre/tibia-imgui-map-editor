@@ -96,7 +96,7 @@ CleanupResult MapCleanupService::cleanHouseItems(
                 
                 // Get item type to check if moveable
                 const Domain::ItemType* item_type = client_data.getItemTypeByServerId(item->getServerId());
-                if (item_type && item_type->is_moveable) {
+                if (item_type && item_type->isMoveable()) {
                     tile->removeItem(idx);
                     result.items_removed++;
                 }

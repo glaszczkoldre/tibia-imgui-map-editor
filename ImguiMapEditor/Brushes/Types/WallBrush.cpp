@@ -1,0 +1,580 @@
+#include "WallBrush.h"
+
+#include "Brushes/BrushRegistry.h"
+#include "Brushes/Types/BrushUtils.h"
+#include "Domain/ChunkedMap.h"
+#include "Domain/Item.h"
+#include "Domain/Tile.h"
+#include "Services/ClientDataService.h"
+#include "Services/BrushSettingsService.h"
+#include "Services/Brushes/WallLookupService.h"
+#include <algorithm>
+#include <array>
+#include <cctype>
+#include <functional>
+#include <unordered_set>
+#include <iostream>
+
+namespace MapEditor::Brushes {
+
+namespace {
+
+std::string normalizeName(const std::string &value) {
+  std::string normalized = value;
+  std::transform(normalized.begin(), normalized.end(), normalized.begin(),
+                 [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+  return normalized;
+}
+
+constexpr std::array<std::tuple<int, int, WallNeighbor>, 4> kWallNeighbors{{
+    {0, -1, WallNeighbor::North},
+    {-1, 0, WallNeighbor::West},
+    {1, 0, WallNeighbor::East},
+    {0, 1, WallNeighbor::South},
+}};
+
+} // namespace
+
+void WallBrush::updateConsecutiveDecorations(
+    Domain::Tile &tile, Domain::Item *baseItem,
+    const std::function<uint16_t(const WallBrush &, const Domain::Item &)> &resolveItemId) const {
+  if (!baseItem) {
+    return;
+  }
+
+  size_t baseIndex = tile.getItemCount();
+  for (size_t index = 0; index < tile.getItemCount(); ++index) {
+    if (tile.getItem(index) == baseItem) {
+      baseIndex = index;
+      break;
+    }
+  }
+
+  if (baseIndex == tile.getItemCount()) {
+    return;
+  }
+
+  std::vector<const Domain::Item *> itemsToRemove;
+  for (size_t index = baseIndex + 1; index < tile.getItemCount(); ++index) {
+    auto *item = tile.getItem(index);
+    if (!item) {
+      continue;
+    }
+
+    const auto *itemBrush = WallBrush::resolveWallBrushForItem(*item, registry_);
+    auto *decorationBrush = dynamic_cast<const WallBrush *>(itemBrush);
+    if (!decorationBrush ||
+        decorationBrush->getType() != BrushType::WallDecoration) {
+      break;
+    }
+
+    if (const auto itemId = resolveItemId(*decorationBrush, *item);
+        itemId != 0) {
+      const auto ownerBrushId =
+          item->getOwnerBrushId() != InvalidBrushId
+              ? item->getOwnerBrushId()
+              : registry_.getBrushId(decorationBrush);
+      Types::updateItemVisuals(*item, registry_, itemId, ownerBrushId);
+      continue;
+    }
+
+    itemsToRemove.push_back(item);
+  }
+
+  if (!itemsToRemove.empty()) {
+    tile.removeItemsIf([&itemsToRemove](const Domain::Item *item) {
+      return std::find(itemsToRemove.begin(), itemsToRemove.end(), item) !=
+             itemsToRemove.end();
+    });
+  }
+}
+
+const WallBrush *WallBrush::resolveWallBrushForItem(const Domain::Item &item,
+                                                     BrushRegistry &registry) {
+  if (item.getOwnerBrushId() != InvalidBrushId) {
+    if (const auto *brush =
+            dynamic_cast<const WallBrush *>(registry.getBrushById(item.getOwnerBrushId()))) {
+      return brush;
+    }
+  }
+
+  for (auto *brush : registry.getBrushesForItem(item.getServerId())) {
+    if (const auto *wallBrush = dynamic_cast<const WallBrush *>(brush)) {
+      return wallBrush;
+    }
+  }
+
+  return nullptr;
+}
+
+WallBrush::WallBrush(std::string name, uint32_t lookId, BrushRegistry &registry)
+    : BrushBase(std::move(name), lookId, true), registry_(registry),
+      normalizedName_(normalizeName(getName())) {}
+
+void WallBrush::draw(Domain::ChunkedMap &map, Domain::Tile *tile,
+                     const DrawContext &ctx) {
+  if (!tile) {
+    return;
+  }
+
+  const auto placement = placeWallTile(*tile, ctx);
+  if (!placement.changed) {
+    return;
+  }
+
+  if (placement.requiresRebuild && (!ctx.brushSettings || ctx.brushSettings->getAutoBorder())) {
+    rebuildAround(map, tile->getPosition());
+  }
+  map.markChanged();
+}
+
+void WallBrush::undraw(Domain::ChunkedMap &map, Domain::Tile *tile) {
+  if (!tile) {
+    return;
+  }
+  eraseFromTile(*tile);
+  rebuildAround(map, tile->getPosition());
+  map.markChanged();
+}
+
+WallBrush::DirectPlacementResult
+WallBrush::placeWallTile(Domain::Tile &tile, const DrawContext &ctx) const {
+  if (ctx.specialAction) {
+    for (const auto &item : tile.getItems()) {
+      if (!item) {
+        continue;
+      }
+
+      const auto *itemBrush = resolveWallBrushForItem(*item, registry_);
+      if (itemBrush != this) {
+        continue;
+      }
+
+      const auto replacementId = findNextWallVariant(item->getServerId());
+      if (!replacementId.has_value()) {
+        return {};
+      }
+
+      Types::updateItemVisuals(*item, registry_, *replacementId,
+                               ctx.ownerBrushId != InvalidBrushId
+                                   ? ctx.ownerBrushId
+                                   : item->getOwnerBrushId());
+      tile.markDirty();
+      return {.changed = true, .requiresRebuild = false};
+    }
+  }
+
+  tile.removeItemsIf([this](const Domain::Item *item) { return ownsItem(item); });
+  if (const auto itemId = selectWallItem(WallAlign::Horizontal); itemId != 0) {
+    tile.addItem(Types::createTypedItem(ctx, itemId));
+  }
+  const bool deferNeighborRebuild =
+      ctx.isDragging && !ctx.specialAction;
+  return {.changed = true, .requiresRebuild = !deferNeighborRebuild};
+}
+
+void WallBrush::eraseFromTile(Domain::Tile &tile) const {
+  tile.removeItemsIf([this](const Domain::Item *item) { return ownsItem(item); });
+}
+
+bool WallBrush::ownsItem(const Domain::Item *item) const {
+  return item && ownedItemIds_.contains(item->getServerId());
+}
+
+void WallBrush::addWallItem(WallAlign align, uint16_t itemId, uint32_t chance) {
+  wallNodes_[static_cast<size_t>(align)].addItem(itemId, chance);
+  itemAlignments_[itemId] = align;
+  ownedItemIds_.insert(itemId);
+  registry_.registerItemBinding(itemId, this);
+  if (lookId_ == 0) {
+    lookId_ = itemId;
+  }
+}
+
+void WallBrush::addDoorItem(WallAlign align, DoorNode door) {
+  door.alignment = align;
+  for (const auto itemId : door.items) {
+    doorNodesByItemId_.try_emplace(itemId, door);
+    itemAlignments_[itemId] = align;
+    ownedItemIds_.insert(itemId);
+    registry_.registerItemBinding(itemId, this);
+    if (lookId_ == 0) {
+      lookId_ = itemId;
+    }
+  }
+  doorNodes_[static_cast<size_t>(align)].push_back(std::move(door));
+}
+
+void WallBrush::addRedirectName(const std::string &name) {
+  redirectNames_.insert(normalizeName(name));
+  redirectBrushesCacheDirty_ = true;
+}
+
+void WallBrush::addFriendName(const std::string &name) {
+  friendNames_.insert(normalizeName(name));
+}
+
+void WallBrush::addWallHateMeItem(uint16_t itemId) {
+  wallHateMeItems_.insert(itemId);
+}
+
+uint16_t WallBrush::getPreviewItemId() const {
+  if (const auto itemId = selectWallItem(WallAlign::Horizontal); itemId != 0) {
+    return itemId;
+  }
+  return lookId_;
+}
+
+std::optional<WallAlign> WallBrush::getAlignmentForItem(uint16_t itemId) const {
+  return findAlignmentForItem(itemId);
+}
+
+uint16_t WallBrush::getWallItemForAlign(WallAlign align) const {
+  return selectWallItem(align);
+}
+
+
+void WallBrush::rebuildAround(Domain::ChunkedMap &map,
+                              const Domain::Position &center) const {
+  for (int dy = -1; dy <= 1; ++dy) {
+    for (int dx = -1; dx <= 1; ++dx) {
+      rebuildTile(map, {center.x + dx, center.y + dy, center.z});
+    }
+  }
+}
+
+void WallBrush::rebuildTiles(
+    Domain::ChunkedMap &map, std::span<const Domain::Position> positions) const {
+  for (const auto &pos : positions) {
+    rebuildTile(map, pos);
+  }
+}
+
+void WallBrush::rebuildNeighbors(Domain::ChunkedMap &map,
+                                 const Domain::Position &center) const {
+  for (int dy = -1; dy <= 1; ++dy) {
+    for (int dx = -1; dx <= 1; ++dx) {
+      if (dx == 0 && dy == 0) {
+        continue;
+      }
+
+      rebuildTile(map, {center.x + dx, center.y + dy, center.z});
+    }
+  }
+}
+
+const std::vector<const WallBrush *> &WallBrush::getRedirectBrushes() const {
+  if (!redirectBrushesCacheDirty_) {
+    return redirectBrushesCache_;
+  }
+
+  redirectBrushesCache_.clear();
+  redirectBrushesCacheDirty_ = false;
+  if (redirectNames_.empty()) {
+    return redirectBrushesCache_;
+  }
+
+  for (auto *brush : registry_.getAllBrushes()) {
+    auto *wallBrush = dynamic_cast<const WallBrush *>(brush);
+    if (!wallBrush || wallBrush == this) {
+      continue;
+    }
+
+    if (redirectNames_.contains(normalizeName(wallBrush->getName()))) {
+      redirectBrushesCache_.push_back(wallBrush);
+    }
+  }
+  return redirectBrushesCache_;
+}
+
+bool WallBrush::isWallGroupItem(uint16_t itemId) const {
+  for (auto *brush : registry_.getBrushesForItem(itemId)) {
+    auto *wallBrush = dynamic_cast<const WallBrush *>(brush);
+    if (wallBrush && connectsTo(wallBrush)) {
+      return true;
+    }
+  }
+
+  return findAlignmentForItem(itemId).has_value();
+}
+
+std::optional<WallAlign> WallBrush::findAlignmentForItem(uint16_t itemId) const {
+  std::optional<WallAlign> alignment;
+  visitWallRedirectChain([&](const WallBrush &brush) {
+    if (const auto it = brush.itemAlignments_.find(itemId);
+        it != brush.itemAlignments_.end()) {
+      alignment = it->second;
+      return true;
+    }
+    return false;
+  });
+  return alignment;
+}
+
+std::optional<uint16_t> WallBrush::findNextWallVariant(uint16_t currentItemId) const {
+  const auto alignment = findAlignmentForItem(currentItemId);
+  if (!alignment.has_value()) {
+    return std::nullopt;
+  }
+
+  std::vector<uint16_t> candidates;
+  visitWallRedirectChain([&](const WallBrush &brush) {
+    for (const auto &[candidateId, _] :
+         brush.wallNodes_[static_cast<size_t>(*alignment)].getItems()) {
+      if (candidateId == 0 ||
+          std::find(candidates.begin(), candidates.end(), candidateId) !=
+              candidates.end()) {
+        continue;
+      }
+
+      candidates.push_back(static_cast<uint16_t>(candidateId));
+    }
+
+    return false;
+  });
+
+  if (candidates.size() <= 1) {
+    return std::nullopt;
+  }
+
+  const auto currentIt =
+      std::find(candidates.begin(), candidates.end(), currentItemId);
+  if (currentIt == candidates.end()) {
+    return candidates.front();
+  }
+
+  auto nextIt = std::next(currentIt);
+  if (nextIt == candidates.end()) {
+    nextIt = candidates.begin();
+  }
+
+  return *nextIt;
+}
+
+std::optional<WallAlign>
+WallBrush::findTileAlignment(const Domain::Tile &tile) const {
+  for (const auto &item : tile.getItems()) {
+    if (!item) {
+      continue;
+    }
+    if (const auto alignment = findAlignmentForItem(item->getServerId())) {
+      return alignment;
+    }
+  }
+  return std::nullopt;
+}
+
+uint16_t WallBrush::selectWallItem(WallAlign align) const {
+  uint16_t itemId = 0;
+  visitWallRedirectChain([&](const WallBrush &brush) {
+    itemId = brush.wallNodes_[static_cast<size_t>(align)].getRandomItem(registry_.getRng());
+    return itemId != 0;
+  });
+  return itemId;
+}
+
+
+
+void WallBrush::rebuildTile(Domain::ChunkedMap &map,
+                            const Domain::Position &pos) const {
+  auto *tile = map.getTile(pos);
+  if (!tile || !tileHasWallGroup(tile)) {
+    return;
+  }
+
+  DoorType currentDoorType = DoorType::Undefined;
+  bool isOpen = false;
+  bool isLocked = false;
+  std::optional<WallAlign> currentAlignment;
+  BrushId currentOwnerBrushId = registry_.getBrushId(this);
+  Domain::Item *baseItem = nullptr;
+  std::vector<Domain::Item *> duplicateBaseItems;
+  for (const auto &item : tile->getItems()) {
+    if (!item) {
+      continue;
+    }
+
+    const auto *itemBrush = resolveWallBrushForItem(*item, registry_);
+    if (!itemBrush || itemBrush->getType() == BrushType::WallDecoration ||
+        !connectsTo(itemBrush)) {
+      continue;
+    }
+
+    if (!baseItem) {
+      baseItem = item.get();
+      currentAlignment = findAlignmentForItem(item->getServerId());
+    } else {
+      duplicateBaseItems.push_back(item.get());
+    }
+
+    if (const auto door = findDoorForItem(item->getServerId())) {
+      currentDoorType = door->type;
+      isOpen = door->isOpen;
+      isLocked = door->isLocked;
+      currentAlignment = door->alignment;
+      if (item->getOwnerBrushId() != InvalidBrushId) {
+        currentOwnerBrushId = item->getOwnerBrushId();
+      }
+    }
+  }
+
+  if (!baseItem) {
+    return;
+  }
+
+  if (pos == Domain::Position{118, 27, 7}) {
+    std::cout << "[DEBUG] rebuildTile called on (118, 27, 7)\n";
+  }
+
+  // Compute neighbor bitmask (same encoding as RME: N=1, W=2, E=4, S=8)
+  WallNeighbor neighbors = WallNeighbor::None;
+  for (const auto &[dx, dy, bit] : kWallNeighbors) {
+    const auto *neighborTile = map.getTile(pos.x + dx, pos.y + dy, pos.z);
+    const bool hasWall = tileHasWallGroup(neighborTile);
+    if (pos == Domain::Position{118, 27, 7}) {
+      std::cout << "  Neighbor dx=" << dx << " dy=" << dy << " hasWall=" << hasWall << "\n";
+    }
+    if (hasWall) {
+      neighbors |= bit;
+    }
+  }
+
+  // Two-pass alignment: try full table first, then half table (RME parity)
+  static const Services::Brushes::WallLookupService lookupService;
+  const auto fullAlign = lookupService.getFullType(neighbors);
+  const auto halfAlign = lookupService.getHalfType(neighbors);
+
+  auto resolvedAlignment = fullAlign;
+  uint16_t replacementId = 0;
+
+  if (currentDoorType != DoorType::Undefined) {
+    if (currentAlignment && (*currentAlignment == fullAlign || *currentAlignment == halfAlign) && baseItem) {
+      replacementId = baseItem->getServerId();
+      resolvedAlignment = *currentAlignment;
+    } else {
+      if (currentAlignment) {
+        if (const auto door =
+                selectDoorItem(*currentAlignment, currentDoorType, isOpen, isLocked)) {
+          replacementId = static_cast<uint16_t>(door->getItem());
+          resolvedAlignment = *currentAlignment;
+        }
+      }
+
+      if (replacementId == 0) {
+        if (const auto door =
+                selectDoorItem(fullAlign, currentDoorType, isOpen, isLocked)) {
+          replacementId = static_cast<uint16_t>(door->getItem());
+          resolvedAlignment = fullAlign;
+        }
+      }
+
+      // Half table fallback for doors
+      if (replacementId == 0 && halfAlign != fullAlign) {
+        if (const auto door =
+                selectDoorItem(halfAlign, currentDoorType, isOpen, isLocked)) {
+          replacementId = static_cast<uint16_t>(door->getItem());
+          resolvedAlignment = halfAlign;
+        }
+      }
+    }
+  }
+
+  // Wall item selection with two-pass fallback
+  if (replacementId == 0) {
+    replacementId = selectWallItem(fullAlign);
+    resolvedAlignment = fullAlign;
+  }
+  if (replacementId == 0 && halfAlign != fullAlign) {
+    replacementId = selectWallItem(halfAlign);
+    resolvedAlignment = halfAlign;
+  }
+  if (replacementId == 0) {
+    replacementId = selectWallItem(WallAlign::Horizontal);
+    resolvedAlignment = WallAlign::Horizontal;
+  }
+
+  if (replacementId == 0) {
+    return;
+  }
+
+  Types::updateItemVisuals(*baseItem, registry_, replacementId,
+                           currentOwnerBrushId);
+
+  updateConsecutiveDecorations(
+      *tile, baseItem,
+      [resolvedAlignment, currentDoorType, isOpen, isLocked](
+          const WallBrush &decorationBrush, const Domain::Item &) -> uint16_t {
+        if (currentDoorType != DoorType::Undefined) {
+          if (const auto decorationDoor =
+                  decorationBrush.getDoorItemForAlign(resolvedAlignment,
+                                                      currentDoorType, isOpen,
+                                                      isLocked);
+              decorationDoor.has_value()) {
+            return static_cast<uint16_t>(decorationDoor->getItem());
+          }
+
+          return 0;
+        }
+
+        return decorationBrush.getWallItemForAlign(resolvedAlignment);
+      });
+
+  if (!duplicateBaseItems.empty()) {
+    tile->removeItemsIf([&duplicateBaseItems](const Domain::Item *item) {
+      return std::find(duplicateBaseItems.begin(), duplicateBaseItems.end(),
+                       item) != duplicateBaseItems.end();
+    });
+  }
+
+  tile->markDirty();
+}
+
+bool WallBrush::connectsTo(const IBrush *brush) const {
+  if (brush == this) {
+    return true;
+  }
+
+  const auto *wallBrush = dynamic_cast<const WallBrush *>(brush);
+  if (!wallBrush) {
+    return false;
+  }
+
+  // Wall decoration brushes connect to any wall brush
+  if (getType() == BrushType::WallDecoration || wallBrush->getType() == BrushType::WallDecoration) {
+    return true;
+  }
+
+  // Redirect friends (bidirectional)
+  if (redirectNames_.contains(wallBrush->normalizedName_) ||
+      wallBrush->redirectNames_.contains(normalizedName_)) {
+    return true;
+  }
+  // Non-redirect friends (bidirectional)
+  if (friendNames_.contains(wallBrush->normalizedName_) ||
+      wallBrush->friendNames_.contains(normalizedName_)) {
+    return true;
+  }
+  return false;
+}
+
+bool WallBrush::tileHasWallGroup(const Domain::Tile *tile) const {
+  if (!tile) {
+    return false;
+  }
+
+  for (const auto &item : tile->getItems()) {
+    if (!item) {
+      continue;
+    }
+    // WallHateMe items break wall connections
+    if (wallHateMeItems_.contains(item->getServerId())) {
+      continue;
+    }
+    if (isWallGroupItem(item->getServerId())) {
+      return true;
+    }
+  }
+  return false;
+}
+
+} // namespace MapEditor::Brushes

@@ -11,6 +11,7 @@
 #include "Rendering/Overlays/PreviewOverlay.h"
 #include "Rendering/Overlays/SelectionOverlay.h"
 #include "Rendering/Overlays/StatusOverlay.h"
+#include "Rendering/Visibility/FloorIterator.h"
 #include "Rendering/Visibility/LODPolicy.h"
 #include "Services/Preview/DragPreviewProvider.h"
 #include "ext/fontawesome6/IconsFontAwesome6.h"
@@ -227,8 +228,23 @@ void MapPanel::renderInternal(MapType *map, Rendering::RenderState &state,
         glm::vec2 current_mouse(io.MousePos.x, io.MousePos.y);
         Domain::Position mouse_tile = camera_.screenToTile(current_mouse);
 
+        // Compute fractional position within tile (0..1) for sub-tile precision
+        // Used by wall brush preview for virtual grid alignment
+        float floor_offset =
+            Rendering::FloorIterator::getFloorOffset(camera_.getCurrentFloor(),
+                                                     camera_.getCurrentFloor());
+        float offset_tiles = floor_offset / Config::Rendering::TILE_SIZE;
+        glm::vec2 local = current_mouse - camera_.getViewportPos() -
+                          camera_.getViewportSize() * 0.5f;
+        local /= (Config::Rendering::TILE_SIZE * camera_.getZoom());
+        float world_x = camera_.getCameraPosition().x + local.x + offset_tiles;
+        float world_y = camera_.getCameraPosition().y + local.y + offset_tiles;
+        float fracX = world_x - std::floor(world_x);
+        float fracY = world_y - std::floor(world_y);
+
         auto &previewService = session_->getPreviewService();
         previewService.updateCursor(mouse_tile);
+        previewService.updateFractional(fracX, fracY);
 
         // Note: The previous logic calling view_model->getPastePreview() etc.
         // was invalid and has been replaced by the PreviewService logic here.
@@ -241,7 +257,8 @@ void MapPanel::renderInternal(MapType *map, Rendering::RenderState &state,
             previewService.getPreviewTiles(),
             previewService.getAnchorPosition(), camera_.getCameraPosition(),
             camera_.getViewportPos(), camera_.getViewportSize(),
-            camera_.getZoom(), previewService.getStyle());
+            camera_.getZoom(), previewService.getStyle(),
+            map);
       }
     }
   }

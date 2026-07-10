@@ -1,15 +1,11 @@
 #pragma once
 #include "IPreviewProvider.h"
 
-namespace MapEditor {
-namespace Services {
+namespace MapEditor::Services {
 class BrushSettingsService;
-} // namespace Services
-} // namespace MapEditor
+} // namespace MapEditor::Services
 
-namespace MapEditor {
-namespace Services {
-namespace Preview {
+namespace MapEditor::Services::Preview {
 
 /**
  * Preview provider for Creature brush placement.
@@ -28,16 +24,8 @@ public:
    */
   explicit CreaturePreviewProvider(
       const std::string &creatureName,
-      BrushSettingsService *brushSettings = nullptr);
-
-  /**
-   * Set brush settings service for size/shape.
-   * Called if settings weren't available at construction.
-   */
-  void setBrushSettingsService(BrushSettingsService *service) {
-    brushSettings_ = service;
-    needsRegen_ = true;
-  }
+      const BrushSettingsService *brushSettings = nullptr,
+      uint8_t direction = 2);
 
   // IPreviewProvider interface
   bool isActive() const override;
@@ -47,35 +35,22 @@ public:
   void updateCursorPosition(const Domain::Position &cursor) override;
 
   // Regeneration support for brush size changes
-  bool needsRegeneration() const override { return needsRegen_; }
   void regenerate() override;
-
-  /**
-   * Get the creature name being previewed.
-   */
-  const std::string &getCreatureName() const { return creatureName_; }
-
-  /**
-   * Mark preview as needing regeneration.
-   * Called by BrushSettingsService when settings change.
-   */
-  void markNeedsRegeneration() { needsRegen_ = true; }
 
 private:
   std::string creatureName_;
-  BrushSettingsService *brushSettings_ = nullptr;
+  const BrushSettingsService *brushSettings_ = nullptr;
+  uint8_t direction_ = 2;
   Domain::Position anchor_{0, 0, 0};
-  std::vector<PreviewTileData> tiles_;
-  PreviewBounds bounds_;
+  mutable std::vector<PreviewTileData> tiles_;
+  mutable PreviewBounds bounds_;
   mutable bool needsRegen_ = false;
 
   // Cached settings for change detection
   mutable std::vector<std::pair<int, int>> cachedOffsets_;
 
-  void buildPreview();
+  void buildPreview() const;
   bool checkSettingsChanged() const;
 };
 
-} // namespace Preview
-} // namespace Services
-} // namespace MapEditor
+} // namespace MapEditor::Services::Preview

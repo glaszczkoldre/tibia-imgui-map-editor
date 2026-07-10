@@ -1,0 +1,56 @@
+#pragma once
+
+#include "Brushes/Core/BrushBase.h"
+#include "Brushes/Enums/BrushEnums.h"
+#include <array>
+#include <cstdint>
+#include <unordered_set>
+#include <vector>
+
+namespace MapEditor::Brushes {
+
+class BrushRegistry;
+
+/**
+ * Table brush.
+ *
+ * Mirrors `CarpetBrush`: paints a single "alone" item, then re-aligns the
+ * 3x3 area based on the 8-neighbour bitmask of owned tiles. The lookup is
+ * delegated to `TableLookupService`; item selection and ownership
+ * bookkeeping are shared with `CarpetBrush` via
+ * `Brushes::Helpers::AlignedBrushHelpers`.
+ */
+class TableBrush : public BrushBase {
+public:
+  TableBrush(std::string name, uint32_t lookId, BrushRegistry &registry);
+
+  BrushType getType() const override { return BrushType::Table; }
+  bool needsBorderUpdate() const override { return true; }
+  bool needBorders() const override { return true; }
+
+  void draw(Domain::ChunkedMap &map, Domain::Tile *tile,
+            const DrawContext &ctx) override;
+  void undraw(Domain::ChunkedMap &map, Domain::Tile *tile) override;
+  bool ownsItem(const Domain::Item *item) const override;
+
+  void addAlignedItem(TableAlign align, uint16_t itemId, uint32_t chance);
+  uint16_t getPreviewItemId() const;
+
+  void placeAloneTile(Domain::Tile &tile, const DrawContext &ctx) const;
+  void eraseFromTile(Domain::Tile &tile) const;
+  void rebuildAround(Domain::ChunkedMap &map,
+                     const Domain::Position &center) const;
+  void rebuildTile(Domain::ChunkedMap &map,
+                   const Domain::Position &pos) const;
+
+private:
+  static constexpr size_t kTableAlignCount = 7;
+  uint16_t selectItem(TableAlign align) const;
+  bool tileHasBrush(const Domain::Tile *tile) const;
+
+  BrushRegistry &registry_;
+  std::array<std::vector<std::pair<uint16_t, uint32_t>>, kTableAlignCount> itemsByAlign_{};
+  std::unordered_set<uint16_t> ownedItemIds_;
+};
+
+} // namespace MapEditor::Brushes

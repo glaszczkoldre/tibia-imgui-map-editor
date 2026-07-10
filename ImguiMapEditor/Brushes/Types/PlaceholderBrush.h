@@ -15,8 +15,8 @@ namespace MapEditor::Brushes {
         
         bool isDraggable() const override { return false; }
         
-        void draw(Domain::ChunkedMap& map, Domain::Tile* tile, const DrawContext& ctx) override {}
-        void undraw(Domain::ChunkedMap& map, Domain::Tile* tile) override {}
+        void draw(Domain::ChunkedMap&, Domain::Tile*, const DrawContext&) override {}
+        void undraw(Domain::ChunkedMap&, Domain::Tile*) override {}
 
     private:
         std::string name_;

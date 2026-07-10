@@ -5,6 +5,10 @@ namespace MapEditor::Brushes {
 class IBrush;
 }
 
+namespace MapEditor::Domain {
+class ChunkedMap;
+}
+
 namespace MapEditor::Services {
 class BrushSettingsService;
 }
@@ -15,14 +19,6 @@ class IPreviewProvider;
 
 /**
  * Factory that creates preview providers based on brush type.
- *
- * Centralizes preview creation logic in one service.
- * Uses dynamic_cast to detect brush types and create appropriate providers.
- *
- * Supported brushes:
- * - RawBrush -> RawBrushPreviewProvider
- * - CreatureBrush -> (future) CreaturePreviewProvider
- * - Other types -> nullptr (no preview)
  */
 class BrushPreviewFactory {
 public:
@@ -33,7 +29,9 @@ public:
    * @return Provider, or nullptr if brush has no preview support
    */
   std::unique_ptr<IPreviewProvider>
-  createProvider(const Brushes::IBrush *brush, BrushSettingsService *settings);
+  createProvider(const ::MapEditor::Brushes::IBrush *brush,
+                 const BrushSettingsService *settings,
+                 const ::MapEditor::Domain::ChunkedMap *map = nullptr);
 };
 
 } // namespace MapEditor::Services::Preview

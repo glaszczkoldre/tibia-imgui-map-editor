@@ -120,13 +120,18 @@ bool HotkeyJsonReader::load(const std::filesystem::path& path, Domain::HotkeyBin
                         continue;
                     }
                 }
-                
+
                 // Parse modifiers
                 binding.mods = 0;
                 if (binding_data.contains("mods")) {
                     for (const auto& mod : binding_data["mods"]) {
                         binding.mods |= parseModifier(mod.get<std::string>());
                     }
+                }
+
+                if (binding.action_id == "SHOW_SHADE" &&
+                    binding.key == GLFW_KEY_Q && binding.mods == 0) {
+                    binding.key = GLFW_KEY_F9;
                 }
                 
                 temp.emplace(binding.action_id, std::move(binding));

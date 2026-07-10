@@ -22,12 +22,10 @@ struct SelectionSettings;
 namespace AppLogic {
 class MapTabManager;
 } // namespace AppLogic
-namespace UI {
-class TilesetWidget;
-} // namespace UI
 namespace Brushes {
 class BrushController;
 class BrushRegistry;
+class BrushSystem;
 } // namespace Brushes
 } // namespace MapEditor
 
@@ -44,7 +42,7 @@ struct UIFactoryContext {
   Services::OtbmSettings &otbm_settings;
   AppLogic::MapTabManager &tab_manager;
   AppStateManager &state_manager;
-  UI::TilesetWidget &tileset_widget;
+  Brushes::BrushSystem &brush_system;
   Brushes::BrushController &brush_controller;
   Brushes::BrushRegistry &brush_registry;
   Services::TilesetService &tileset_service; // For palette/tileset UI access

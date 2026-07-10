@@ -1,4 +1,5 @@
 #include "PropertyPanelRenderer.h"
+#include "../../../Utils/StringCopy.h"
 #include "Domain/Item.h"
 #include "Domain/ItemType.h"
 #include "Domain/Spawn.h"
@@ -65,7 +66,7 @@ PanelType PropertyPanelRenderer::detectPanelType() const {
     // Writeable check - uses group from OTB, also check maxTextLen, Readable flag, or if text is set
     if (item_type_->isWriteable() || 
         item_type_->maxTextLen > 0 || 
-        item_type_->hasFlag(Domain::ItemFlag::Readable) ||
+        item_type_->hasFlag(Domain::ItemFlag::CanReadText) ||
         !item_->getText().empty()) {
         return PanelType::Writeable;
     }
@@ -135,7 +136,7 @@ void PropertyPanelRenderer::loadValuesFromContext() {
         // Text
         std::string text = item_->getText();
         if (!text.empty()) {
-            std::strncpy(edit_.text, text.c_str(), sizeof(edit_.text) - 1);
+            ::MapEditor::Utils::copyTruncate(edit_.text, text);
         }
     }
     
@@ -253,7 +254,7 @@ void PropertyPanelRenderer::renderCommonItemFields() {
     dirty_ |= PropertyWidgets::inputUniqueId(edit_.unique_id);
     
     // Count for stackables
-    if (item_type_->is_stackable) {
+    if (item_type_->isStackable()) {
         dirty_ |= PropertyWidgets::inputCount(edit_.count, 100);
     }
     

@@ -26,6 +26,15 @@ void HistoryBuffer::push(std::unique_ptr<HistoryEntry> entry) {
     size_t entry_size = entry->memsize();
     current_memory_ += entry_size;
     
+    // Handle capacity limit manually to prevent memory tracking leaks and index shifting mismatches
+    if (entries_.full()) {
+        current_memory_ -= entries_.front()->memsize();
+        entries_.pop_front();
+        if (current_index_ > 0) {
+            --current_index_;
+        }
+    }
+    
     // Add new entry
     entries_.push_back(std::move(entry));
     current_index_ = entries_.size();
