@@ -159,15 +159,7 @@ void TooltipBubbleRenderer::endBubbles() {
                     instances_.size() * sizeof(BubbleInstance),
                     instances_.data());
     
-    // Save OpenGL state
-    GLboolean scissor_enabled = glIsEnabled(GL_SCISSOR_TEST);
-    GLboolean blend_enabled = glIsEnabled(GL_BLEND);
-    GLint blend_src, blend_dst;
-    glGetIntegerv(GL_BLEND_SRC_ALPHA, &blend_src);
-    glGetIntegerv(GL_BLEND_DST_ALPHA, &blend_dst);
-    
-    // Set up rendering state
-    if (scissor_enabled) glDisable(GL_SCISSOR_TEST);
+    // Set up rendering state statelessly without glGet* pipeline stalls
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     
@@ -178,11 +170,6 @@ void TooltipBubbleRenderer::endBubbles() {
     glBindVertexArray(vao_.get());
     glDrawArraysInstanced(GL_TRIANGLES, 0, 6, static_cast<GLsizei>(instances_.size()));
     glBindVertexArray(0);
-    
-    // Restore state
-    if (scissor_enabled) glEnable(GL_SCISSOR_TEST);
-    if (!blend_enabled) glDisable(GL_BLEND);
-    glBlendFunc(blend_src, blend_dst);
 }
 
 void TooltipBubbleRenderer::renderText(ImDrawList* draw_list) {

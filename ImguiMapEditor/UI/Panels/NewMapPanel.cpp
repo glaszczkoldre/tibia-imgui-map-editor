@@ -3,6 +3,7 @@
 #include "UI/Core/Theme.h"
 #include "ext/fontawesome6/IconsFontAwesome6.h"
 #include <algorithm>
+#include <cmath>
 #include <format>
 #include <imgui.h>
 #include <misc/cpp/imgui_stdlib.h>

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Rendering/Core/GLHandle.h"
 #include <vector>
 #include <cstdint>
 
@@ -15,7 +16,7 @@ namespace Rendering {
 class LightTexture {
 public:
     LightTexture();
-    ~LightTexture();
+    ~LightTexture() = default;
     
     // Non-copyable
     LightTexture(const LightTexture&) = delete;
@@ -38,7 +39,7 @@ public:
     /**
      * Get the OpenGL texture ID.
      */
-    uint32_t getTextureId() const { return texture_id_; }
+    uint32_t getTextureId() const { return texture_handle_.get(); }
     
     /**
      * Get texture dimensions.
@@ -47,7 +48,7 @@ public:
     int getHeight() const { return height_; }
 
 private:
-    uint32_t texture_id_ = 0;
+    DeferredGLHandle<TextureTraits> texture_handle_;
     int width_ = 0;
     int height_ = 0;
     std::vector<uint8_t> buffer_;  // RGBA buffer

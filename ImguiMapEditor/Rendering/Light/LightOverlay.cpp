@@ -23,7 +23,7 @@ void main() {
 }
 )";
 
-// Fragment shader - unchanged multiply blend
+// Fragment shader - multiply blend
 static const char* FRAGMENT_SHADER = R"(
 #version 330 core
 in vec2 TexCoord;
@@ -41,13 +41,9 @@ LightOverlay::LightOverlay() = default;
 LightOverlay::~LightOverlay() {
     if (shader_program_ != 0) {
         glDeleteProgram(shader_program_);
+        shader_program_ = 0;
     }
-    if (vao_ != 0) {
-        glDeleteVertexArrays(1, &vao_);
-    }
-    if (vbo_ != 0) {
-        glDeleteBuffers(1, &vbo_);
-    }
+    // RAII handles cleanup for vao_ and vbo_ automatically via DeferredVAOHandle/DeferredVBOHandle
 }
 
 bool LightOverlay::initialize() {
@@ -127,8 +123,6 @@ bool LightOverlay::createShader() {
 
 bool LightOverlay::createQuad() {
     // Unit Quad: 0,0 to 1,1
-    // Used with MVP for positioning
-    // V-coordinate flipped (0->1, 1->0) to match map coordinate system
     float vertices[] = {
         // Position     // TexCoord
         0.0f, 0.0f,     0.0f, 0.0f,  // Top-Left
@@ -140,12 +134,12 @@ bool LightOverlay::createQuad() {
         0.0f, 1.0f,     0.0f, 1.0f   // Bottom-Left
     };
     
-    glGenVertexArrays(1, &vao_);
-    glGenBuffers(1, &vbo_);
+    vao_.create();
+    vbo_.create();
     
-    glBindVertexArray(vao_);
+    glBindVertexArray(vao_.get());
     
-    glBindBuffer(GL_ARRAY_BUFFER, vbo_);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo_.get());
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
     
     // Position attribute
@@ -159,7 +153,7 @@ bool LightOverlay::createQuad() {
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
     
-    return vao_ != 0 && vbo_ != 0;
+    return vao_.isValid() && vbo_.isValid();
 }
 
 void LightOverlay::apply(uint32_t light_texture_id,
@@ -168,14 +162,7 @@ void LightOverlay::apply(uint32_t light_texture_id,
 {
     if (!initialized_ || shader_program_ == 0 || light_texture_id == 0) return;
     
-    // Save current blend state
-    GLboolean blend_enabled;
-    GLint blend_src, blend_dst;
-    glGetBooleanv(GL_BLEND, &blend_enabled);
-    glGetIntegerv(GL_BLEND_SRC_ALPHA, &blend_src);
-    glGetIntegerv(GL_BLEND_DST_ALPHA, &blend_dst);
-    
-    // Enable multiply blend mode
+    // Enable multiply blend mode statelessly without calling glGet* driver queries
     glEnable(GL_BLEND);
     glBlendFunc(GL_DST_COLOR, GL_ZERO);
     
@@ -205,20 +192,14 @@ void LightOverlay::apply(uint32_t light_texture_id,
     }
     
     // Draw quad
-    glBindVertexArray(vao_);
+    glBindVertexArray(vao_.get());
     glDrawArrays(GL_TRIANGLES, 0, 6);
     glBindVertexArray(0);
     
-    // Restore state
+    // Restore state to standard alpha blending
     glBindTexture(GL_TEXTURE_2D, 0);
     glUseProgram(0);
-    
-    if (blend_enabled) {
-        glEnable(GL_BLEND);
-        glBlendFunc(blend_src, blend_dst);
-    } else {
-        glDisable(GL_BLEND);
-    }
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 }
 
 } // namespace Rendering
