@@ -1,4 +1,5 @@
 #include "WeightedSelection.h"
+#include <algorithm>
 #include <numeric>
 
 namespace MapEditor::Brushes {

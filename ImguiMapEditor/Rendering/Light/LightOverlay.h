@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Rendering/Core/GLHandle.h"
 #include <glad/glad.h>
 #include <glm/glm.hpp>
 #include <cstdint>
@@ -28,8 +29,8 @@ private:
     bool createQuad();
 
     uint32_t shader_program_ = 0;
-    uint32_t vao_ = 0;
-    uint32_t vbo_ = 0;
+    DeferredVAOHandle vao_;
+    DeferredVBOHandle vbo_;
     int uniform_texture_ = -1;
     int uniform_mvp_ = -1;
     bool initialized_ = false;

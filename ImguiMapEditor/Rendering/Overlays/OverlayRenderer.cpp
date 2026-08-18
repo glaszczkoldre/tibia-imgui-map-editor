@@ -65,7 +65,6 @@ void OverlayRenderer::render(
   }
 
   draw_list->PopClipRect();
-  draw_list->PopClipRect();
 }
 
 void OverlayRenderer::setLODMode(bool enabled) {

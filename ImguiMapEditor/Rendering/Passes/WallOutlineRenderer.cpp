@@ -173,53 +173,63 @@ void WallOutlineRenderer::collectData(const Domain::ChunkedMap &map,
   if (!client_data_)
     return;
 
-  // Reserve some space
   line_vertices_.reserve(Config::Performance::WALL_VERTICES_RESERVE);
 
-  // Scan all visible tiles for wall items
-  for (int y = start_y; y < end_y; ++y) {
-    for (int x = start_x; x < end_x; ++x) {
+  int range_x = end_x - start_x + 1;
+  int range_y = end_y - start_y + 1;
+  if (range_x <= 0 || range_y <= 0)
+    return;
+
+  // Precompute flat 2D grid of wall flags for visible bounds [start_x..end_x] x [start_y..end_y]
+  // Eliminates O(N*M) pointer chasing and repeated Hash/map lookups during neighbor checks.
+  std::vector<uint8_t> wall_grid(static_cast<size_t>(range_x * range_y), 0);
+
+  for (int y = start_y; y <= end_y; ++y) {
+    int gy = y - start_y;
+    for (int x = start_x; x <= end_x; ++x) {
+      int gx = x - start_x;
       Domain::Position pos(x, y, static_cast<int16_t>(floor_z));
       const Domain::Tile *tile = map.getTile(pos);
       if (!tile)
         continue;
 
-      float screen_x = x * TILE_SIZE - floor_offset;
-      float screen_y = y * TILE_SIZE - floor_offset;
-
-      bool has_wall = false;
-
-      // Check all stacked items on this tile for walls
       for (const auto &item : tile->getItems()) {
         const Domain::ItemType *type =
             client_data_->getItemTypeByServerId(item->getServerId());
         if (type && isWallItem(*type)) {
-          has_wall = true;
+          wall_grid[gy * range_x + gx] = 1;
           break;
         }
       }
+    }
+  }
 
-      // Add yellow lines for wall connections
-      // Only check +X and +Y to avoid duplicates
-      if (has_wall) {
-        float center_x = screen_x + TILE_SIZE / 2.0f;
-        float center_y = screen_y + TILE_SIZE / 2.0f;
+  // Scan flat grid and generate line segments in O(1) time per tile
+  for (int y = start_y; y < end_y; ++y) {
+    int gy = y - start_y;
+    float screen_y = y * TILE_SIZE - floor_offset;
+    float center_y = screen_y + TILE_SIZE / 2.0f;
 
-        // Check neighbor at (x+1, y)
-        if (tileHasWall(map, x + 1, y, floor_z)) {
-          float neighbor_center_x =
-              (x + 1) * TILE_SIZE - floor_offset + TILE_SIZE / 2.0f;
-          addLine(center_x, center_y, neighbor_center_x, center_y, YELLOW_R,
-                  YELLOW_G, YELLOW_B, YELLOW_A);
-        }
+    for (int x = start_x; x < end_x; ++x) {
+      int gx = x - start_x;
+      if (!wall_grid[gy * range_x + gx])
+        continue;
 
-        // Check neighbor at (x, y+1)
-        if (tileHasWall(map, x, y + 1, floor_z)) {
-          float neighbor_center_y =
-              (y + 1) * TILE_SIZE - floor_offset + TILE_SIZE / 2.0f;
-          addLine(center_x, center_y, center_x, neighbor_center_y, YELLOW_R,
-                  YELLOW_G, YELLOW_B, YELLOW_A);
-        }
+      float screen_x = x * TILE_SIZE - floor_offset;
+      float center_x = screen_x + TILE_SIZE / 2.0f;
+
+      // Check neighbor at (x + 1, y) using flat grid
+      if (wall_grid[gy * range_x + (gx + 1)]) {
+        float neighbor_center_x = (x + 1) * TILE_SIZE - floor_offset + TILE_SIZE / 2.0f;
+        addLine(center_x, center_y, neighbor_center_x, center_y, YELLOW_R,
+                YELLOW_G, YELLOW_B, YELLOW_A);
+      }
+
+      // Check neighbor at (x, y + 1) using flat grid
+      if (wall_grid[(gy + 1) * range_x + gx]) {
+        float neighbor_center_y = (y + 1) * TILE_SIZE - floor_offset + TILE_SIZE / 2.0f;
+        addLine(center_x, center_y, center_x, neighbor_center_y, YELLOW_R,
+                YELLOW_G, YELLOW_B, YELLOW_A);
       }
     }
   }

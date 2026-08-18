@@ -7,20 +7,13 @@ namespace Rendering {
 
 LightTexture::LightTexture() = default;
 
-LightTexture::~LightTexture() {
-    if (texture_id_ != 0) {
-        glDeleteTextures(1, &texture_id_);
-        texture_id_ = 0;
-    }
-}
-
 bool LightTexture::initialize() {
     if (initialized_) return true;
     
-    glGenTextures(1, &texture_id_);
-    if (texture_id_ == 0) return false;
+    texture_handle_.create();
+    if (!texture_handle_.isValid()) return false;
     
-    glBindTexture(GL_TEXTURE_2D, texture_id_);
+    glBindTexture(GL_TEXTURE_2D, texture_handle_.get());
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -32,10 +25,10 @@ bool LightTexture::initialize() {
 }
 
 void LightTexture::upload(const std::vector<uint8_t>& buffer, int width, int height) {
-    if (!initialized_ || texture_id_ == 0) return;
+    if (!initialized_ || !texture_handle_.isValid()) return;
     if (buffer.empty() || width <= 0 || height <= 0) return;
     
-    glBindTexture(GL_TEXTURE_2D, texture_id_);
+    glBindTexture(GL_TEXTURE_2D, texture_handle_.get());
 
     if (width == width_ && height == height_) {
         // Optimized path: No reallocation, just update content
